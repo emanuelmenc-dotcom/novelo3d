@@ -11,8 +11,8 @@ const COLOR: Record<B.LoopKind, string> = { initial: "#6b7280", yo: "#c2410c", p
 const BASE_COLOR = "#9ca3af";
 /** Raio da curva do U de uma base: grande o bastante para o fio de uma alça entrar nele e o da base vizinha passar. */
 const BASE_R = 24;
-/** Até onde (abaixo do U da base) descem, abertas, as duas linhas da base vizinha que entraram na curva. */
-const DOWN = 36;
+/** Comprimento horizontal em que as duas linhas de uma base afinam, em ângulo, de 48 px para 12 px de distância. */
+const TAPER = 60;
 /** Espaço entre as alças na agulha; as casas ficam entre as faixas (meia faixa de diferença), longe dos furos. */
 const SLOT = 80;
 const HOOK_Y = 80;
@@ -229,13 +229,11 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
     }
   }
   const stepOf = (b: number): number => 34 + (Math.max(1, pulledPerBase.get(b) ?? 0) - 1) * PITCH;
-  const baseCenters: number[] = [40 + 80 * Math.ceil((stepOf(0) + 4) / 80)];
+  const baseCenters: number[] = [40 + 80 * Math.ceil((stepOf(0) + TAPER + 24) / 80)];
   for (let b = 1; b < nb; b++) {
-    baseCenters.push((baseCenters[b - 1] as number) + 80 * Math.ceil((stepOf(b) + BASE_R + 16) / 80));
+    baseCenters.push((baseCenters[b - 1] as number) + 80 * Math.ceil((stepOf(b) + TAPER + 40) / 80));
   }
   const baseX = (b: number): number => baseCenters[b] as number;
-  /** Onde, dentro do U da base `b`, descem as duas linhas da base vizinha que entraram pela curva. */
-  const turnX = (b: number): number => baseX(b) + BASE_R - 16;
 
   // largura múltipla de 80: as casas da agulha, ancoradas na ponta, ficam sempre a 40 px das faixas
   const width =
@@ -331,8 +329,8 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
   for (const p of legs) byBase.set(p.base as number, [...(byBase.get(p.base as number) ?? []), p]);
   for (const [b, list] of byBase) {
     list.sort((p, q) => p.drop - q.drop || p.id - q.id);
-    // as casas ficam à esquerda do par da base vizinha, a PITCH uma da outra, dentro do interior do U da base
-    for (const [i, p] of list.entries()) p.land = turnX(b) - 22 - (list.length - 1 - i) * PITCH;
+    // as casas ficam do lado da ponta do par da base vizinha (que para em cx + 6), a PITCH uma da outra, dentro do U da base
+    for (const [i, p] of list.entries()) p.land = baseX(b) - 14 - (list.length - 1 - i) * PITCH;
   }
   // Ordem das pistas, de cima para baixo. Regra: quanto mais longe da base a alça cai, mais baixa a pista (sem cruzar dentro
   // da mesma base). Restrição: se a casa de entrada de B fica a menos de PITCH da descida de A, a pista de B é mais baixa
@@ -368,7 +366,7 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
 
   const railY = maxY + 24;
   const baseY = railY + 24 + BASE_R + tracked.length * PITCH;
-  const height = baseY + 76;
+  const height = baseY + 64;
   for (const p of legs) {
     if (p.track < 0) p.land = p.drop;
     if (p.track >= 0) {
@@ -394,7 +392,7 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
   );
   for (let b = 0; b < nb; b++) {
     out.push(
-      `<text x="${f(X(baseX(b)))}" y="${f(baseY + 60)}" font-size="11" text-anchor="middle" fill="#6b7280">base ${b}</text>`,
+      `<text x="${f(X(baseX(b)))}" y="${f(baseY + 48)}" font-size="11" text-anchor="middle" fill="#6b7280">base ${b}</text>`,
     );
   }
 
@@ -441,6 +439,12 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
         const coords = `x1="${f(X(a.x))}" y1="${f(a.y)}" x2="${f(X(b.x))}" y2="${f(b.y)}"`;
         const el = `<line ${attrs} ${coords} stroke="${color}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
         if (!arm) {
+          // o último trecho da perna entra no U da base por cima do braço de trás: o halo corta o braço
+          if (p.base !== undefined && k === line.length - 2) {
+            middle.push(
+              `<line ${coords} stroke="${BG}" stroke-width="${STRAND_W + 7}" stroke-linecap="butt"/>`,
+            );
+          }
           middle.push(el);
           continue;
         }
@@ -476,8 +480,9 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
     `<line data-hook-handle="1" x1="${f(X(10))}" y1="${HOOK_Y}" x2="${f(X(80))}" y2="${HOOK_Y}" stroke="#6b7280" stroke-width="15" stroke-linecap="round"/>`,
     `<path data-hook-tip="1" d="M ${f(X(width - 18))} ${HOOK_Y} L ${f(X(width - 6))} ${HOOK_Y} L ${f(X(width - 12))} ${HOOK_Y + 9}" fill="none" stroke="#374151" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`,
   );
-  // Cada base é um U: a curva (do lado do cabo) liga as duas linhas dela, que vão para o lado da ponta, se aproximam a GAP uma
-  // da outra, entram pela curva da base vizinha e descem abertas lá dentro (a correntinha do topo da série de pontos).
+  // Cada base é um U: a curva (do lado do cabo) liga as duas linhas dela, que vão para o lado da ponta, afinam em ângulo de
+  // 48 px para GAP de distância (sem dobras de 90°), passam POR CIMA da curva da base vizinha (um halo na cor do fundo corta
+  // a curva embaixo delas) e param, abertas, logo dentro dela: a correntinha do topo da série de pontos. Nada desce.
   const baseCurves: string[] = [];
   const baseLines: string[] = [];
   for (let b = 0; b < nb; b++) {
@@ -487,24 +492,21 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
     baseCurves.push(
       `<path data-base-top="${b}" data-cx="${f(X(cx))}" data-cy="${f(baseY)}" data-hx="${f(X((left + right) / 2))}" data-hw="${f((right - left) / 2)}" d="M ${f(X(cx))} ${f(baseY - BASE_R)} A ${BASE_R} ${BASE_R} 0 0 ${mirrored ? 0 : 1} ${f(X(cx))} ${f(baseY + BASE_R)}" fill="none" stroke="${BASE_COLOR}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`,
     );
-    const xt = b > 0 ? turnX(b - 1) : cx - step - 24;
-    const mid: Pos[] = [
-      { x: cx - step, y: baseY },
-      { x: xt, y: baseY },
-      { x: xt, y: baseY + DOWN },
-    ];
+    const end = b > 0 ? baseX(b - 1) + HALF : cx - step - TAPER - 30;
     let seg = 0;
     const put = (a: Pos, z: Pos): void => {
+      const coords = `x1="${f(X(a.x))}" y1="${f(a.y)}" x2="${f(X(z.x))}" y2="${f(z.y)}"`;
       baseLines.push(
-        `<line data-base-line="${b}" data-seg="${seg++}" x1="${f(X(a.x))}" y1="${f(a.y)}" x2="${f(X(z.x))}" y2="${f(z.y)}" stroke="${BASE_COLOR}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`,
+        `<line ${coords} stroke="${BG}" stroke-width="${STRAND_W + 7}" stroke-linecap="butt"/>`,
+        `<line data-base-line="${b}" data-seg="${seg++}" ${coords} stroke="${BASE_COLOR}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`,
       );
     };
-    for (const s of [-1, 1]) {
-      // da ponta da curva até a parte estreita (as duas linhas a GAP uma da outra)
-      put({ x: cx, y: baseY + s * BASE_R }, { x: cx - step, y: baseY + s * BASE_R });
-      put({ x: cx - step, y: baseY + s * BASE_R }, { x: cx - step, y: baseY + s * HALF });
-      const line = offset(mid, -s * HALF);
-      for (let k = 0; k + 1 < line.length; k++) put(line[k] as Pos, line[k + 1] as Pos);
+    for (const sd of [-1, 1]) {
+      const y = baseY + sd * BASE_R;
+      const yIn = baseY + sd * HALF;
+      put({ x: cx, y }, { x: cx - step, y });
+      put({ x: cx - step, y }, { x: cx - step - TAPER, y: yIn });
+      put({ x: cx - step - TAPER, y: yIn }, { x: end, y: yIn });
     }
   }
   out.push(...baseCurves, ...baseLines);

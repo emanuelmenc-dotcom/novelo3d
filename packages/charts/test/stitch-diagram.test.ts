@@ -478,7 +478,7 @@ describe("pernas duplas (U comprido)", () => {
     }
   });
 
-  test("a fileira de bases é uma corrente de U: as duas linhas de cada base entram no U da base vizinha e descem abertas", () => {
+  test("a fileira de bases é uma correntinha: as linhas afinam em ângulo (sem dobras de 90°), passam por cima da curva da vizinha, param dentro dela e nada desce", () => {
     for (const state of states(SEQUENCES.find((q) => q.file === "puff")?.cmds ?? [])) {
       for (const hand of ["right", "left"] as const) {
         const els = elements(stitchDiagramSvg(state, { hand }));
@@ -488,22 +488,54 @@ describe("pernas duplas (U comprido)", () => {
             .map((e) => [Number(e["data-base-top"]), e] as const),
         );
         for (const [k, top] of tops) {
+          const where = `base ${k} ${hand}`;
           const lines = els.filter((e) => e["data-base-line"] === String(k));
-          expect(lines.length, `base ${k} ${hand}`).toBeGreaterThan(0);
-          // as duas linhas descem (verticais, abertas); as de uma base entram no U da base vizinha (a base 0 vira as suas no próprio fim)
-          const down = lines.filter(
-            (e) =>
-              Math.abs(num(e, "x1") - num(e, "x2")) < 0.05 &&
-              Math.abs(num(e, "y2") - (num(top, "data-cy") + 36)) < 0.1,
-          );
-          expect(down.length, `base ${k} ${hand}`).toBe(2);
-          const [d0, d1] = [down[0] as El, down[1] as El];
-          expect(Math.abs(num(d0, "x1") - num(d1, "x1")), `base ${k} ${hand}`).toBeCloseTo(12, 1);
+          expect(lines.length, where).toBe(6);
+          const cy = num(top, "data-cy");
+          // nada desce abaixo do U da base, e não há trecho vertical nem dobra de 90°: cada lado é reta, reta inclinada, reta
+          for (const e of lines) {
+            expect(Math.max(num(e, "y1"), num(e, "y2")), where).toBeLessThanOrEqual(cy + 24.1);
+            expect(Math.abs(num(e, "x1") - num(e, "x2")), where).toBeGreaterThan(1);
+          }
+          expect(
+            lines.filter((e) => Math.abs(num(e, "y1") - num(e, "y2")) > 1).length,
+            `${where} trechos inclinados`,
+          ).toBe(2);
+          // as duas linhas terminam a 12 px uma da outra...
+          const ends = [lines[2] as El, lines[5] as El];
+          expect(Math.abs(num(ends[0] as El, "y2") - num(ends[1] as El, "y2")), where).toBeCloseTo(12, 1);
+          // ...dentro do U da base vizinha (a base 0 não tem vizinha desse lado: só para, aberta)
           const into = tops.get(k - 1);
-          if (into)
-            expect(Math.abs(num(d0, "x1") - num(into, "data-hx")), `base ${k} ${hand}`).toBeLessThan(
-              num(into, "data-hw"),
-            );
+          if (into) {
+            for (const e of ends) {
+              expect(Math.abs(num(e, "x2") - num(into, "data-hx")), where).toBeLessThan(num(into, "data-hw"));
+            }
+          }
+          // por cima da curva vizinha: cada trecho tem, logo antes dele, um halo na cor do fundo com as mesmas pontas
+          for (const e of lines) {
+            const halo = els[els.indexOf(e) - 1] as El;
+            expect(halo.stroke, where).toBe("#faf7ef");
+            for (const key of ["x1", "y1", "x2", "y2"]) expect(halo[key], where).toBe(e[key]);
+          }
+        }
+      }
+    }
+  });
+
+  test("as pernas verdes passam por cima do braço de trás do U da base: o último trecho de cada uma tem um halo, com as mesmas pontas, logo antes", () => {
+    for (const seq of SEQUENCES) {
+      const state = states(seq.cmds).pop() as B.BuilderState;
+      const els = elements(stitchDiagramSvg(state));
+      for (const id of new Set(
+        els.filter((e) => e["data-leg"] !== undefined).map((e) => e["data-leg"] as string),
+      )) {
+        const mine = els.filter((e) => e["data-leg"] === id);
+        const last = Math.max(...mine.map((e) => Number(e["data-seg"])));
+        for (const e of mine.filter((x) => Number(x["data-seg"]) === last && x["data-part"] === undefined)) {
+          const halo = els[els.indexOf(e) - 1] as El;
+          expect(halo.stroke, `${seq.file} perna ${id}`).toBe("#faf7ef");
+          for (const key of ["x1", "y1", "x2", "y2"])
+            expect(halo[key], `${seq.file} perna ${id}`).toBe(e[key]);
         }
       }
     }
@@ -617,7 +649,7 @@ function deepIds(state: B.BuilderState): Set<number> {
 }
 
 // pares sobrepostos nas 300 caminhadas, por categoria (preenchido na primeira execução)
-const COUNTS_WALKS = { deep: 123, cycle: 7 };
+const COUNTS_WALKS = { deep: 122, cycle: 5 };
 
 describe("alça fechada: U de lado (sem elipses)", () => {
   const all = (): B.BuilderState[] => {

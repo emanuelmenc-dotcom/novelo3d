@@ -500,7 +500,13 @@ export function mountView3D(
       else dir.copy(up);
       q4.setFromUnitVectors(up, dir);
       pos.addVectors(pa, pb).multiplyScalar(0.5);
-      sc.set(radius, Math.max(len, 1e-6), radius);
+      // tensão por ponto: o fio engrossa ou afina com o tamanho dos dois pontos que o segmento liga
+      const w =
+        (radius *
+          (((nodes[a] as NodeMeta).scale ?? (nodes[a] as NodeMeta).size ?? 1) +
+            ((nodes[b] as NodeMeta).scale ?? (nodes[b] as NodeMeta).size ?? 1))) /
+        2;
+      sc.set(w, Math.max(len, 1e-6), w);
       im.setMatrixAt(k, m4.compose(pos, q4, sc));
       // ligação dentro da volta em azul; ligação entre voltas (coluna) em vermelho, como a vista padrão do CrochetPARADE
       const sameRow = (nodes[a] as NodeMeta).row === (nodes[b] as NodeMeta).row;
@@ -611,7 +617,7 @@ export function mountView3D(
       // estilo CrochetPARADE: a elipsoide invisível de clique fica sobre o ponto do grafo, onde o fio passa
       const mp = new THREE.Matrix4();
       for (let i = 0; i < n; i++) {
-        const sz = (sizes[i] as number) * 0.8;
+        const sz = (sizes[i] as number) * 1.2;
         const x = p[i * 3] as number;
         const y = p[i * 3 + 1] as number;
         const z = p[i * 3 + 2] as number;

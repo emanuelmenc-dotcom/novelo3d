@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Interruptores de recursos pausados (D-57, 2026-11-13). Os três ficam desligados: o código continua no repositório e
-// testado (os testes ligam o interruptor que precisam), mas some da interface e os comandos recusam. Para retomar um
+// testado nos testes de unidade (que ligam o interruptor de que precisam; os e2e do Render e do Criador ficam pulados e o
+// caminho realista do `view3d` não tem e2e), mas some da interface e os comandos recusam. Para retomar um
 // recurso, ligue o interruptor abaixo; `docs/15` e `docs/16` dizem o que mais conferir.
 //   render        janela Render e comandos `render.*` (render 3D realista, docs/15)
 //   stitchEditor  janela "Criador de pontos" e comandos `stitchEditor.*` (docs/16)

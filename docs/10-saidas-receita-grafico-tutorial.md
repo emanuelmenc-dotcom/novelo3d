@@ -160,7 +160,7 @@ Usa o roteiro de passos descrito em `09-motor-reverso.md`.
 | Ligação cruzada | Clicar em um ponto no 3D destaca o símbolo no gráfico e a linha na receita, e vice-versa |
 | Progresso       | Contador de pontos e de voltas; o ponto em que o usuário parou é salvo no projeto        |
 
-Representação do ponto no 3D: instância de uma malha simples em forma de "V" achatado, orientada pela direção da carreira e pela normal da superfície. Não é necessário simular o fio.
+Representação do ponto no 3D (D-57): o mesmo desenho do 3D de edição, no estilo CrochetPARADE: fio em segmentos ao longo das ligações do grafo, colorido por ponto, com opção "Só linhas". Pontos feitos em cor cheia e por fazer esmaecidos ou ocultos se obtêm pintando os segmentos por estado. Não depende dos modelos realistas de ponto nem do render, que estão pausados.
 
 ## 5. Tabela de verificação
 

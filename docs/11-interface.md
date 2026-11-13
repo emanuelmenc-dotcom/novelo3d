@@ -90,6 +90,8 @@ O usuário não avança do passo 1 para o 2 sem confirmar a transcrição, porqu
 - Tamanho mínimo de alvo de clique: 32 px.
 - Antes de desenhar a interface em M4, propor ao usuário um esboço da tela principal e aguardar aprovação.
 
-## 11. Janela Render (R3b)
+## 11. Janela Render (R3b) — PAUSADA (D-57)
+
+A janela não aparece na interface enquanto o interruptor `render` estiver desligado (`packages/commands/src/features.ts`). A descrição abaixo vale para quando voltar.
 
 Aba "Render" (junto de Materiais, por padrão). Botões Play/Continuar, Pausar, Parar e Salvar PNG; barra de progresso e estado ("renderizando", "pausado", "concluído", "parado", "obsoleto", "erro"); a imagem aparece na própria janela e vai sendo refinada. Ajustes: resolução (720p a 4K ou largura × altura até 4096, confirmados ao sair do campo ou com Enter), qualidade (rápida/fina), amostras de suavização, sombras, luz (direção, altura, intensidade, ambiente), fundo (cor, degradê, transparente) e câmera (copiar a do 3D, seguir o 3D ou enquadramento automático). O trabalho continua mesmo se o usuário trocar de aba. Se a receita mudar durante o render, a rodada fica "obsoleta".

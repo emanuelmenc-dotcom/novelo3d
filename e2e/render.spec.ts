@@ -5,7 +5,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, type Page, test } from "@playwright/test";
 
-// Render pausado (D-57): para retomar, ligue `render` em packages/commands/src/features.ts (e na página, ver docs/15) e remova esta linha.
+// Render pausado (D-57): para retomar, ligue `render` em packages/commands/src/features.ts e remova esta linha.
 test.skip(true, "janela Render pausada (D-57)");
 
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });

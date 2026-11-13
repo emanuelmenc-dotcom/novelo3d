@@ -2,6 +2,10 @@
 
 > Revisado em 2026-11-11. Substitui o roteiro M0–M11 do handoff. Um marco por vez; cada um termina com algo que o usuário abre e avalia. Não iniciar um marco antes de o anterior ser aprovado.
 
+## Estado em 2026-11-13: pausas e próxima etapa
+
+Pausados (D-57, interruptores em `packages/commands/src/features.ts`): série R (render 3D realista, R3b a R3d), R4 (path tracing), 3D realista dos pontos (R1), criador de pontos (B a E, `docs/16`) e Plano D (Electron). A etapa H (fio relaxado) foi encerrada sem sucesso (D-54). **Próxima etapa: P4 (tutorial)**, que só precisa do grafo de pontos e do 3D no estilo CrochetPARADE.
+
 ## Visão geral
 
 | Marco | Entrega                                                                                | Depende de |

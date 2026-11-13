@@ -324,14 +324,15 @@ test("D-57: 3D no estilo CrochetPARADE: fio por ligação, clique acha o ponto e
   const mx = ((xy[pair * 2] as number) + (xy[(pair + 1) * 2] as number)) / 2;
   const my = ((xy[pair * 2 + 1] as number) + (xy[(pair + 1) * 2 + 1] as number)) / 2;
   await page.mouse.click(box.x + mx, box.y + my);
-  // o ponto achado pode ser outro (um de outra volta que cobre o pixel), mas tem de estar ao lado do segmento clicado
-  const hit = (await st())?.selected;
+  // o que está na frente do pixel vence (outro ponto da malha oca pode cobrir o meio do segmento), mas o ponto achado tem
+  // de cobrir o pixel: fica a menos de uma ligação de distância do clique
+  const hit = (await st())?.selected as number;
   expect(hit).not.toBeNull();
-  const near = Math.hypot(
-    (xy[(hit as number) * 2] as number) - mx,
-    (xy[(hit as number) * 2 + 1] as number) - my,
+  const gap = Math.hypot(
+    (xy[pair * 2] as number) - (xy[(pair + 1) * 2] as number),
+    (xy[pair * 2 + 1] as number) - (xy[(pair + 1) * 2 + 1] as number),
   );
-  expect(near).toBeLessThan(60);
+  expect(Math.hypot((xy[hit * 2] as number) - mx, (xy[hit * 2 + 1] as number) - my)).toBeLessThan(gap + 4);
   await page.mouse.click(box.x + (xy[target * 2] as number), box.y + (xy[target * 2 + 1] as number));
   await page.getByTestId("wire-toggle").check();
   expect((await st())?.selected).toBe(target);

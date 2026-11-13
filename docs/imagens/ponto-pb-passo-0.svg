@@ -1,20 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420.0 204.0" width="420.0" height="204.0" font-family="sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420.0 192.0" width="420.0" height="192.0" font-family="sans-serif">
 <rect width="100%" height="100%" fill="#faf7ef"/>
 <text x="12" y="24" font-size="15" fill="#1f2937">pb, passo 0: começo</text>
 <text x="408.0" y="24" font-size="13" text-anchor="end" fill="#4b5563">alças: 1</text>
-<path data-base-top="0" d="M 316.0 146.0 L 330.0 160.0 L 344.0 146.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="330.0" y="184.0" font-size="11" text-anchor="middle" fill="#6b7280">base 0</text>
-<path data-base-top="1" d="M 256.0 146.0 L 270.0 160.0 L 284.0 146.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="270.0" y="184.0" font-size="11" text-anchor="middle" fill="#6b7280">base 1</text>
-<path data-base-top="2" d="M 196.0 146.0 L 210.0 160.0 L 224.0 146.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="210.0" y="184.0" font-size="11" text-anchor="middle" fill="#6b7280">base 2</text>
-<path data-base-top="3" d="M 136.0 146.0 L 150.0 160.0 L 164.0 146.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="150.0" y="184.0" font-size="11" text-anchor="middle" fill="#6b7280">base 3</text>
-<path data-base-top="4" d="M 76.0 146.0 L 90.0 160.0 L 104.0 146.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="90.0" y="184.0" font-size="11" text-anchor="middle" fill="#6b7280">base 4</text>
-<path data-loop="0" data-kind="initial" data-on-hook="1" data-part="back" d="M 30.0 60.0 A 6 20 0 0 1 30.0 100.0" fill="none" stroke="#6b7280" stroke-width="5" stroke-linecap="round"/>
+<text x="330.0" y="178.0" font-size="11" text-anchor="middle" fill="#6b7280">base 0</text>
+<text x="270.0" y="178.0" font-size="11" text-anchor="middle" fill="#6b7280">base 1</text>
+<text x="210.0" y="178.0" font-size="11" text-anchor="middle" fill="#6b7280">base 2</text>
+<text x="150.0" y="178.0" font-size="11" text-anchor="middle" fill="#6b7280">base 3</text>
+<text x="90.0" y="178.0" font-size="11" text-anchor="middle" fill="#6b7280">base 4</text>
+<path data-base-top="0" data-cx="330.0" data-hw="14.0" d="M 316.0 134.0 L 330.0 148.0 L 344.0 134.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-base-top="1" data-cx="270.0" data-hw="14.0" d="M 256.0 134.0 L 270.0 148.0 L 284.0 134.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-base-top="2" data-cx="210.0" data-hw="14.0" d="M 196.0 134.0 L 210.0 148.0 L 224.0 134.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-base-top="3" data-cx="150.0" data-hw="14.0" d="M 136.0 134.0 L 150.0 148.0 L 164.0 134.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-base-top="4" data-cx="90.0" data-hw="14.0" d="M 76.0 134.0 L 90.0 148.0 L 104.0 134.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<path data-loop="0" data-kind="initial" data-on-hook="1" data-part="back" data-cx="30.0" data-cy="80.0" d="M 36.0 80.0 L 36.0 94.0 A 6 6 0 0 1 30.0 100.0" fill="none" stroke="#6b7280" stroke-width="5" stroke-linecap="round"/>
 <line data-hook="1" x1="404.0" y1="80" x2="16.0" y2="80" stroke="#374151" stroke-width="7" stroke-linecap="round"/>
 <line data-hook-handle="1" x1="410.0" y1="80" x2="340.0" y2="80" stroke="#6b7280" stroke-width="15" stroke-linecap="round"/>
 <path data-hook-tip="1" d="M 18.0 80 L 6.0 80 L 12.0 89" fill="none" stroke="#374151" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M 30.0 60.0 A 6 20 0 0 0 30.0 100.0" fill="none" stroke="#faf7ef" stroke-width="10" stroke-linecap="butt"/><path data-loop="0" data-kind="initial" data-on-hook="1" data-part="front" d="M 30.0 60.0 A 6 20 0 0 0 30.0 100.0" fill="none" stroke="#6b7280" stroke-width="5" stroke-linecap="round"/>
+<path d="M 30.0 100.0 A 6 6 0 0 1 24.0 94.0 L 24.0 80.0" fill="none" stroke="#faf7ef" stroke-width="10" stroke-linecap="butt"/><path data-loop="0" data-kind="initial" data-on-hook="1" data-part="front" data-cx="30.0" data-cy="80.0" d="M 30.0 100.0 A 6 6 0 0 1 24.0 94.0 L 24.0 80.0" fill="none" stroke="#6b7280" stroke-width="5" stroke-linecap="round"/>
 </svg>

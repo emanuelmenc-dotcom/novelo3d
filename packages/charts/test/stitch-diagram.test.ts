@@ -55,13 +55,12 @@ interface Hole {
   cy: number;
 }
 
-/** Furos dos anéis fechados: o centro sai do arco das costas ("M x y A ..."), a meia largura é HOLE_RX. */
+/** Furos dos anéis fechados: o centro vem de data-cx/data-cy das costas do anel, a meia largura é HOLE_RX. */
 function holesOf(els: El[]): Map<number, Hole> {
   const out = new Map<number, Hole>();
   for (const e of els) {
     if (e["data-part"] !== "back" || e["data-on-hook"] !== "0") continue;
-    const m = /^M ([\d.-]+) ([\d.-]+)/.exec(e.d ?? "");
-    if (m) out.set(Number(e["data-loop"]), { cx: Number(m[1]) + HOLE_RX, cy: Number(m[2]) });
+    out.set(Number(e["data-loop"]), { cx: Number(e["data-cx"]), cy: Number(e["data-cy"]) });
   }
   return out;
 }
@@ -136,8 +135,7 @@ function checkDiagram(state: B.BuilderState, where: string, hand: Hand = "right"
   // folga: nenhum anel fechado fica sobre um V (só as pernas ligam o anel à base)
   const vCenters = new Map<number, number>();
   for (const e of els) {
-    const m = /^M ([\d.-]+) /.exec(e.d ?? "");
-    if (e["data-base-top"] !== undefined && m) vCenters.set(Number(e["data-base-top"]), Number(m[1]) + 14);
+    if (e["data-base-top"] !== undefined) vCenters.set(Number(e["data-base-top"]), Number(e["data-cx"]));
   }
   for (const [id, h] of holes) {
     for (const [b, x] of vCenters) {
@@ -225,12 +223,10 @@ function geometry(svg: string): {
   const hook = new Map<number, number>();
   const closed = new Map<number, number>();
   for (const e of els) {
-    const m = /^M ([\d.-]+) /.exec(e.d ?? "");
-    if (!m) continue;
-    if (e["data-base-top"] !== undefined) v.set(Number(e["data-base-top"]), Number(m[1]) + 14);
+    if (e["data-base-top"] !== undefined) v.set(Number(e["data-base-top"]), Number(e["data-cx"]));
     else if (e["data-part"] === "back" && e["data-on-hook"] === "1")
-      hook.set(Number(e["data-loop"]), Number(m[1]));
-    else if (e["data-part"] === "back") closed.set(Number(e["data-loop"]), Number(m[1]) + HOLE_RX);
+      hook.set(Number(e["data-loop"]), Number(e["data-cx"]));
+    else if (e["data-part"] === "back") closed.set(Number(e["data-loop"]), Number(e["data-cx"]));
   }
   return { width: Number(/viewBox="0 0 ([\d.]+) /.exec(svg)?.[1]), v, hook, closed };
 }
@@ -333,6 +329,149 @@ describe("mão direita e mão esquerda", () => {
     }
   });
 });
+
+const LEG_GAP = 12;
+
+/** Peças retas das pernas (linhas com data-leg), agrupadas por alça e por peça. */
+function legPieces(svg: string): Map<string, El[]> {
+  const out = new Map<string, El[]>();
+  for (const e of elements(svg)) {
+    if (e.tag !== "line" || e["data-leg"] === undefined) continue;
+    const key = `${e["data-leg"]}:${e["data-seg"]}`;
+    out.set(key, [...(out.get(key) ?? []), e]);
+  }
+  return out;
+}
+
+const num = (e: El, k: string): number => Number(e[k]);
+
+describe("pernas duplas (U comprido)", () => {
+  test("as duas linhas de cada alça puxada são paralelas, a 12 px, em todas as peças e em todos os passos", () => {
+    for (const seq of SEQUENCES) {
+      for (const [step, state] of states(seq.cmds).entries()) {
+        for (const hand of ["right", "left"] as const) {
+          for (const [key, pair] of legPieces(stitchDiagramSvg(state, { hand }))) {
+            const where = `${seq.file} passo ${step} ${hand} peça ${key}`;
+            expect(pair.length, where).toBe(2);
+            const [a, b] = pair as [El, El];
+            const [dx, dy] = [num(a, "x2") - num(a, "x1"), num(a, "y2") - num(a, "y1")];
+            const len = Math.hypot(dx, dy);
+            // paralelas (produto vetorial nulo) e a distância entre as retas
+            expect(
+              Math.abs(dx * (num(b, "y2") - num(b, "y1")) - dy * (num(b, "x2") - num(b, "x1"))) / (len * len),
+              where,
+            ).toBeLessThan(0.01);
+            const dist =
+              Math.abs((num(b, "x1") - num(a, "x1")) * dy - (num(b, "y1") - num(a, "y1")) * dx) / len;
+            expect(dist, where).toBeGreaterThan(LEG_GAP - 0.15);
+            expect(dist, where).toBeLessThan(LEG_GAP + 0.15);
+          }
+        }
+      }
+    }
+  });
+
+  test("sem sobreposição: em todos os prefixos das 9 sequências, nas duas mãos (estrito)", () => {
+    for (const seq of SEQUENCES) {
+      for (const [step, state] of states(seq.cmds).entries()) {
+        for (const hand of ["right", "left"] as const) {
+          expect(legOverlaps(state, hand), `${seq.file} passo ${step} ${hand}`).toEqual([]);
+        }
+      }
+    }
+  });
+
+  test("sem sobreposição nas 300 caminhadas (todos os prefixos), salvo o limite conhecido: 2 bases com 2 ou mais puxadas", () => {
+    for (let seed = 1; seed <= 300; seed++) {
+      for (const state of walk(seed)) {
+        const found = legOverlaps(state, "right");
+        if (found.length === 0) continue;
+        // limite conhecido (docs/16): cada par cai a menos de um passo de onde o outro desce, e nenhuma ordem de pistas resolve
+        expect(pullyBases(state), `semente ${seed}: ${found[0]}`).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
+  test("continuidade: braços saem do U (agulha) ou do fundo do anel e terminam nas pontas da curva; a curva fica no V da sua base", () => {
+    const states_ = [...SEQUENCES.flatMap((q) => states(q.cmds))];
+    for (let seed = 1; seed <= 60; seed++) states_.push(...walk(seed));
+    for (const state of states_) {
+      for (const hand of ["right", "left"] as const) {
+        const svg = stitchDiagramSvg(state, { hand });
+        const els = elements(svg);
+        const where = `${state.cmds.length} cmds ${hand}`;
+        const holes = holesOf(els);
+        const v = new Map(
+          els
+            .filter((e) => e["data-base-top"] !== undefined)
+            .map((e) => [Number(e["data-base-top"]), e] as const),
+        );
+        for (const curve of els.filter((e) => e["data-leg-curve"] !== undefined)) {
+          const id = curve["data-leg-curve"] as string;
+          const pieces = [...legPieces(svg)].filter(([k]) => k.startsWith(`${id}:`));
+          const last = Math.max(...pieces.map(([k]) => Number(k.split(":")[1])));
+          const first = pieces.filter(([k]) => k.endsWith(":0")).flatMap(([, ls]) => ls);
+          const ends = pieces.filter(([k]) => k.endsWith(`:${last}`)).flatMap(([, ls]) => ls);
+          const m = /^M ([\d.-]+) ([\d.-]+) A [\d.]+ [\d.]+ 0 0 [01] ([\d.-]+) ([\d.-]+)/.exec(
+            curve.d ?? "",
+          ) as RegExpExecArray;
+          // as duas últimas peças terminam exatamente nas duas pontas da curva
+          expect(ends.map((e) => `${e.x2},${e.y2}`).sort(), where).toEqual(
+            [`${m[1]},${m[2]}`, `${m[3]},${m[4]}`].sort(),
+          );
+          // as duas primeiras peças começam a ±6 do centro da alça: na agulha (y = 80) ou no fundo do anel (cy + 6)
+          const loop = els.find((e) => e["data-loop"] === id && e["data-part"] !== undefined) as El;
+          const cx = Number(loop["data-cx"]);
+          const hole = holes.get(Number(id));
+          const y0 = hole ? hole.cy + 6 : 80;
+          expect(first.map((e) => `${e.x1},${e.y1}`).sort(), where).toEqual(
+            [`${(cx - 6).toFixed(1)},${y0.toFixed(1)}`, `${(cx + 6).toFixed(1)},${y0.toFixed(1)}`].sort(),
+          );
+          // a curva está dentro do V da sua base
+          const vv = v.get(Number(curve["data-base"])) as El;
+          const mid = (Number(m[1]) + Number(m[3])) / 2;
+          expect(Math.abs(mid - Number(vv["data-cx"])), where).toBeLessThanOrEqual(Number(vv["data-hw"]));
+        }
+      }
+    }
+  });
+});
+
+/** Trechos retos paralelos de alças diferentes que se sobrepõem em menos de 10 px (linhas de alças diferentes). */
+function legOverlaps(state: B.BuilderState, hand: Hand): string[] {
+  const found: string[] = [];
+  const axis = (e: El): "v" | "h" | "d" =>
+    Math.abs(num(e, "x1") - num(e, "x2")) < 0.05
+      ? "v"
+      : Math.abs(num(e, "y1") - num(e, "y2")) < 0.05
+        ? "h"
+        : "d";
+  const lines = [...legPieces(stitchDiagramSvg(state, { hand })).values()].flat();
+  for (const [i, a] of lines.entries()) {
+    for (const b of lines.slice(i + 1)) {
+      if (a["data-leg"] === b["data-leg"] || axis(a) !== axis(b) || axis(a) === "d") continue;
+      const [p, q] = axis(a) === "v" ? ["y", "x"] : ["x", "y"];
+      const span = (e: El): [number, number] => [
+        Math.min(num(e, `${p}1`), num(e, `${p}2`)),
+        Math.max(num(e, `${p}1`), num(e, `${p}2`)),
+      ];
+      const [sa, sb] = [span(a), span(b)];
+      if (Math.min(sa[1], sb[1]) - Math.max(sa[0], sb[0]) <= 1) continue;
+      if (Math.abs(num(a, `${q}1`) - num(b, `${q}1`)) < 10) {
+        found.push(`${a["data-leg"]}:${a["data-seg"]} x ${b["data-leg"]}:${b["data-seg"]}`);
+      }
+    }
+  }
+  return found;
+}
+
+/** Quantas bases têm 2 ou mais alças puxadas (uma por `insert`). */
+function pullyBases(state: B.BuilderState): number {
+  const n = new Map<number, number>();
+  for (const c of state.cmds)
+    if (c.kind === "insert" && c.base !== undefined) n.set(c.base, (n.get(c.base) ?? 0) + 1);
+  return [...n.values()].filter((k) => k >= 2).length;
+}
 
 const describeCmd = (c: B.Cmd): string =>
   c.kind === "yo"

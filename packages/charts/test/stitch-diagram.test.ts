@@ -48,63 +48,148 @@ function elements(svg: string): El[] {
   return out;
 }
 
+const HOLE_RX = 15;
+interface Hole {
+  cx: number;
+  cy: number;
+}
+
+/** Furos dos anéis fechados: o centro sai do arco das costas ("M x y A ..."), a meia largura é HOLE_RX. */
+function holesOf(els: El[]): Map<number, Hole> {
+  const out = new Map<number, Hole>();
+  for (const e of els) {
+    if (e["data-part"] !== "back" || e["data-on-hook"] !== "0") continue;
+    const m = /^M ([\d.-]+) ([\d.-]+)/.exec(e.d ?? "");
+    if (m) out.set(Number(e["data-loop"]), { cx: Number(m[1]) + HOLE_RX, cy: Number(m[2]) });
+  }
+  return out;
+}
+
+/** O segmento atravessa o furo: passa pela altura do centro com x dentro da meia largura. */
+function crosses(e: El, h: Hole): boolean {
+  const [x1, y1, x2, y2] = [Number(e.x1), Number(e.y1), Number(e.x2), Number(e.y2)] as [
+    number,
+    number,
+    number,
+    number,
+  ];
+  if (h.cy < Math.min(y1, y2) - 0.05 || h.cy > Math.max(y1, y2) + 0.05) return false;
+  if (Math.abs(y2 - y1) < 0.05) return Math.min(x1, x2) < h.cx + HOLE_RX && Math.max(x1, x2) > h.cx - HOLE_RX;
+  const t = Math.min(1, Math.max(0, (h.cy - y1) / (y2 - y1)));
+  return Math.abs(x1 + (x2 - x1) * t - h.cx) < HOLE_RX;
+}
+
+/** Todas as invariantes do diagrama de um estado (alças, ligações do fio, pernas, determinismo). */
+function checkDiagram(state: B.BuilderState, where: string): void {
+  const svg = stitchDiagramSvg(state);
+  const els = elements(svg);
+  const at = (pred: (e: El) => boolean): number => els.findIndex(pred);
+
+  // número de alças na agulha = estado
+  const onHook = els.filter((e) => e["data-part"] === "back" && e["data-on-hook"] === "1");
+  expect(onHook.length, where).toBe(state.loops.length);
+  expect(onHook.map((e) => Number(e["data-loop"])).sort((a, b) => a - b)).toEqual(
+    state.loops.map((l) => l.id).sort((a, b) => a - b),
+  );
+
+  const draws = state.events.filter((e) => e.through).map((e) => e.through as number[]);
+  const holes = holesOf(els);
+  draws.forEach((through, j) => {
+    const mine = els.filter((e) => e["data-draw"] === String(j + 1));
+    // as passagens do draw, na ordem do documento, são o `through` do evento
+    expect(
+      mine.filter((e) => e["data-through"] !== undefined).map((e) => Number(e["data-through"])),
+      `${where} draw ${j + 1}`,
+    ).toEqual(through);
+    // o fio do draw atravessa os furos de exatamente as alças atravessadas, e de mais nenhuma
+    const hit = new Set<number>();
+    for (const seg of mine) for (const [id, h] of holes) if (crosses(seg, h)) hit.add(id);
+    expect(
+      [...hit].sort((a, b) => a - b),
+      `${where} furos do draw ${j + 1}`,
+    ).toEqual([...through].sort((a, b) => a - b));
+    // camadas: costas do anel, depois o fio, depois a frente
+    for (const id of through) {
+      const back = at((e) => e["data-loop"] === String(id) && e["data-part"] === "back");
+      const front = at((e) => e["data-loop"] === String(id) && e["data-part"] === "front");
+      const pass = at((e) => e["data-through"] === String(id));
+      expect(pass, `${where} fio em ${id}`).toBeGreaterThan(back);
+      expect(front, `${where} frente ${id}`).toBeGreaterThan(pass);
+    }
+  });
+  // anéis fechados = alças atravessadas por algum draw
+  expect(holes.size, where).toBe(new Set(draws.flat()).size);
+
+  // pernas: cada base usada tem pernas e nenhuma perna atravessa o furo de um anel
+  for (const b of B.basesOf(state.cmds)) {
+    expect(
+      els.some((e) => e["data-leg"] !== undefined && e["data-base"] === String(b)),
+      where,
+    ).toBe(true);
+  }
+  for (const leg of els.filter((e) => e["data-leg"] !== undefined)) {
+    for (const [id, h] of holes)
+      expect(crosses(leg, h), `${where} perna de ${leg["data-leg"]} no anel ${id}`).toBe(false);
+  }
+
+  // determinismo
+  expect(stitchDiagramSvg(state), where).toBe(svg);
+}
+
+/** Caminhada aleatória (semente fixa) pelos comandos que `allowed` aceita; devolve todos os estados do caminho. */
+function walk(seed: number): B.BuilderState[] {
+  let a = seed >>> 0;
+  const rnd = (): number => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const out = [B.start()];
+  const len = 1 + Math.floor(rnd() * 20);
+  for (let i = 0; i < len; i++) {
+    const s = out[out.length - 1] as B.BuilderState;
+    const al = B.allowed(s);
+    const options: B.Cmd[] = [];
+    if (al.yo) options.push(Y);
+    if (al.insert) {
+      const bases = B.basesOf(s.cmds);
+      const last = bases[bases.length - 1];
+      options.push(I(last ?? 0));
+      if (last !== undefined && bases.length < B.MAX_BASES) options.push(I(last + 1));
+    }
+    for (let k = 1; k <= al.drawMax; k++) options.push(D(k));
+    if (al.finish) options.push(F);
+    const pick = options[Math.floor(rnd() * options.length)];
+    if (!pick) break;
+    const r = B.apply(s, pick);
+    if (r.ok) out.push(r.state);
+  }
+  return out;
+}
+
 describe("stitchDiagramSvg: cada prefixo de cada sequência", () => {
   for (const seq of SEQUENCES) {
-    test(`${seq.file}: alças na agulha, passagens do fio, pernas e determinismo`, () => {
+    test(`${seq.file}: alças, ligações do fio, pernas e determinismo`, () => {
       states(seq.cmds).forEach((state, step) => {
-        const svg = stitchDiagramSvg(state);
-        const els = elements(svg);
-        const where = `${seq.file} passo ${step}`;
-        const at = (pred: (e: El) => boolean): number => els.findIndex(pred);
-
-        // número de alças na agulha = estado
-        const onHook = els.filter((e) => e["data-part"] === "back" && e["data-on-hook"] === "1");
-        expect(onHook.length, where).toBe(state.loops.length);
-        expect(onHook.map((e) => Number(e["data-loop"])).sort((a, b) => a - b)).toEqual(
-          state.loops.map((l) => l.id).sort((a, b) => a - b),
-        );
-
-        // cada draw: o fio passa por todas as atravessadas, entre as costas e a frente do anel
-        const draws = state.events.filter((e) => e.through).map((e) => e.through as number[]);
-        for (const through of draws) {
-          for (const id of through) {
-            const back = at((e) => e["data-loop"] === String(id) && e["data-part"] === "back");
-            const front = at((e) => e["data-loop"] === String(id) && e["data-part"] === "front");
-            const pass = at((e) => e["data-through"] === String(id));
-            expect(back, `${where} anel ${id}`).toBeGreaterThanOrEqual(0);
-            expect(pass, `${where} fio em ${id}`).toBeGreaterThan(back);
-            expect(front, `${where} frente ${id}`).toBeGreaterThan(pass);
-          }
-        }
-        // as passagens, agrupadas por fio, repetem os `through` dos eventos na mesma ordem
-        const byStrand = new Map<string, number[]>();
-        for (const e of els) {
-          const s = e["data-strand"];
-          if (s !== undefined && e["data-through"] !== undefined) {
-            byStrand.set(s, [...(byStrand.get(s) ?? []), Number(e["data-through"])]);
-          }
-        }
-        expect([...byStrand.values()], where).toEqual(draws);
-
-        // anéis fechados = alças atravessadas por algum draw
-        const gone = new Set(draws.flat());
-        expect(els.filter((e) => e["data-part"] === "back" && e["data-on-hook"] === "0").length, where).toBe(
-          gone.size,
-        );
-
-        // cada base usada tem pernas
-        for (const b of B.basesOf(state.cmds)) {
-          expect(
-            els.some((e) => e["data-leg"] !== undefined && e["data-base"] === String(b)),
-            where,
-          ).toBe(true);
-        }
-
-        // determinismo
-        expect(stitchDiagramSvg(state), where).toBe(svg);
+        checkDiagram(state, `${seq.file} passo ${step}`);
       });
     });
   }
+
+  test("sequências aleatórias com semente (300 caminhadas): as mesmas invariantes", () => {
+    for (let seed = 1; seed <= 300; seed++) {
+      walk(seed).forEach((state, step) => {
+        checkDiagram(state, `semente ${seed} passo ${step}`);
+      });
+    }
+  });
+
+  test("um laço que é o de cima de dois draws seguidos (yo, yo, draw 1, draw 1) passa pelos dois furos", () => {
+    const s = states([Y, Y, D(1), D(1)]).pop() as B.BuilderState;
+    checkDiagram(s, "yo yo d1 d1");
+  });
 
   test("a legenda é escapada e as bases extras entram", () => {
     const svg = stitchDiagramSvg(B.start(), { caption: "a <b> & c", bases: 7 });

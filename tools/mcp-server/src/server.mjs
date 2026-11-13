@@ -115,4 +115,4 @@ server.registerTool(
 );
 
 await server.connect(new StdioServerTransport());
-log(`pronto (ponte ${bridgeUp ? "em 127.0.0.1:" + bridge.port : "indisponível"})`);
+log(`pronto (ponte ${bridgeUp ? `em 127.0.0.1:${bridge.port}` : "indisponível"})`);

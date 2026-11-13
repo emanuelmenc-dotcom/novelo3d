@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Analisador tolerante de receitas (docs/07 seção 2): dicionário por dialeto + descida recursiva.
-import type { Dialect, Issue, Op, Pattern, Row } from "@novelo/core";
+import { type Dialect, expandPattern, type Issue, type Op, type Pattern, type Row } from "@novelo/core";
 import { FILLER, NUMBER_WORDS, PHRASES, WORDS } from "./dictionary.ts";
 
 export interface ParseOptions {
@@ -23,6 +23,10 @@ export function detectDialect(text: string): Dialect | undefined {
   if (/\b(pb|pbx|aum|dim|corr|mpa|pad)\b|\bpb\d|ponto (baixo|alto)|anel magico/.test(t)) return "pt-BR";
   if (/\bsc\b|\bsc\d|\bslst\b|sl st|single crochet/.test(t)) return "en-US";
   if (/\b(htr|dtr|miss)\b|dcinc|dc\d*tog|half treble|double treble/.test(t)) return "en-UK";
+  // XVA por último: linhas "R3: 8 (X, V)" só com letras do XVA, números e parênteses
+  const xvaLine =
+    /^\s*r\d+(?:\s*[-–]\s*r?\d+)?\s*:\s*(?:[\d\s(),]|xv|xw|xa|mr(?:\[\d+\])?|ch|sl|[xvwatfek])+\s*$/;
+  if (t.split(/\r?\n/).some((l) => xvaLine.test(l))) return "xva";
   return undefined;
 }
 
@@ -61,7 +65,7 @@ function prep(raw: string): string {
 const TOKEN = /\d*[a-z]+\d*[a-z]*\d*|\d+|@[a-z]+|[()[\]*,;×–—-]/g;
 
 const LABEL =
-  /^\s*(?:(v|volta|r|rnd|round|c|carr|carreira|row)\.?\s*)?(\d+)(?:\s*(?:-|–|—|a|to)\s*(\d+))?\s*[:.)]\s*/i;
+  /^\s*(?:(v|volta|r|rnd|round|c|carr|carreira|row)\.?\s*)?(\d+)(?:\s*(?:-|–|—|a|to)\s*(?:(?:v|volta|r|rnd|round|c|carr|carreira|row)\.?\s*)?(\d+))?\s*[:.)]\s*/i;
 const TOTAL_PAREN = /\s*[([]\s*(\d+)\s*(?:sts?|stitches|pts?|pontos?|pb|sc)?\s*[)\]]\s*\.?\s*$/i;
 const TOTAL_DASH = /\s*[-–—=]\s*(\d+)\s*(?:sts?|stitches|pts?|pontos?)?\s*\.?\s*$/i;
 
@@ -91,7 +95,7 @@ function interpret(chunk: string, dialect: Dialect) {
   }
   if (d1 !== undefined || d2 !== undefined) return null;
   if (!term) return null;
-  return { count, term, k: 2 };
+  return { count, term, k: term.k === "inc" || term.k === "dec" ? (term.n ?? 2) : 2 };
 }
 
 function parseLine(body: string, dialect: Dialect, issues: Issue[], row: number, label: string) {
@@ -104,24 +108,26 @@ function parseLine(body: string, dialect: Dialect, issues: Issue[], row: number,
     if (ctx.toks[j] === "rep" || ctx.toks[j] === "repeat" || ctx.toks[j] === "repetir") j++;
     const t = ctx.toks[j];
     const next = ctx.toks[j + 1];
-    const m1 = t ? /^x(\d+)$/.exec(t) : null;
+    // em XVA o "x" é o ponto baixo, não um sinal de vezes: "(X, V) 3X" é um grupo e 3 pb
+    const xTimes = dialect !== "xva";
+    const m1 = t && xTimes ? /^x(\d+)$/.exec(t) : null;
     if (m1) {
       ctx.i = j + 1;
       return Number(m1[1]);
     }
-    const m2 = t ? /^(\d+)x$/.exec(t) : null;
+    const m2 = t && xTimes ? /^(\d+)x$/.exec(t) : null;
     if (m2) {
       ctx.i = j + 1;
       return Number(m2[1]);
     }
-    if ((t === "x" || t === "×") && next && /^\d+$/.test(next)) {
+    if (xTimes && (t === "x" || t === "×") && next && /^\d+$/.test(next)) {
       ctx.i = j + 2;
       return Number(next);
     }
     if (
       t &&
       /^\d+$/.test(t) &&
-      (next === "times" || next === "vezes" || next === "vez" || next === "x" || next === "×")
+      (next === "times" || next === "vezes" || next === "vez" || (xTimes && (next === "x" || next === "×")))
     ) {
       ctx.i = j + 2;
       return Number(t);
@@ -171,7 +177,8 @@ function parseLine(body: string, dialect: Dialect, issues: Issue[], row: number,
         return;
       }
     }
-    if (FILLER.has(t)) {
+    // em XVA "a" (diminuição) e "e" (pad) são pontos, não as palavras de ligação
+    if (FILLER.has(t) && !(dialect === "xva" && (t === "a" || t === "e"))) {
       ctx.i++;
       return;
     }
@@ -211,6 +218,18 @@ function parseLine(body: string, dialect: Dialect, issues: Issue[], row: number,
       }
       if (t === "," || t === ";") {
         ctx.i++;
+        continue;
+      }
+      // repetição com o número na frente: "6 (3x, v)" (antes era sempre erro)
+      const after = ctx.toks[ctx.i + 1];
+      if (/^\d+$/.test(t) && (after === "(" || after === "[")) {
+        const times = Number(t);
+        ctx.i += 2;
+        const want = after === "(" ? ")" : "]";
+        const inner = parseOps(want);
+        if (ctx.toks[ctx.i] === want) ctx.i++;
+        else bad("UNPARSED_TEXT", `Volta ${label}: falta fechar '${after}'.`);
+        pushRepeat(ops, inner, times);
         continue;
       }
       if (t === "(" || t === "[") {
@@ -255,6 +274,7 @@ export function parsePattern(text: string, options: ParseOptions = {}): ParseRes
 
   const rows: Row[] = [];
   let nextNumber = 1;
+  let pendingRing: { n: number | undefined; at: number } | undefined;
   for (const raw of text.split(/\r?\n/)) {
     let line = raw.trim();
     if (line === "" || line.startsWith("#") || line.startsWith("//")) continue;
@@ -273,6 +293,14 @@ export function parsePattern(text: string, options: ParseOptions = {}): ParseRes
     } else {
       nextNumber += 1;
     }
+    // XVA: "R0: MR" ou "R0: MR[N]" é só o anel mágico; vira o começo da linha seguinte (sem linha vazia)
+    const ring =
+      dialect === "xva" && label === "0" ? /^mr\s*(?:\[\s*(\d+)\s*\])?\s*$/i.exec(line.trim()) : null;
+    if (ring) {
+      pendingRing = { n: ring[1] === undefined ? undefined : Number(ring[1]), at: rows.length };
+      nextNumber = 1;
+      continue;
+    }
     let declared: number | undefined;
     const tm = TOTAL_PAREN.exec(line) ?? TOTAL_DASH.exec(line);
     if (tm) {
@@ -283,9 +311,27 @@ export function parsePattern(text: string, options: ParseOptions = {}): ParseRes
     const { ops, start } = parseLine(instruction, dialect, issues, rows.length, label);
     const row: Row = { label, kind, ops, sourceText: instruction };
     if (start) row.start = start;
+    else if (pendingRing && pendingRing.at === rows.length) row.start = "magicRing";
     if (repeat > 1) row.repeatRows = repeat;
     if (declared !== undefined) row.declaredCount = declared;
     rows.push(row);
   }
-  return { pattern: { dialect, rows }, issues, detected };
+  // XVA sem "R0: MR": a primeira volta nasce de um anel mágico, a não ser que comece por corrente
+  const first = rows[0];
+  if (dialect === "xva" && first && !first.start) {
+    const op0 = first.ops[0];
+    if (!(op0 && op0.kind === "stitch" && op0.code === "CH")) first.start = "magicRing";
+  }
+  const pattern: Pattern = { dialect, rows };
+  if (pendingRing?.n !== undefined && rows[pendingRing.at]) {
+    const produced = expandPattern(pattern)[pendingRing.at]?.produced;
+    if (produced !== undefined && produced !== pendingRing.n)
+      issues.push({
+        code: "RING_COUNT_MISMATCH",
+        severity: "warning",
+        message: `MR[${pendingRing.n}] não bate com os ${produced} pontos da primeira volta.`,
+        row: pendingRing.at,
+      });
+  }
+  return { pattern, issues, detected };
 }

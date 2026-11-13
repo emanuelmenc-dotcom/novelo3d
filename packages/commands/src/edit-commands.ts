@@ -63,7 +63,7 @@ import { partsRedoTick, partsUndoTick, redoParts, undoParts } from "./parts-stor
 type Params = Record<string, unknown>;
 type Cmd = (p: Params) => unknown;
 
-const DIALECTS = ["pt-BR", "en-US", "en-UK"];
+const DIALECTS = ["pt-BR", "en-US", "en-UK", "xva"];
 const num = (p: Params, k: string): number => {
   const v = p[k];
   if (typeof v !== "number" || !Number.isFinite(v)) throw new Error(`parâmetro '${k}' deve ser número`);

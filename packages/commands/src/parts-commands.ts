@@ -34,7 +34,7 @@ import { getSettings } from "./settings.ts";
 type Params = Record<string, unknown>;
 type Cmd = (p: Params) => unknown;
 
-const DIALECTS = ["pt-BR", "en-US", "en-UK"];
+const DIALECTS = ["pt-BR", "en-US", "en-UK", "xva"];
 const dialectOf = (v: unknown): Dialect | undefined =>
   typeof v === "string" && DIALECTS.includes(v) ? (v as Dialect) : undefined;
 

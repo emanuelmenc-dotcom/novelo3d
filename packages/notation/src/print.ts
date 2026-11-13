@@ -67,6 +67,10 @@ function names(key: string, d: Dialect): { name: string; plain: boolean } {
   if (key === "CH0") return { name: pt ? "corr (não conta)" : "ch (does not count)", plain: false };
   if (key === "SL0" || key === "SL") return { name: N.SL, plain: false };
   const inc = /^INC(\d+)$/.exec(key);
+  if (inc && d === "xva") {
+    const k = inc[1];
+    return { name: k === "2" ? "v" : k === "3" ? "w" : `x${k}inc`, plain: false };
+  }
   if (inc) return { name: inc[1] === "2" ? N.INC : `${N.INC}${inc[1]}`, plain: false };
   const dec = /^DEC(\d+)$/.exec(key);
   if (dec) {
@@ -78,12 +82,20 @@ function names(key: string, d: Dialect): { name: string; plain: boolean } {
 
 function runText(key: string, count: number, d: Dialect): string {
   const { name, plain } = names(key, d);
-  return plain ? name : `${count} ${name}`;
+  if (plain) return name;
+  // XVA: contagem colada na letra (6x, 3v); termos em inglês ficam separados (2 ch)
+  return d === "xva" && /^[a-z]$|^x\d/.test(name) ? `${count}${name}` : `${count} ${name}`;
 }
 
 export function segText(segs: Seg[], d: Dialect): string {
   return segs
-    .map((s) => (s.t === "run" ? runText(s.key, s.count, d) : `(${segText(runs(s.keys), d)}) x${s.times}`))
+    .map((s) =>
+      s.t === "run"
+        ? runText(s.key, s.count, d)
+        : d === "xva"
+          ? `${s.times} (${segText(runs(s.keys), d)})`
+          : `(${segText(runs(s.keys), d)}) x${s.times}`,
+    )
     .join(", ");
 }
 
@@ -91,11 +103,12 @@ export function rowBody(e: ExpandedRow, d: Dialect): string {
   const pt = d === "pt-BR";
   const keys = e.atoms.map(atomKey);
   const allSc = keys.length > 0 && keys.every((k) => k === "SC");
+  if (e.row.start === "magicRing" && d === "xva") return segText(foldKeys(keys), d);
   if (e.row.start === "magicRing") {
     const tail = pt ? "no anel mágico" : "in magic ring";
     return `${segText(foldKeys(keys), d)} ${tail}`;
   }
-  if (allSc && keys.length === e.prevCounted && e.prevCounted > 0) {
+  if (d !== "xva" && allSc && keys.length === e.prevCounted && e.prevCounted > 0) {
     return `1 ${NAMES[d].SC} ${pt ? "em cada ponto" : "in each st"}`;
   }
   return segText(foldKeys(keys), d);
@@ -105,6 +118,7 @@ export const PREFIX: Record<Dialect, { round: string; row: string }> = {
   "pt-BR": { round: "V", row: "C" },
   "en-US": { round: "Rnd ", row: "Row " },
   "en-UK": { round: "Round ", row: "Row " },
+  xva: { round: "R", row: "R" },
 };
 
 /** Escreve a receita no dialeto pedido a partir da forma canônica. */
@@ -124,6 +138,7 @@ export function printPattern(pattern: Pattern, dialect: Dialect = pattern.dialec
     const label = m.reps > 1 ? `${n}–${n + m.reps - 1}` : String(n);
     n += m.reps;
     const pre = PREFIX[dialect][m.e.row.kind];
+    if (dialect === "xva" && m.e.row.start === "magicRing") lines.push("R0: MR");
     lines.push(`${pre}${label}: ${rowBody(m.e, dialect)} (${m.e.produced})`);
   }
   return lines.join("\n");

@@ -74,10 +74,11 @@ function postStrands(wraps: number): ModelStrand[] {
   ];
 }
 
-const names = (pt: string, us: string, uk: string): Record<Dialect, string[]> => ({
+const names = (pt: string, us: string, uk: string, xva: string): Record<Dialect, string[]> => ({
   "pt-BR": [pt],
   "en-US": [us],
   "en-UK": [uk],
+  xva: [xva],
 });
 
 /** Tipos embutidos, na ordem dos índices do armazém: RING, CH, SL, SC, HDC, DC, TR. */
@@ -87,7 +88,7 @@ export const STITCH_TYPES: StitchTypeDef[] = [
     version: 1,
     builtin: true,
     lengthFactor: 0,
-    names: names("anel", "ring", "ring"),
+    names: names("anel", "ring", "ring", "mr"),
     model: { gen: "ring", wraps: 0 },
   },
   {
@@ -95,7 +96,7 @@ export const STITCH_TYPES: StitchTypeDef[] = [
     version: 1,
     builtin: true,
     lengthFactor: 0.8,
-    names: names("corr", "ch", "ch"),
+    names: names("corr", "ch", "ch", "ch"),
     model: { gen: "loop", wraps: 0 },
   },
   {
@@ -103,7 +104,7 @@ export const STITCH_TYPES: StitchTypeDef[] = [
     version: 1,
     builtin: true,
     lengthFactor: 0.4,
-    names: names("pbx", "sl st", "sl st"),
+    names: names("pbx", "sl st", "sl st", "sl"),
     model: { gen: "post", wraps: 0 },
   },
   {
@@ -111,7 +112,7 @@ export const STITCH_TYPES: StitchTypeDef[] = [
     version: 1,
     builtin: true,
     lengthFactor: 1,
-    names: names("pb", "sc", "dc"),
+    names: names("pb", "sc", "dc", "x"),
     model: { gen: "post", wraps: 0, strands: postStrands(0) },
   },
   {
@@ -119,7 +120,7 @@ export const STITCH_TYPES: StitchTypeDef[] = [
     version: 1,
     builtin: true,
     lengthFactor: 1.33,
-    names: names("mpa", "hdc", "htr"),
+    names: names("mpa", "hdc", "htr", "t"),
     model: { gen: "post", wraps: 1, strands: postStrands(1) },
   },
   {
@@ -127,7 +128,7 @@ export const STITCH_TYPES: StitchTypeDef[] = [
     version: 1,
     builtin: true,
     lengthFactor: 2,
-    names: names("pa", "dc", "tr"),
+    names: names("pa", "dc", "tr", "f"),
     model: { gen: "post", wraps: 2, strands: postStrands(2) },
   },
   {
@@ -135,7 +136,7 @@ export const STITCH_TYPES: StitchTypeDef[] = [
     version: 1,
     builtin: true,
     lengthFactor: 3,
-    names: names("pad", "tr", "dtr"),
+    names: names("pad", "tr", "dtr", "e"),
     model: { gen: "post", wraps: 3, strands: postStrands(3) },
   },
 ];

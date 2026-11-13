@@ -12,7 +12,8 @@ export interface Issue {
 export type Result<T> = { ok: true; value: T; issues: Issue[] } | { ok: false; issues: Issue[] };
 
 export type StitchCode = "CH" | "SL" | "SC" | "HDC" | "DC" | "TR";
-export type Dialect = "pt-BR" | "en-US" | "en-UK";
+/** `xva`: notação de letras (X pb, V aumento, A diminuição, T mpa, F pa, E pad), mistura com os termos de en-US. */
+export type Dialect = "pt-BR" | "en-US" | "en-UK" | "xva";
 /** Número de pontos, ou "rest": todos os topos contados que ainda restam na volta anterior. */
 export type Count = number | "rest";
 

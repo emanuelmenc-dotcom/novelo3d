@@ -76,3 +76,17 @@ test("P1: fluxo completo na tela única e comandos via MCP", async ({ page }) =>
     await client.close();
   }
 });
+
+test("XVA: escolher o dialeto XVA na tela e a receita de letras fecha (detecção automática também)", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const receita = page.getByLabel("Receita", { exact: true });
+  await receita.fill(
+    ["R0: MR", "R1: 6X", "R2: 6V", "R3: 6 (X, V)", "R4: 18X", "R5: 6 (X, A)", "R6: 6A"].join("\n"),
+  );
+  await page.getByLabel("Dialeto").selectOption("xva");
+  await expect(page.getByTestId("verify-summary")).toContainText("Receita fecha");
+  await page.getByLabel("Dialeto").selectOption("auto");
+  await expect(page.getByTestId("verify-summary")).toContainText("Receita fecha");
+});

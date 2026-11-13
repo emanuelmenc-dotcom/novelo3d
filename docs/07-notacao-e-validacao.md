@@ -155,3 +155,27 @@ Subconjunto da linguagem do CrochetPARADE que o pacote `interop` lê e escreve:
 | `#` comentário                | `note`                 |
 
 Rótulos, pontos de fixação (`@`), definições (`DEF:`) e diretivas `DOT:` ficam fora do subconjunto; na importação geram aviso `UNSUPPORTED_CP_FEATURE`. A sintaxe exata deve ser conferida no manual do CrochetPARADE antes de implementar, porque este resumo foi tirado de exemplos do repositório.
+
+## 7. Dialeto XVA (2026-11-13)
+
+Convenção de letras usada por outras ferramentas de amigurumi (a documentação do Knotly não tem licença: só a convenção foi usada; parser, tabela e testes são próprios). Id `xva` em `Dialect`; mistura com os termos de en-US.
+
+| Canônico        | XVA                     |
+| --------------- | ----------------------- |
+| `SC`            | `X`                     |
+| `HDC`           | `T`                     |
+| `DC`            | `F`                     |
+| `TR`            | `E`                     |
+| aumento de 2    | `V` ou `XV`             |
+| aumento de 3    | `W` ou `XW`             |
+| diminuição de 2 | `A` ou `XA`             |
+| pular           | `K`                     |
+| corrente, pbx   | `CH`, `SL`              |
+| anel mágico     | `R0: MR` ou `R0: MR[N]` |
+
+- **R0:** a linha `R0: MR` não vira volta; marca a R1 com anel mágico. `MR[N]` que não bate com os pontos da R1 gera o aviso `RING_COUNT_MISMATCH`. Sem R0, a primeira volta nasce de um anel, a não ser que comece por corrente.
+- **Repetição:** `6 (3X, V)` (número na frente; vale também nos outros dialetos) e o intervalo `R7-R15: 42X` (rótulo repetido no segundo número; vale em todos).
+- **O "x" não é sinal de vezes em XVA:** `(X, V) 3X` é o grupo mais 3 pb. As letras `a` e `e` não são palavras de ligação.
+- **Escrita:** `R0: MR` no começo, `6X`, `6 (X, V)`, aumento de 3 como `W`.
+- **Fora do escopo** (viram erro `UNKNOWN_TERM`): Q, puff, bobble, pipoca; aumentos e diminuições que não são de pb (TV, FV, EV, TW, FW, EW, TA, FA, pois `Op` só tem pb nesses casos); posições `Sn`; partes `Pn`; costura; carreiras de ida e volta.
+- **Detecção automática:** por último, depois de pt-BR, en-US e en-UK, e só com linhas `R<n>:` formadas só por letras XVA, números e parênteses.

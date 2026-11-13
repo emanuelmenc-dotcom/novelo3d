@@ -285,12 +285,12 @@ const str = (p: Params, k: string): string => {
   return v;
 };
 
-const DIALECTS: Dialect[] = ["pt-BR", "en-US", "en-UK"];
+const DIALECTS: Dialect[] = ["pt-BR", "en-US", "en-UK", "xva"];
 function dialectOf(p: Params, k = "dialect"): Dialect | undefined {
   const v = p[k];
   if (v === undefined || v === null || v === "" || v === "auto") return undefined;
   if (typeof v === "string" && (DIALECTS as string[]).includes(v)) return v as Dialect;
-  throw new Error(`dialeto '${String(v)}' inválido (use pt-BR, en-US, en-UK ou auto)`);
+  throw new Error(`dialeto '${String(v)}' inválido (use pt-BR, en-US, en-UK, xva ou auto)`);
 }
 
 function read(p: Params): { pattern: Pattern; issues: Issue[]; detected: Dialect | undefined } {

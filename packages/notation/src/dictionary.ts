@@ -4,8 +4,8 @@ import type { Dialect, StitchCode } from "@novelo/core";
 
 export type Term =
   | { k: "stitch"; code: StitchCode }
-  | { k: "inc" }
-  | { k: "dec" }
+  | { k: "inc"; n?: number }
+  | { k: "dec"; n?: number }
   | { k: "skip" }
   | { k: "ring" };
 
@@ -58,6 +58,23 @@ export const WORDS: Record<Dialect, Record<string, Term>> = {
     skip: { k: "skip" },
     mr: { k: "ring" },
   },
+  xva: {},
+};
+
+/** XVA: letras (X pb, V aumento, A diminuição, W aumento de 3, T mpa, F pa, E pad, K pular) mais os termos de en-US. */
+WORDS.xva = {
+  ...WORDS["en-US"],
+  x: stitch("SC"),
+  t: stitch("HDC"),
+  f: stitch("DC"),
+  e: stitch("TR"),
+  v: { k: "inc" },
+  xv: { k: "inc" },
+  w: { k: "inc", n: 3 },
+  xw: { k: "inc", n: 3 },
+  a: { k: "dec" },
+  xa: { k: "dec" },
+  k: { k: "skip" },
 };
 
 /** Nomes usados ao escrever. */
@@ -83,6 +100,17 @@ export const NAMES: Record<Dialect, Record<StitchCode | "INC" | "DEC" | "SKIP", 
     INC: "inc",
     DEC: "dec",
     SKIP: "sk",
+  },
+  xva: {
+    CH: "ch",
+    SL: "sl",
+    SC: "x",
+    HDC: "t",
+    DC: "f",
+    TR: "e",
+    INC: "v",
+    DEC: "a",
+    SKIP: "k",
   },
   "en-UK": {
     CH: "ch",

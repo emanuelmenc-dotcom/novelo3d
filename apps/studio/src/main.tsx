@@ -139,7 +139,7 @@ function readJson(key: string): unknown {
   const d = legacy.dialect;
   loadParts(readJson(PARTS_KEY), {
     text: typeof legacy.text === "string" ? legacy.text : EXEMPLO,
-    ...(d === "pt-BR" || d === "en-US" || d === "en-UK" ? { dialect: d } : {}),
+    ...(d === "pt-BR" || d === "en-US" || d === "en-UK" || d === "xva" ? { dialect: d } : {}),
   });
   const root = rootOf(partsSnapshot().active).id;
   loadPaintAll(readJson(PROJECT_KEY), root);
@@ -457,6 +457,7 @@ function App() {
               <option value="pt-BR">pt-BR</option>
               <option value="en-US">en-US</option>
               <option value="en-UK">en-UK</option>
+              <option value="xva">XVA (X V A T F E)</option>
             </select>
           </label>
           <label>

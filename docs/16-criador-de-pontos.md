@@ -15,19 +15,21 @@ Plano do advisor Opus, 2026-11-13. Chamado "criador B–E" nos documentos e rela
 - `allowed(estado)` devolve os comandos habilitados.
 - Sequências (derivação do advisor; escrever o modelo e esta tabela aqui antes de codar e mandar para revisão):
 
-| Ponto            | Sequência                                                 |
-| ---------------- | --------------------------------------------------------- |
-| corrente         | yo, draw 1                                                |
-| pbx (baixíssimo) | insert, draw 1                                            |
-| pb               | insert, yo, draw 2                                        |
-| mpa              | yo, insert, yo, draw 3                                    |
-| pa               | yo, insert, (yo, draw 2) ×2                               |
-| pad              | yo, yo, insert, (yo, draw 2) ×3                           |
-| pb2juntos        | insert a, insert b, yo, draw 3                            |
-| pipoca/puff      | yo e insert repetidos na mesma base, depois draw de todas |
+| Ponto                        | Sequência                                                                                          |
+| ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| corrente                     | yo, draw 1                                                                                         |
+| pbx (baixíssimo)             | insert, draw 1                                                                                     |
+| pb                           | insert, yo, draw 2                                                                                 |
+| mpa                          | yo, insert, yo, draw 3                                                                             |
+| pa                           | yo, insert, (yo, draw 2) ×2                                                                        |
+| pad                          | yo, yo, insert, (yo, draw 2) ×3                                                                    |
+| pb2juntos                    | insert a, insert b, yo, draw 3                                                                     |
+| puff (mpa ×4 na mesma base)  | repetir (yo, insert) 4 vezes, cada uma sem fechar (deixa 2 alças), depois yo, draw de todas        |
+| bobble (pa ×4 na mesma base) | repetir (yo, insert, yo, draw 2) 4 vezes, cada uma deixando 1 alça extra, depois yo, draw de todas |
 
 - Antes de codar: ler os campos que `registry.ts` realmente tem para pernas e altura e derivar a saída do ponto desses campos, sem inventar campos novos.
 - Teste 1: cada linha da tabela produz as pernas e a altura do registro.
+- Oráculo de consumo (inspirado na tabela da documentação do Knotly, só a convenção): corrente 0 → 1; pontos básicos 1 → 1; aumento 1 → 2 (dois pontos terminados na mesma base); pb2juntos 2 → 1; pular 1 → 0. Cada sequência deve produzir o consumo e a produção certos.
 - Teste 2: passos inválidos são recusados (`finish` com 2 alças, `draw(k ≥ alças)`, `insert` sem base escolhida).
 - Fora do escopo: pipoca com alça solta, tunisiano, broomstick/hairpin, costura.
 

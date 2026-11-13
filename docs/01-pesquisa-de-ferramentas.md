@@ -160,6 +160,17 @@ Detalhes e links no documento `02-referencias-tecnicas.md`.
 5. Receita importada que vira geometria editável, e não só visualização.
 6. Receita em português do Brasil, com conversão entre termos BR, US e UK.
 
+## 8.1 Calculadoras e geradores de amigurumi (2026-11-13)
+
+Busca por "amigurumi crochet calculator tools". Veredito do advisor Opus: **nada achado melhora a geometria 3D do ponto**; pouco vale aproveitar.
+
+- **Calculadoras web** (knitcalcs, everycalculators, usecalcpro, yarn calculators): código fechado, conta trivial (circunferência = diâmetro × tensão; voltas de aumento e diminuição de 6 em 6; metragem por área × fator), algumas páginas com título trocado (pouco confiáveis). Não aproveitar. O fator ×1,3 para amigurumi e o método da amostra servem só como limites de sanidade: a medição da usuária vale mais.
+- **GitHub:** crochet-cad (judy2k, GPL-3.0, parado desde 2018, só formas simples); Amigurumi-Generator (kaisalepajoe, MIT, inacabado); crochet-modeler (Memnoc) não existe (404). AmiGo continua previsto para P5.
+- **Knotly** (fechado; a documentação em github.com/charonchan1991/knotly-docs **não tem licença**): descreve uma linguagem de receita com notação "XVA" (X = pb, V = aumento, A = diminuição, T = mpa, F = pa, E = pad, `MR[N]` como R0, intervalos `R7-R15: 42X`, repetições `6 (3X, V)`) e os modos de render Sketch, Chart e Realistic. Usar só a convenção de notação, com parser e testes próprios; não copiar texto, tabelas nem imagens. A simulação deles é por física da forma de cada peça (peças costuradas viram uma montagem), não se sabe como o modo Realistic desenha o fio.
+- **Ideias só registradas (não iniciar):** dialeto XVA no `notation`; modo "gráfico" no 3D (símbolos desenhados sobre a peça); tabela "consome → produz" como oráculo de teste da máquina de estados do criador (docs/16).
+- **Artigos não lidos:** bridges2024-369 (PDF binário, sem extrator de texto na máquina) e a página da Eurographics (403). Se algum descrever o fio ponto a ponto, será a referência de um caminho futuro; não reabre a etapa H.
+- **Já existe no projeto:** dialetos pt-BR, US e UK no `notation`; consumo de fio por ponto (`core`); escala da interface (não é tensão).
+
 ## 9. Fontes
 
 - [CrochetPARADE (site)](https://www.crochetparade.org/) · [código](https://codeberg.org/crochetparade/CrochetPARADE) · [Remesher (código)](https://codeberg.org/crochetparade/CrochetPARADE_Remesher) · [anúncio do Remesher](https://crochetparade.org/crochetforum/showthread.php?tid=59)

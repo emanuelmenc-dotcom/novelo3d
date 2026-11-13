@@ -32,6 +32,11 @@ export interface StitchDiagramOptions {
   bases?: number;
   /** Texto no canto superior esquerdo. */
   caption?: string;
+  /**
+   * Mão que segura a agulha. "right" (padrão): ponta da agulha à esquerda e cabo à direita, a base 0 na direita e as
+   * demais crescendo para a esquerda (4 3 2 1 0). "left": o espelho exato desse desenho.
+   */
+  hand?: "right" | "left";
 }
 
 interface Info {
@@ -81,9 +86,12 @@ function history(state: B.BuilderState): { info: Map<number, Info>; draws: Draw[
   return { info, draws, peak };
 }
 
-/** Anel em volta da agulha (elipse em pé): costas = metade esquerda, frente = metade direita. */
-const hookArc = (c: Pos, front: boolean): string =>
-  `M ${f(c.x)} ${f(c.y - HOOK_RY)} A ${HOOK_RX} ${HOOK_RY} 0 0 ${front ? 1 : 0} ${f(c.x)} ${f(c.y + HOOK_RY)}`;
+/**
+ * Anel em volta da agulha (elipse em pé). Na mão esquerda (desenho de base): costas = metade esquerda, frente = metade
+ * direita; na mão direita as metades trocam de lado (espelho), então o sentido do arco inverte.
+ */
+const hookArc = (c: Pos, front: boolean, mirrored: boolean): string =>
+  `M ${f(c.x)} ${f(c.y - HOOK_RY)} A ${HOOK_RX} ${HOOK_RY} 0 0 ${front !== mirrored ? 1 : 0} ${f(c.x)} ${f(c.y + HOOK_RY)}`;
 
 /** Laço fechado (elipse deitada, o fio passa na vertical): costas = metade de cima, frente = metade de baixo. */
 const closedArc = (c: Pos, front: boolean): string =>
@@ -136,21 +144,32 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
   };
   for (const r of roots) place(r, HOOK_Y + HOOK_RY);
 
+  const railY = maxY + 24;
+  const baseY = railY + 36;
+  // largura múltipla de 60: as casas da agulha, ancoradas na ponta, ficam sempre a 30 px das faixas
+  const width =
+    Math.ceil(
+      Math.max(
+        320,
+        2 * BASE_X0 + BASE_SHIFT + (nb - 1) * BASE_DX,
+        BASE_X0 + Math.max(0, nextLane - 1) * LANE_W + 60,
+        30 + (peak - 1) * SLOT + 130,
+      ) / 60,
+    ) * 60;
+  const height = baseY + 44;
+
+  // Tudo é calculado no desenho da mão esquerda (ponta da agulha à direita) e espelhado na saída (x -> largura - x) na
+  // mão direita. As alças da agulha ficam ancoradas na ponta: a mais nova está na ponta e as mais antigas deslizam
+  // 60 px em direção ao cabo a cada alça nova (e de volta quando um `draw` as remove).
+  const mirrored = (opts.hand ?? "right") === "right";
+  const X = (x: number): number => (mirrored ? width - x : x);
   const onHook = new Map<number, Pos>();
-  for (const [i, l] of state.loops.entries()) onHook.set(l.id, { x: 30 + i * SLOT, y: HOOK_Y });
+  for (const [i, l] of state.loops.entries()) {
+    onHook.set(l.id, { x: width - 30 - (state.loops.length - 1 - i) * SLOT, y: HOOK_Y });
+  }
   const centerOf = (id: number): Pos => (onHook.get(id) ?? closed.get(id)) as Pos;
   const isHook = (id: number): boolean => onHook.has(id);
   const ids = [...info.keys()].filter((id) => onHook.has(id) || closed.has(id)).sort((a, b) => a - b);
-
-  const railY = maxY + 24;
-  const baseY = railY + 36;
-  const width = Math.max(
-    320,
-    2 * BASE_X0 + BASE_SHIFT + (nb - 1) * BASE_DX,
-    BASE_X0 + Math.max(0, nextLane - 1) * LANE_W + 60,
-    30 + (peak - 1) * SLOT + 60,
-  );
-  const height = baseY + 44;
 
   const out: string[] = [];
   out.push(
@@ -164,7 +183,7 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
 
   // bases (topos da carreira de baixo)
   for (let b = 0; b < nb; b++) {
-    const x = baseX(b);
+    const x = X(baseX(b));
     out.push(
       `<path data-base-top="${b}" d="M ${f(x - 14)} ${f(baseY - 14)} L ${f(x)} ${f(baseY)} L ${f(x + 14)} ${f(baseY - 14)}" fill="none" stroke="${BASE_COLOR}" stroke-width="${STRAND_W}" stroke-linecap="round" stroke-linejoin="round"/>`,
       `<text x="${f(x)}" y="${f(baseY + 24)}" font-size="11" text-anchor="middle" fill="#6b7280">base ${b}</text>`,
@@ -183,7 +202,7 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
     ] as const) {
       // desce na vertical (numa faixa sem anel embaixo) e, abaixo de todos os anéis, vai em diagonal até o V da base
       const leg = (a: Pos, b: Pos, seg: string): string =>
-        `<line data-leg="${id}" data-base="${inf.base}" data-side="${side}" data-seg="${seg}" x1="${f(a.x)}" y1="${f(a.y)}" x2="${f(b.x)}" y2="${f(b.y)}" stroke="${COLOR.pulled}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
+        `<line data-leg="${id}" data-base="${inf.base}" data-side="${side}" data-seg="${seg}" x1="${f(X(a.x))}" y1="${f(a.y)}" x2="${f(X(b.x))}" y2="${f(b.y)}" stroke="${COLOR.pulled}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
       out.push(
         leg({ x: c.x + dx, y: yb }, { x: c.x + dx, y: railY }, "v"),
         leg({ x: c.x + dx, y: railY }, { x: baseX(inf.base as number) + dx, y: baseY - 8 }, "d"),
@@ -195,7 +214,8 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
     const inf = info.get(id) as Info;
     const c = centerOf(id);
     const hook = isHook(id);
-    const d = hook ? hookArc(c, front) : closedArc(c, front);
+    const m: Pos = { x: X(c.x), y: c.y };
+    const d = hook ? hookArc(m, front, mirrored) : closedArc(m, front);
     const attrs = `data-loop="${id}" data-kind="${inf.kind}" data-on-hook="${hook ? 1 : 0}" data-part="${front ? "front" : "back"}"`;
     const draw = `<path ${attrs} d="${d}" fill="none" stroke="${COLOR[inf.kind]}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
     // a frente leva um halo na cor do fundo: corta o que passa por trás dela
@@ -206,8 +226,11 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
 
   // 1) costas dos anéis, 2) agulha, 3) fios, 4) frentes dos anéis: o fio passa entre as costas e a frente
   for (const id of ids) out.push(ring(id, false));
+  // agulha: corpo, cabo (grosso, na ponta oposta aos laços) e a pontinha do gancho, no lado da ponta
   out.push(
-    `<line data-hook="1" x1="16" y1="${HOOK_Y}" x2="${f(width - 16)}" y2="${HOOK_Y}" stroke="#374151" stroke-width="7" stroke-linecap="round"/>`,
+    `<line data-hook="1" x1="${f(X(16))}" y1="${HOOK_Y}" x2="${f(X(width - 16))}" y2="${HOOK_Y}" stroke="#374151" stroke-width="7" stroke-linecap="round"/>`,
+    `<line data-hook-handle="1" x1="${f(X(10))}" y1="${HOOK_Y}" x2="${f(X(80))}" y2="${HOOK_Y}" stroke="#6b7280" stroke-width="15" stroke-linecap="round"/>`,
+    `<path data-hook-tip="1" d="M ${f(X(width - 18))} ${HOOK_Y} L ${f(X(width - 6))} ${HOOK_Y} L ${f(X(width - 12))} ${HOOK_Y + 9}" fill="none" stroke="#374151" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`,
   );
   // o fio de cada laço sai do fundo dele, passa pelo centro de cada anel na ordem de `through` e sai pela frente do último
   const resume = new Map<number, Pos>();
@@ -216,7 +239,7 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
     let from = resume.get(d.top) ?? { x: top.x, y: top.y + (isHook(d.top) ? HOOK_RY : CLOSED_RY) };
     const color = COLOR[(info.get(d.top) as Info).kind];
     const seg = (a: Pos, b: Pos, extra: string): string =>
-      `<line data-strand="${d.top}" data-draw="${d.level}" ${extra} x1="${f(a.x)}" y1="${f(a.y)}" x2="${f(b.x)}" y2="${f(b.y)}" stroke="${color}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
+      `<line data-strand="${d.top}" data-draw="${d.level}" ${extra} x1="${f(X(a.x))}" y1="${f(a.y)}" x2="${f(X(b.x))}" y2="${f(b.y)}" stroke="${color}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
     for (const id of d.through) {
       const c = centerOf(id);
       out.push(seg(from, c, `data-through="${id}"`));

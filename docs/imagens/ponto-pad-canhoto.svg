@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420.0 314.0" width="420.0" height="314.0" font-family="sans-serif">
+<rect width="100%" height="100%" fill="#faf7ef"/>
+<text x="12" y="24" font-size="15" fill="#1f2937">ponto alto duplo (pad): pronto (canhoto)</text>
+<text x="408.0" y="24" font-size="13" text-anchor="end" fill="#4b5563">alças: 1</text>
+<path data-base-top="0" d="M 76.0 256.0 L 90.0 270.0 L 104.0 256.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="90.0" y="294.0" font-size="11" text-anchor="middle" fill="#6b7280">base 0</text>
+<path data-base-top="1" d="M 136.0 256.0 L 150.0 270.0 L 164.0 256.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="150.0" y="294.0" font-size="11" text-anchor="middle" fill="#6b7280">base 1</text>
+<path data-base-top="2" d="M 196.0 256.0 L 210.0 270.0 L 224.0 256.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="210.0" y="294.0" font-size="11" text-anchor="middle" fill="#6b7280">base 2</text>
+<path data-base-top="3" d="M 256.0 256.0 L 270.0 270.0 L 284.0 256.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="270.0" y="294.0" font-size="11" text-anchor="middle" fill="#6b7280">base 3</text>
+<path data-base-top="4" d="M 316.0 256.0 L 330.0 270.0 L 344.0 256.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="330.0" y="294.0" font-size="11" text-anchor="middle" fill="#6b7280">base 4</text>
+<line data-leg="3" data-base="0" data-side="l" data-seg="v" x1="56.0" y1="196.0" x2="56.0" y2="234.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
+<line data-leg="3" data-base="0" data-side="l" data-seg="d" x1="56.0" y1="234.0" x2="86.0" y2="262.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
+<line data-leg="3" data-base="0" data-side="r" data-seg="v" x1="64.0" y1="196.0" x2="64.0" y2="234.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
+<line data-leg="3" data-base="0" data-side="r" data-seg="d" x1="64.0" y1="234.0" x2="94.0" y2="262.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
+<path data-loop="0" data-kind="initial" data-on-hook="0" data-part="back" d="M 225.0 140.0 A 15 6 0 0 1 255.0 140.0" fill="none" stroke="#6b7280" stroke-width="5" stroke-linecap="round"/>
+<path data-loop="1" data-kind="yo" data-on-hook="0" data-part="back" d="M 165.0 172.0 A 15 6 0 0 1 195.0 172.0" fill="none" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<path data-loop="2" data-kind="yo" data-on-hook="0" data-part="back" d="M 105.0 204.0 A 15 6 0 0 1 135.0 204.0" fill="none" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<path data-loop="3" data-kind="pulled" data-on-hook="0" data-part="back" d="M 45.0 190.0 A 15 6 0 0 1 75.0 190.0" fill="none" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
+<path data-loop="4" data-kind="yo" data-on-hook="0" data-part="back" d="M 45.0 158.0 A 15 6 0 0 1 75.0 158.0" fill="none" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<path data-loop="5" data-kind="yo" data-on-hook="0" data-part="back" d="M 45.0 126.0 A 15 6 0 0 1 75.0 126.0" fill="none" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<path data-loop="6" data-kind="yo" data-on-hook="1" data-part="back" d="M 390.0 60.0 A 6 20 0 0 0 390.0 100.0" fill="none" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<line data-hook="1" x1="16.0" y1="80" x2="404.0" y2="80" stroke="#374151" stroke-width="7" stroke-linecap="round"/>
+<line data-hook-handle="1" x1="10.0" y1="80" x2="80.0" y2="80" stroke="#6b7280" stroke-width="15" stroke-linecap="round"/>
+<path data-hook-tip="1" d="M 402.0 80 L 414.0 80 L 408.0 89" fill="none" stroke="#374151" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<line data-strand="4" data-draw="1" data-through="3" x1="60.0" y1="164.0" x2="60.0" y2="190.0" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<line data-strand="4" data-draw="1" data-through="2" x1="60.0" y1="190.0" x2="120.0" y2="204.0" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<line data-strand="4" data-draw="1" data-exit="1" x1="120.0" y1="204.0" x2="120.0" y2="214.0" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<line data-strand="5" data-draw="2" data-through="4" x1="60.0" y1="132.0" x2="60.0" y2="158.0" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<line data-strand="5" data-draw="2" data-through="1" x1="60.0" y1="158.0" x2="180.0" y2="172.0" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<line data-strand="5" data-draw="2" data-exit="1" x1="180.0" y1="172.0" x2="180.0" y2="182.0" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<line data-strand="6" data-draw="3" data-through="5" x1="390.0" y1="100.0" x2="60.0" y2="126.0" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<line data-strand="6" data-draw="3" data-through="0" x1="60.0" y1="126.0" x2="240.0" y2="140.0" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<line data-strand="6" data-draw="3" data-exit="1" x1="240.0" y1="140.0" x2="240.0" y2="150.0" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<path d="M 225.0 140.0 A 15 6 0 0 0 255.0 140.0" fill="none" stroke="#faf7ef" stroke-width="10" stroke-linecap="butt"/><path data-loop="0" data-kind="initial" data-on-hook="0" data-part="front" d="M 225.0 140.0 A 15 6 0 0 0 255.0 140.0" fill="none" stroke="#6b7280" stroke-width="5" stroke-linecap="round"/>
+<path d="M 165.0 172.0 A 15 6 0 0 0 195.0 172.0" fill="none" stroke="#faf7ef" stroke-width="10" stroke-linecap="butt"/><path data-loop="1" data-kind="yo" data-on-hook="0" data-part="front" d="M 165.0 172.0 A 15 6 0 0 0 195.0 172.0" fill="none" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<path d="M 105.0 204.0 A 15 6 0 0 0 135.0 204.0" fill="none" stroke="#faf7ef" stroke-width="10" stroke-linecap="butt"/><path data-loop="2" data-kind="yo" data-on-hook="0" data-part="front" d="M 105.0 204.0 A 15 6 0 0 0 135.0 204.0" fill="none" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<path d="M 45.0 190.0 A 15 6 0 0 0 75.0 190.0" fill="none" stroke="#faf7ef" stroke-width="10" stroke-linecap="butt"/><path data-loop="3" data-kind="pulled" data-on-hook="0" data-part="front" d="M 45.0 190.0 A 15 6 0 0 0 75.0 190.0" fill="none" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
+<path d="M 45.0 158.0 A 15 6 0 0 0 75.0 158.0" fill="none" stroke="#faf7ef" stroke-width="10" stroke-linecap="butt"/><path data-loop="4" data-kind="yo" data-on-hook="0" data-part="front" d="M 45.0 158.0 A 15 6 0 0 0 75.0 158.0" fill="none" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<path d="M 45.0 126.0 A 15 6 0 0 0 75.0 126.0" fill="none" stroke="#faf7ef" stroke-width="10" stroke-linecap="butt"/><path data-loop="5" data-kind="yo" data-on-hook="0" data-part="front" d="M 45.0 126.0 A 15 6 0 0 0 75.0 126.0" fill="none" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+<path d="M 390.0 60.0 A 6 20 0 0 1 390.0 100.0" fill="none" stroke="#faf7ef" stroke-width="10" stroke-linecap="butt"/><path data-loop="6" data-kind="yo" data-on-hook="1" data-part="front" d="M 390.0 60.0 A 6 20 0 0 1 390.0 100.0" fill="none" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
+</svg>

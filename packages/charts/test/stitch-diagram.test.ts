@@ -36,6 +36,7 @@ function states(cmds: B.Cmd[]): B.BuilderState[] {
 }
 
 type El = Record<string, string>;
+type Hand = "right" | "left";
 
 /** Elementos do SVG, em ordem do documento, com seus atributos. */
 function elements(svg: string): El[] {
@@ -80,8 +81,8 @@ function crosses(e: El, h: Hole): boolean {
 }
 
 /** Todas as invariantes do diagrama de um estado (alças, ligações do fio, pernas, determinismo). */
-function checkDiagram(state: B.BuilderState, where: string): void {
-  const svg = stitchDiagramSvg(state);
+function checkDiagram(state: B.BuilderState, where: string, hand: Hand = "right"): void {
+  const svg = stitchDiagramSvg(state, { hand });
   const els = elements(svg);
   const at = (pred: (e: El) => boolean): number => els.findIndex(pred);
 
@@ -145,7 +146,7 @@ function checkDiagram(state: B.BuilderState, where: string): void {
   }
 
   // determinismo
-  expect(stitchDiagramSvg(state), where).toBe(svg);
+  expect(stitchDiagramSvg(state, { hand }), where).toBe(svg);
 }
 
 /** Caminhada aleatória (semente fixa) pelos comandos que `allowed` aceita; devolve todos os estados do caminho. */
@@ -186,14 +187,16 @@ describe("stitchDiagramSvg: cada prefixo de cada sequência", () => {
     test(`${seq.file}: alças, ligações do fio, pernas e determinismo`, () => {
       states(seq.cmds).forEach((state, step) => {
         checkDiagram(state, `${seq.file} passo ${step}`);
+        checkDiagram(state, `${seq.file} passo ${step} (canhoto)`, "left");
       });
     });
   }
 
-  test("sequências aleatórias com semente (300 caminhadas): as mesmas invariantes", () => {
+  test("sequências aleatórias com semente (300 caminhadas, mão direita; 60 na esquerda): as mesmas invariantes", () => {
     for (let seed = 1; seed <= 300; seed++) {
       walk(seed).forEach((state, step) => {
         checkDiagram(state, `semente ${seed} passo ${step}`);
+        if (seed <= 60) checkDiagram(state, `semente ${seed} passo ${step} (canhoto)`, "left");
       });
     }
   });
@@ -207,6 +210,127 @@ describe("stitchDiagramSvg: cada prefixo de cada sequência", () => {
     const svg = stitchDiagramSvg(B.start(), { caption: "a <b> & c", bases: 7 });
     expect(svg).toContain("a &lt;b&gt; &amp; c");
     expect(elements(svg).filter((e) => e["data-base-top"] !== undefined).length).toBe(7);
+  });
+});
+
+/** Centros (x) dos V das bases, dos anéis na agulha e dos anéis fechados, mais a largura do desenho. */
+function geometry(svg: string): {
+  width: number;
+  v: Map<number, number>;
+  hook: Map<number, number>;
+  closed: Map<number, number>;
+} {
+  const els = elements(svg);
+  const v = new Map<number, number>();
+  const hook = new Map<number, number>();
+  const closed = new Map<number, number>();
+  for (const e of els) {
+    const m = /^M ([\d.-]+) /.exec(e.d ?? "");
+    if (!m) continue;
+    if (e["data-base-top"] !== undefined) v.set(Number(e["data-base-top"]), Number(m[1]) + 14);
+    else if (e["data-part"] === "back" && e["data-on-hook"] === "1")
+      hook.set(Number(e["data-loop"]), Number(m[1]));
+    else if (e["data-part"] === "back") closed.set(Number(e["data-loop"]), Number(m[1]) + HOLE_RX);
+  }
+  return { width: Number(/viewBox="0 0 ([\d.]+) /.exec(svg)?.[1]), v, hook, closed };
+}
+
+const SLOT = 60;
+
+describe("mão direita e mão esquerda", () => {
+  test("mão direita: a base 0 fica na direita e as outras crescem para a esquerda (4 3 2 1 0)", () => {
+    for (const seq of SEQUENCES) {
+      for (const state of states(seq.cmds)) {
+        const xs = [...geometry(stitchDiagramSvg(state)).v.entries()]
+          .sort((a, b) => a[0] - b[0])
+          .map((e) => e[1]);
+        for (let i = 1; i < xs.length; i++)
+          expect(xs[i] as number, seq.file).toBeLessThan(xs[i - 1] as number);
+      }
+    }
+    const left = [...geometry(stitchDiagramSvg(B.start(), { hand: "left" })).v.entries()].sort(
+      (a, b) => a[0] - b[0],
+    );
+    for (let i = 1; i < left.length; i++)
+      expect((left[i] as [number, number])[1]).toBeGreaterThan((left[i - 1] as [number, number])[1]);
+  });
+
+  test("a agulha tem a ponta à esquerda e o cabo à direita (mão direita); na esquerda, o contrário", () => {
+    const els = elements(stitchDiagramSvg(B.start()));
+    const handle = els.find((e) => e["data-hook-handle"] !== undefined) as El;
+    const tip = els.find((e) => e["data-hook-tip"] !== undefined) as El;
+    const tipX = Number(/^M ([\d.-]+) /.exec(tip.d as string)?.[1]);
+    expect(tipX).toBeLessThan(Math.min(Number(handle.x1), Number(handle.x2)));
+    const l = elements(stitchDiagramSvg(B.start(), { hand: "left" }));
+    const handleL = l.find((e) => e["data-hook-handle"] !== undefined) as El;
+    const tipL = Number(
+      /^M ([\d.-]+) /.exec((l.find((e) => e["data-hook-tip"] !== undefined) as El).d as string)?.[1],
+    );
+    expect(tipL).toBeGreaterThan(Math.max(Number(handleL.x1), Number(handleL.x2)));
+  });
+
+  test("alças ancoradas na ponta: a mais nova na ponta, cada mais antiga 60 px para o cabo; yo e insert empurram, draw devolve", () => {
+    for (const seq of SEQUENCES) {
+      const all = states(seq.cmds);
+      const pos = (state: B.BuilderState): Map<number, number> => geometry(stitchDiagramSvg(state)).hook;
+      for (const state of all) {
+        const p = pos(state);
+        const n = state.loops.length;
+        for (const [i, l] of state.loops.entries()) {
+          expect(p.get(l.id), `${seq.file}: alça ${l.id}`).toBe(30 + (n - 1 - i) * SLOT);
+        }
+      }
+      for (let i = 1; i < all.length; i++) {
+        const [prev, next, cmd] = [
+          all[i - 1] as B.BuilderState,
+          all[i] as B.BuilderState,
+          seq.cmds[i - 1] as B.Cmd,
+        ];
+        const [a, b] = [pos(prev), pos(next)];
+        if (cmd.kind === "yo" || cmd.kind === "insert") {
+          for (const l of prev.loops)
+            expect(b.get(l.id), `${seq.file} passo ${i}`).toBe((a.get(l.id) as number) + SLOT);
+        } else if (cmd.kind === "draw") {
+          const top = prev.loops[prev.loops.length - 1] as B.Loop;
+          expect(b.get(top.id), `${seq.file} passo ${i}`).toBe(30);
+          for (const l of next.loops.slice(0, -1))
+            expect(b.get(l.id), `${seq.file} passo ${i}`).toBe((a.get(l.id) as number) - SLOT * cmd.k);
+        }
+      }
+    }
+  });
+
+  test("a mão esquerda é o espelho exato da direita: mesma largura, x = largura - x, mesmos textos", () => {
+    for (const seq of SEQUENCES) {
+      for (const state of states(seq.cmds)) {
+        const [r, l] = [stitchDiagramSvg(state), stitchDiagramSvg(state, { hand: "left" })];
+        const [gr, gl] = [geometry(r), geometry(l)];
+        expect(gl.width, seq.file).toBe(gr.width);
+        for (const [key, ml, mr] of [
+          ["V", gl.v, gr.v],
+          ["agulha", gl.hook, gr.hook],
+          ["fechados", gl.closed, gr.closed],
+        ] as const) {
+          expect([...ml.keys()], `${seq.file} ${key}`).toEqual([...mr.keys()]);
+          for (const [id, x] of mr)
+            expect(ml.get(id), `${seq.file} ${key} ${id}`).toBeCloseTo(gr.width - x, 1);
+        }
+        const [er, el] = [
+          elements(r).filter((e) => e.tag === "line"),
+          elements(l).filter((e) => e.tag === "line"),
+        ];
+        expect(el.length).toBe(er.length);
+        er.forEach((e, i) => {
+          const o = el[i] as El;
+          expect(Number(o.x1), seq.file).toBeCloseTo(gr.width - Number(e.x1), 1);
+          expect(Number(o.x2), seq.file).toBeCloseTo(gr.width - Number(e.x2), 1);
+          expect([o.y1, o.y2]).toEqual([e.y1, e.y2]);
+        });
+        const texts = (svg: string): string[] =>
+          [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1] as string);
+        expect(texts(l)).toEqual(texts(r));
+      }
+    }
   });
 });
 
@@ -227,6 +351,10 @@ describe.runIf(process.env.NOVELO_DIAGRAMS === "1")("gera as imagens de docs/ima
       writeFileSync(
         `docs/imagens/ponto-${seq.file}.svg`,
         stitchDiagramSvg(last, { caption: `${seq.name}: pronto` }),
+      );
+      writeFileSync(
+        `docs/imagens/ponto-${seq.file}-canhoto.svg`,
+        stitchDiagramSvg(last, { caption: `${seq.name}: pronto (canhoto)`, hand: "left" }),
       );
     }
     const pb = SEQUENCES.find((s) => s.file === "pb") as (typeof SEQUENCES)[number];

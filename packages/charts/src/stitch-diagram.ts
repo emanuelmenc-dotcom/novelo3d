@@ -22,23 +22,25 @@ const HALF = GAP / 2;
 const PITCH = GAP + STRAND_W + 6;
 /** Onde o fio dobra por cima da agulha: a dobra fica acima dela e as duas linhas descem, uma de cada lado. */
 const BEND_Y = HOOK_Y - 8;
-/** Anel fechado: elipse deitada, larga o bastante para duas passagens de fio (a que o atravessa e a dele mesmo). */
-const CLOSED_RX = 22;
+/** Alça fechada: um U de lado (a elipse é o símbolo da corrente), com o mesmo raio GAP/2 da alça na agulha. */
 const CLOSED_RY = 6;
-/** Deslocamento, dentro do furo, do fio que atravessa o anel (PASS) e do fio do próprio anel (OWN). */
-const PASS = -PITCH / 2;
-const OWN = PITCH / 2;
+/**
+ * O U fica com o círculo (a curva) a BOWL_DX do centro da faixa e os braços (as duas linhas da própria alça) vão ARM para
+ * o lado da ponta; o fio que atravessa o U passa por dentro dele, com uma linha no centro do círculo e a outra GAP ao lado.
+ */
+const BOWL_DX = -16;
+const ARM = 32;
 /** Altura da primeira camada de anéis abaixo da agulha, e distância de uma camada à seguinte (a partir da última linha). */
 const FIRST = 42;
 const LEVEL = 56;
 /** Distância entre as linhas de anéis de uma mesma camada: todo anel tem a sua altura, então nenhuma pista se encosta. */
-const ROW = 42;
+const ROW = 48;
 /** Folga acima de cada anel para a pista horizontal do fio que vai entrar nele. */
-const ENTER = 22;
+const ENTER = 24;
 const BASE_X0 = 80;
 /** Os V das bases ficam meia coluna à direita das faixas: nenhum anel fechado cai sobre um V; só os fios ligam anel e base. */
 const BASE_SHIFT = 40;
-/** Largura de uma faixa (folha da árvore); no mínimo 2 × CLOSED_RX mais folga. */
+/** Largura de uma faixa (folha da árvore); no mínimo a largura de um U fechado mais folga. */
 const LANE_W = 80;
 
 export interface StitchDiagramOptions {
@@ -116,10 +118,6 @@ function history(state: B.BuilderState): { info: Map<number, Info>; draws: Draw[
   }
   return { info, draws, peak };
 }
-
-/** Laço fechado (elipse deitada, o fio passa na vertical): costas = metade de cima, frente = metade de baixo. */
-const closedArc = (c: Pos, front: boolean): string =>
-  `M ${f(c.x - CLOSED_RX)} ${f(c.y)} A ${CLOSED_RX} ${CLOSED_RY} 0 0 ${front ? 0 : 1} ${f(c.x + CLOSED_RX)} ${f(c.y)}`;
 
 type Line = { p: Pos; dir: Pos };
 
@@ -269,9 +267,10 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
   const paths: Path[] = [];
   for (const id of ids) {
     const kids = children.get(id) ?? [];
-    if (!isHook(id) && kids.length === 0 && baseOf(id) === undefined) continue;
+    const hook = isHook(id);
     const c = centerOf(id);
-    const start: Pos = isHook(id) ? { x: c.x, y: BEND_Y } : { x: c.x + OWN, y: c.y + CLOSED_RY };
+    const bx = c.x + BOWL_DX;
+    const start: Pos = hook ? { x: c.x, y: BEND_Y } : { x: bx, y: c.y };
     const pts: Pos[] = [start];
     const tags: (number | null)[] = [];
     const through: (number | null)[] = [];
@@ -285,18 +284,20 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
       pending = null;
       cur = p;
     };
+    // os braços do U fechado: as duas linhas da própria alça saem pelas pontas, no sentido da ponta da agulha
+    if (!hook) push({ x: bx + ARM, y: c.y }, null);
     for (const [i, k] of kids.entries()) {
       const kc = closed.get(k) as Pos;
       const lvl = levelOf.get(k) as number;
       const prev = i === 0 ? lvl : (levelOf.get(kids[i - 1] as number) as number);
       push({ x: cur.x, y: kc.y - ENTER }, prev);
-      push({ x: kc.x + PASS, y: kc.y - ENTER }, lvl);
+      push({ x: kc.x + BOWL_DX + HALF, y: kc.y - ENTER }, lvl);
       pending = k;
     }
     const lastKid = kids[kids.length - 1];
     if (lastKid !== undefined) {
       push({ x: cur.x, y: (closed.get(lastKid) as Pos).y + 14 }, levelOf.get(lastKid) as number);
-    } else if (baseOf(id) === undefined) {
+    } else if (hook && baseOf(id) === undefined) {
       push({ x: cur.x, y: HOOK_Y + HOOK_RY }, null);
     }
     const base = baseOf(id);
@@ -374,34 +375,24 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
   const fronts: string[] = [];
   const middle: string[] = [];
 
-  // anéis fechados (elipses deitadas): costas antes da agulha e dos fios, frente depois
-  const ring = (id: number, front: boolean): string => {
-    const c = centerOf(id);
-    const m: Pos = { x: X(c.x), y: c.y };
-    const d = closedArc(m, front);
-    const attrs = `data-loop="${id}" data-kind="${kindOf(id)}" data-on-hook="0" data-part="${front ? "front" : "back"}" data-cx="${f(m.x)}" data-cy="${f(m.y)}"`;
-    const draw = `<path ${attrs} d="${d}" fill="none" stroke="${COLOR[kindOf(id)]}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
-    // a frente leva um halo na cor do fundo: corta o que passa por trás dela
-    return front
-      ? `<path d="${d}" fill="none" stroke="${BG}" stroke-width="${STRAND_W + 5}" stroke-linecap="butt"/>${draw}`
-      : draw;
-  };
-  for (const id of ids) {
-    if (isHook(id)) continue;
-    backs.push(ring(id, false));
-    fronts.push(ring(id, true));
-  }
-
   // fios: as duas linhas de cada caminho; nas alças da agulha, o primeiro trecho (e a dobra) cruzam a agulha
   const sweep = mirrored ? 0 : 1;
   for (const p of paths) {
     const hook = isHook(p.id);
     const color = COLOR[kindOf(p.id)];
     const c = centerOf(p.id);
-    for (const [side, d] of [
-      ["back", HALF],
-      ["front", -HALF],
-    ] as const) {
+    const bx = c.x + BOWL_DX;
+    // no U fechado os braços são horizontais: a linha de cima é a de trás, a de baixo a da frente
+    const sides = hook
+      ? ([
+          ["back", HALF],
+          ["front", -HALF],
+        ] as const)
+      : ([
+          ["back", -HALF],
+          ["front", HALF],
+        ] as const);
+    for (const [side, d] of sides) {
       const line = offset(p.pts, d);
       for (let k = 0; k + 1 < line.length; k++) {
         const [a, b] = [line[k] as Pos, line[k + 1] as Pos];
@@ -411,9 +402,12 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
         if (p.base !== undefined && k >= p.legFrom) attrs += ` data-leg="${p.id}" data-base="${p.base}"`;
         if (tag !== null) attrs += ` data-strand="${p.id}" data-draw="${tag}"`;
         if (thr !== null) attrs += ` data-through="${thr}"`;
-        const arm = hook && k === 0;
-        if (arm) {
+        const arm = k === 0;
+        if (arm && hook) {
           attrs += ` data-loop="${p.id}" data-kind="${kindOf(p.id)}" data-on-hook="1" data-part="${side}" data-cx="${f(X(c.x))}" data-cy="${HOOK_Y}"`;
+        } else if (arm) {
+          // data-cx/data-cy: o centro do círculo do U; data-hx/data-hw: o interior por onde passa o fio que o atravessa
+          attrs += ` data-loop="${p.id}" data-kind="${kindOf(p.id)}" data-on-hook="0" data-part="${side}" data-cx="${f(X(bx))}" data-cy="${f(c.y)}" data-hx="${f(X(bx + (ARM - HALF) / 2))}" data-hw="${f((ARM + HALF) / 2)}"`;
         }
         const coords = `x1="${f(X(a.x))}" y1="${f(a.y)}" x2="${f(X(b.x))}" y2="${f(b.y)}"`;
         const el = `<line ${attrs} ${coords} stroke="${color}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
@@ -421,11 +415,15 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
           middle.push(el);
           continue;
         }
-        // o braço atrás da agulha vai antes dela; o da frente vai depois, com halo na cor do fundo
-        const bend =
-          side === "back"
+        // o braço atrás da agulha (ou do fio que atravessa o U) vai antes; o da frente vai depois, com halo na cor do fundo
+        const sw = mirrored ? 1 : 0;
+        const bend = hook
+          ? side === "back"
             ? `M ${f(X(c.x - HALF))} ${BEND_Y} A ${HALF} ${HALF} 0 0 ${sweep} ${f(X(c.x))} ${BEND_Y - HALF}`
-            : `M ${f(X(c.x))} ${BEND_Y - HALF} A ${HALF} ${HALF} 0 0 ${sweep} ${f(X(c.x + HALF))} ${BEND_Y}`;
+            : `M ${f(X(c.x))} ${BEND_Y - HALF} A ${HALF} ${HALF} 0 0 ${sweep} ${f(X(c.x + HALF))} ${BEND_Y}`
+          : side === "back"
+            ? `M ${f(X(bx))} ${f(c.y - HALF)} A ${HALF} ${HALF} 0 0 ${sw} ${f(X(bx - HALF))} ${f(c.y)}`
+            : `M ${f(X(bx - HALF))} ${f(c.y)} A ${HALF} ${HALF} 0 0 ${sw} ${f(X(bx))} ${f(c.y + HALF)}`;
         const arc = `<path data-bend="${p.id}" data-side="${side}" d="${bend}" fill="none" stroke="${color}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
         if (side === "back") backs.push(arc, el);
         else {

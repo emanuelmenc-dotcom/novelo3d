@@ -55,19 +55,23 @@ function elements(svg: string): El[] {
   return out;
 }
 
-const HOLE_RX = 22;
 const HOOK_Y = 80;
 interface Hole {
   cx: number;
   cy: number;
+  hw: number;
 }
 
-/** Furos dos anéis fechados: o centro vem de data-cx/data-cy das costas do anel, a meia largura é HOLE_RX. */
+/** Interior dos U fechados (por onde passa o fio que os atravessa): data-hx, data-cy e data-hw dos braços de trás. */
 function holesOf(els: El[]): Map<number, Hole> {
   const out = new Map<number, Hole>();
   for (const e of els) {
     if (e["data-part"] !== "back" || e["data-on-hook"] !== "0") continue;
-    out.set(Number(e["data-loop"]), { cx: Number(e["data-cx"]), cy: Number(e["data-cy"]) });
+    out.set(Number(e["data-loop"]), {
+      cx: Number(e["data-hx"]),
+      cy: Number(e["data-cy"]),
+      hw: Number(e["data-hw"]),
+    });
   }
   return out;
 }
@@ -81,9 +85,9 @@ function crosses(e: El, h: Hole): boolean {
     number,
   ];
   if (h.cy < Math.min(y1, y2) - 0.05 || h.cy > Math.max(y1, y2) + 0.05) return false;
-  if (Math.abs(y2 - y1) < 0.05) return Math.min(x1, x2) < h.cx + HOLE_RX && Math.max(x1, x2) > h.cx - HOLE_RX;
+  if (Math.abs(y2 - y1) < 0.05) return Math.min(x1, x2) < h.cx + h.hw && Math.max(x1, x2) > h.cx - h.hw;
   const t = Math.min(1, Math.max(0, (h.cy - y1) / (y2 - y1)));
-  return Math.abs(x1 + (x2 - x1) * t - h.cx) < HOLE_RX;
+  return Math.abs(x1 + (x2 - x1) * t - h.cx) < h.hw;
 }
 
 /** Todas as invariantes do diagrama de um estado (alças, ligações do fio, pernas, determinismo). */
@@ -461,19 +465,15 @@ describe("pernas duplas (U comprido)", () => {
           expect(ends.map((e) => `${e.x2},${e.y2}`).sort(), where).toEqual(
             [`${m[1]},${m[2]}`, `${m[3]},${m[4]}`].sort(),
           );
-          // as duas primeiras peças começam a ±6 do centro da alça: na agulha (y = 80) ou no fundo do anel (cy + 6)
+          // as duas primeiras peças começam a ±6: na agulha, na dobra por cima dela (x ± 6, y = 72); num U fechado, nas
+          // pontas do círculo (x, cy ± 6)
           const loop = els.find((e) => e["data-loop"] === id && e["data-part"] !== undefined) as El;
           const cx = Number(loop["data-cx"]);
           const hole = holes.get(Number(id));
-          // na agulha o fio sai da dobra por cima dela (y = 72); num anel fechado, do fundo dele (cy + 6) e 11,5 ao lado
-          const y0 = hole ? hole.cy + 6 : 72;
-          const own = hole ? (hand === "right" ? -11.5 : 11.5) : 0;
-          expect(first.map((e) => `${e.x1},${e.y1}`).sort(), where).toEqual(
-            [
-              `${(cx + own - 6).toFixed(1)},${y0.toFixed(1)}`,
-              `${(cx + own + 6).toFixed(1)},${y0.toFixed(1)}`,
-            ].sort(),
-          );
+          const expected = hole
+            ? [-6, 6].map((dy) => `${cx.toFixed(1)},${(hole.cy + dy).toFixed(1)}`)
+            : [-6, 6].map((dx) => `${(cx + dx).toFixed(1)},72.0`);
+          expect(first.map((e) => `${e.x1},${e.y1}`).sort(), where).toEqual(expected.sort());
           // a curva está dentro do V da sua base
           const vv = v.get(Number(curve["data-base"])) as El;
           const mid = (Number(m[1]) + Number(m[3])) / 2;
@@ -551,7 +551,47 @@ function deepIds(state: B.BuilderState): Set<number> {
 }
 
 // pares sobrepostos nas 300 caminhadas, por categoria (preenchido na primeira execução)
-const COUNTS_WALKS = { deep: 118, twoBases: 3 };
+const COUNTS_WALKS = { deep: 118, twoBases: 2 };
+
+describe("alça fechada: U de lado (sem elipses)", () => {
+  const all = (): B.BuilderState[] => {
+    const out = SEQUENCES.flatMap((q) => states(q.cmds));
+    for (let seed = 1; seed <= 60; seed++) out.push(...walk(seed));
+    return out;
+  };
+
+  test("não há elipses: todo arco do desenho tem rx = ry (a elipse é o símbolo da corrente)", () => {
+    for (const state of all()) {
+      for (const hand of ["right", "left"] as const) {
+        const svg = stitchDiagramSvg(state, { hand });
+        for (const m of svg.matchAll(/A ([\d.]+) ([\d.]+) /g)) {
+          expect(m[1], `${cmdText(state)} ${hand}`).toBe(m[2]);
+        }
+      }
+    }
+  });
+
+  test("o fio que atravessa um U fechado passa por dentro dele: uma linha no centro do círculo do U, a outra a 12 px, as duas entre os braços", () => {
+    for (const state of all()) {
+      for (const hand of ["right", "left"] as const) {
+        const els = elements(stitchDiagramSvg(state, { hand }));
+        for (const arm of els.filter((e) => e["data-part"] === "back" && e["data-on-hook"] === "0")) {
+          const id = arm["data-loop"] as string;
+          const mine = els.filter((e) => e["data-through"] === id);
+          const where = `${cmdText(state)} ${hand} anel ${id}`;
+          expect(mine.length, where).toBeGreaterThan(0);
+          const circle = num(arm, "data-cx");
+          const dist = mine.map((e) => Math.abs(num(e, "x1") - circle));
+          expect(Math.min(...dist), where).toBeLessThan(0.15);
+          expect(Math.max(...dist), where).toBeGreaterThan(11.85);
+          expect(Math.max(...dist), where).toBeLessThan(12.15);
+          for (const e of mine)
+            expect(Math.abs(num(e, "x1") - num(arm, "data-hx")), where).toBeLessThan(num(arm, "data-hw"));
+        }
+      }
+    }
+  });
+});
 
 describe("alça na agulha e ordem dos anéis", () => {
   const all = (): B.BuilderState[] => {

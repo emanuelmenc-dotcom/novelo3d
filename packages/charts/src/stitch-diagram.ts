@@ -21,6 +21,8 @@ const LEVEL = 26;
 const ROW = 14;
 const BASE_X0 = 60;
 const BASE_DX = 60;
+/** Os V das bases ficam meia coluna à direita das faixas: nenhum anel fechado cai sobre um V; só as pernas ligam anel e base. */
+const BASE_SHIFT = 30;
 /** Largura de uma faixa (folha da árvore); no mínimo 2 × CLOSED_RX mais folga. */
 const LANE_W = 60;
 const STRAND_W = 5;
@@ -92,7 +94,7 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
   const bases = B.basesOf(state.cmds);
   const maxBase = bases.length ? Math.max(...bases) : -1;
   const nb = Math.max(opts.bases ?? 5, maxBase + 2);
-  const baseX = (b: number): number => BASE_X0 + b * BASE_DX;
+  const baseX = (b: number): number => BASE_X0 + BASE_SHIFT + b * BASE_DX;
 
   // árvore: o fio de um laço atravessa, na ordem, os laços que os seus `draw` fecharam (os "filhos" dele)
   const children = new Map<number, number[]>();
@@ -144,7 +146,7 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
   const baseY = railY + 36;
   const width = Math.max(
     320,
-    2 * BASE_X0 + (nb - 1) * BASE_DX,
+    2 * BASE_X0 + BASE_SHIFT + (nb - 1) * BASE_DX,
     BASE_X0 + Math.max(0, nextLane - 1) * LANE_W + 60,
     30 + (peak - 1) * SLOT + 60,
   );

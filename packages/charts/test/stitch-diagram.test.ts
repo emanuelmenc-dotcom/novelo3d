@@ -132,6 +132,18 @@ function checkDiagram(state: B.BuilderState, where: string): void {
       expect(crosses(leg, h), `${where} perna de ${leg["data-leg"]} no anel ${id}`).toBe(false);
   }
 
+  // folga: nenhum anel fechado fica sobre um V (só as pernas ligam o anel à base)
+  const vCenters = new Map<number, number>();
+  for (const e of els) {
+    const m = /^M ([\d.-]+) /.exec(e.d ?? "");
+    if (e["data-base-top"] !== undefined && m) vCenters.set(Number(e["data-base-top"]), Number(m[1]) + 14);
+  }
+  for (const [id, h] of holes) {
+    for (const [b, x] of vCenters) {
+      expect(Math.abs(h.cx - x), `${where} anel ${id} sobre a base ${b}`).toBeGreaterThanOrEqual(20);
+    }
+  }
+
   // determinismo
   expect(stitchDiagramSvg(state), where).toBe(svg);
 }

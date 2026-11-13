@@ -2,32 +2,32 @@
 <rect width="100%" height="100%" fill="#faf7ef"/>
 <text x="12" y="24" font-size="15" fill="#1f2937">bobble (4 pa na mesma base): pronto</text>
 <text x="588.0" y="24" font-size="13" text-anchor="end" fill="#4b5563">alças: 1</text>
-<path data-base-top="0" d="M 46.0 266.0 L 60.0 280.0 L 74.0 266.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="60.0" y="304.0" font-size="11" text-anchor="middle" fill="#6b7280">base 0</text>
-<path data-base-top="1" d="M 106.0 266.0 L 120.0 280.0 L 134.0 266.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="120.0" y="304.0" font-size="11" text-anchor="middle" fill="#6b7280">base 1</text>
-<path data-base-top="2" d="M 166.0 266.0 L 180.0 280.0 L 194.0 266.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="180.0" y="304.0" font-size="11" text-anchor="middle" fill="#6b7280">base 2</text>
-<path data-base-top="3" d="M 226.0 266.0 L 240.0 280.0 L 254.0 266.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="240.0" y="304.0" font-size="11" text-anchor="middle" fill="#6b7280">base 3</text>
-<path data-base-top="4" d="M 286.0 266.0 L 300.0 280.0 L 314.0 266.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="300.0" y="304.0" font-size="11" text-anchor="middle" fill="#6b7280">base 4</text>
+<path data-base-top="0" d="M 76.0 266.0 L 90.0 280.0 L 104.0 266.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="90.0" y="304.0" font-size="11" text-anchor="middle" fill="#6b7280">base 0</text>
+<path data-base-top="1" d="M 136.0 266.0 L 150.0 280.0 L 164.0 266.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="150.0" y="304.0" font-size="11" text-anchor="middle" fill="#6b7280">base 1</text>
+<path data-base-top="2" d="M 196.0 266.0 L 210.0 280.0 L 224.0 266.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="210.0" y="304.0" font-size="11" text-anchor="middle" fill="#6b7280">base 2</text>
+<path data-base-top="3" d="M 256.0 266.0 L 270.0 280.0 L 284.0 266.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="270.0" y="304.0" font-size="11" text-anchor="middle" fill="#6b7280">base 3</text>
+<path data-base-top="4" d="M 316.0 266.0 L 330.0 280.0 L 344.0 266.0" fill="none" stroke="#9ca3af" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="330.0" y="304.0" font-size="11" text-anchor="middle" fill="#6b7280">base 4</text>
 <line data-leg="2" data-base="0" data-side="l" data-seg="v" x1="416.0" y1="206.0" x2="416.0" y2="244.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
-<line data-leg="2" data-base="0" data-side="l" data-seg="d" x1="416.0" y1="244.0" x2="56.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
+<line data-leg="2" data-base="0" data-side="l" data-seg="d" x1="416.0" y1="244.0" x2="86.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
 <line data-leg="2" data-base="0" data-side="r" data-seg="v" x1="424.0" y1="206.0" x2="424.0" y2="244.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
-<line data-leg="2" data-base="0" data-side="r" data-seg="d" x1="424.0" y1="244.0" x2="64.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
+<line data-leg="2" data-base="0" data-side="r" data-seg="d" x1="424.0" y1="244.0" x2="94.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
 <line data-leg="5" data-base="0" data-side="l" data-seg="v" x1="296.0" y1="192.0" x2="296.0" y2="244.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
-<line data-leg="5" data-base="0" data-side="l" data-seg="d" x1="296.0" y1="244.0" x2="56.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
+<line data-leg="5" data-base="0" data-side="l" data-seg="d" x1="296.0" y1="244.0" x2="86.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
 <line data-leg="5" data-base="0" data-side="r" data-seg="v" x1="304.0" y1="192.0" x2="304.0" y2="244.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
-<line data-leg="5" data-base="0" data-side="r" data-seg="d" x1="304.0" y1="244.0" x2="64.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
+<line data-leg="5" data-base="0" data-side="r" data-seg="d" x1="304.0" y1="244.0" x2="94.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
 <line data-leg="8" data-base="0" data-side="l" data-seg="v" x1="176.0" y1="178.0" x2="176.0" y2="244.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
-<line data-leg="8" data-base="0" data-side="l" data-seg="d" x1="176.0" y1="244.0" x2="56.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
+<line data-leg="8" data-base="0" data-side="l" data-seg="d" x1="176.0" y1="244.0" x2="86.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
 <line data-leg="8" data-base="0" data-side="r" data-seg="v" x1="184.0" y1="178.0" x2="184.0" y2="244.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
-<line data-leg="8" data-base="0" data-side="r" data-seg="d" x1="184.0" y1="244.0" x2="64.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
+<line data-leg="8" data-base="0" data-side="r" data-seg="d" x1="184.0" y1="244.0" x2="94.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
 <line data-leg="11" data-base="0" data-side="l" data-seg="v" x1="56.0" y1="164.0" x2="56.0" y2="244.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
-<line data-leg="11" data-base="0" data-side="l" data-seg="d" x1="56.0" y1="244.0" x2="56.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
+<line data-leg="11" data-base="0" data-side="l" data-seg="d" x1="56.0" y1="244.0" x2="86.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
 <line data-leg="11" data-base="0" data-side="r" data-seg="v" x1="64.0" y1="164.0" x2="64.0" y2="244.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
-<line data-leg="11" data-base="0" data-side="r" data-seg="d" x1="64.0" y1="244.0" x2="64.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
+<line data-leg="11" data-base="0" data-side="r" data-seg="d" x1="64.0" y1="244.0" x2="94.0" y2="272.0" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>
 <path data-loop="0" data-kind="initial" data-on-hook="0" data-part="back" d="M 525.0 182.0 A 15 6 0 0 1 555.0 182.0" fill="none" stroke="#6b7280" stroke-width="5" stroke-linecap="round"/>
 <path data-loop="1" data-kind="yo" data-on-hook="0" data-part="back" d="M 465.0 214.0 A 15 6 0 0 1 495.0 214.0" fill="none" stroke="#c2410c" stroke-width="5" stroke-linecap="round"/>
 <path data-loop="2" data-kind="pulled" data-on-hook="0" data-part="back" d="M 405.0 200.0 A 15 6 0 0 1 435.0 200.0" fill="none" stroke="#2d6a4f" stroke-width="5" stroke-linecap="round"/>

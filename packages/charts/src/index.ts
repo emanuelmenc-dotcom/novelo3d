@@ -4,6 +4,7 @@ import { roundCount } from "@novelo/core";
 
 export { type ChartOptions, type ChartPage, type ChartResult, renderChart } from "./chart.ts";
 export { type Item, layoutRing, WIDTH } from "./layout.ts";
+export { type StitchDiagramOptions, stitchDiagramSvg } from "./stitch-diagram.ts";
 
 /** Raio mínimo (em unidades de símbolo) para `n` símbolos lado a lado numa volta. */
 export function minRingRadius(n: number): number {

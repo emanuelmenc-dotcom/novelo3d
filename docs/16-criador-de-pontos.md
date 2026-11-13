@@ -53,7 +53,16 @@ Plano do advisor Opus, 2026-11-13. Chamado "criador B–E" nos documentos e rela
 - Faixa de baixo: os topos da carreira de baixo. Alças empilhadas sobre o desenho da agulha. A cada `draw`, a alça nova passa por cima e por baixo das alças que atravessa.
 - Reaproveitar a técnica de interrupção no cruzamento de `cellDiagramSvg`, sem a célula 3D.
 - Testes: o número de alças desenhadas é igual ao do estado; a saída é determinística.
-- **Parada para o usuário:** diagramas finais das 8 sequências mais o pb passo a passo em `docs/imagens`, enviados ao usuário; perguntar se batem com a ideia antes de construir a janela.
+- **Parada para o usuário:** diagramas finais das 9 sequências mais o pb passo a passo em `docs/imagens`, enviados ao usuário; perguntar se batem com a ideia antes de construir a janela.
+
+### C: como ficou (2026-11-13)
+
+- **Módulo:** `packages/charts/src/stitch-diagram.ts`, exportado por `@novelo/charts`: `stitchDiagramSvg(state, { bases?, caption? })`. Puro e determinístico (coordenadas com `toFixed(1)`). A janela da etapa D usa o mesmo módulo.
+- **Sem cálculo de cruzamentos:** o por cima/por baixo vem dos eventos e da ordem de desenho: (1) costas dos anéis, (2) agulha, (3) fios, (4) frentes dos anéis com halo na cor do fundo. O fio passa entre as costas e a frente do anel que atravessa.
+- **Desenho:** carreira de baixo (V por base, rótulo "base n") embaixo; agulha no topo com a ponta à direita e as alças em anéis (mais antiga à esquerda); alça puxada tem duas pernas até o V da sua base; cada `draw` fecha as alças atravessadas em anéis deitados, um nível por `draw` (o primeiro perto das bases) e um anel por alça; o fio da alça de cima desce pelos anéis na ordem de `through`. Cores: alça inicial cinza, laçada laranja, alça puxada verde.
+- **Atributos para teste:** `data-part="back|front"` com `data-loop`, `data-kind` e `data-on-hook` nos anéis; `data-strand` + `data-through` em cada passagem do fio (e `data-tail` na ponta); `data-leg` + `data-base` nas pernas; `data-base-top` nos V.
+- **Testes** (`packages/charts/test/stitch-diagram.test.ts`): para cada prefixo das 9 sequências, alças na agulha = estado, anéis fechados = alças atravessadas, passagens do fio na ordem dos eventos entre as costas e a frente de cada anel, pernas em cada base usada, saída idêntica em duas chamadas. `NOVELO_DIAGRAMS=1 npx vitest run packages/charts` grava `docs/imagens/ponto-<nome>.svg` e `ponto-pb-passo-N.svg`; os PNGs (`ponto-folha-9pontos.png`, `ponto-folha-pb-passos.png`) saem de um script temporário com o Edge, sem script no repositório.
+- **Limite visível:** puff e bobble empilham 8 a 10 anéis com 12 px entre eles; legível, mas apertado.
 
 ## D: janela e comandos
 

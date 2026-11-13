@@ -178,3 +178,16 @@ Cada **parte** tem seu `PointStore`, uids próprios e sobreposições próprias.
 - **Medido (traçado do plano, célula 1×1, ~0,6 s por raio):** ρ = 0,06 → 1,96ρ; 0,08 → 1,99ρ; 0,09 → 1,98ρ; **0,10 → 2,00ρ com o fio 1,4% mais curto**; 0,11 → 1,90ρ (penetração 10%, fio +1%); 0,12 (faixa 1) → 1,79ρ (+4% de fio); 0,16 (faixa 2) → 1,26ρ (+21%); 0,24 → a topologia se rompe (`minDistEver` ≈ 0). Encurtar o fio junto com a inflação (`lengthScale` < 1) **piora** (rompe a topologia já em ρ = 0,12 com escala 0,7).
 - **Leitura:** a célula de 1 pb com o traçado do plano **só cabe até ρ ≈ 0,10** (diâmetro ≈ 20% da largura do ponto); as faixas 1 a 4 de `RHO_BANDS` (0,12 a 0,34) não cabem sem esticar o fio. Critério de parada do plano (1,9ρ na faixa 2): **não atingido**. A causa não é o solver: é o volume (10,2 larguras de fio por ponto contra a caixa de 1 × 1,3 × ~0,6). Opções: (a) usar o relaxado só até ρ = 0,10 (faixa 0, fio fino); (b) refazer o traçado mais curto/compacto (menos fio por pb); (c) mudar a escala do modelo (ρ em outra unidade) para que as faixas atuais correspondam a ρ ≤ 0,10.
 - Diagramas: `docs/imagens/celula-pb.{svg,png}` e `celula-pb-relaxada.{svg,png}` (o halo com tampas retas deixa o diagrama de leitura difícil; é só conferência).
+
+## Etapa H: raio do fio alvo (2026-11-13, estimativa)
+
+Entradas (hipóteses, não medições): fio Círculo Amigurumi, TEX 492 (125 g / 254 m, algodão mercerizado, anúncios de varejo); densidade aparente do fio 0,6 (solto) a 0,9 g/cm³ (firme); largura do ponto baixo com agulha 2,5 mm entre 3,5 e 5,0 mm (faixa plausível, a confirmar com a tensão real da usuária). A receita "coelho Miguel" da Círculo é de tricô (agulha 3,5 mm, sem tensão) e não serve de base.
+
+d = √(4·TEX/(1000·π·dens)) → 1,02 mm (0,6) e 0,83 mm (0,9). ρ = (d/2)/w:
+
+| w (mm) | 3,5 | 4,0 | 4,5 | 5,0 |
+|---|---|---|---|---|
+| dens 0,6 | 0,146 | 0,128 | 0,114 | 0,102 |
+| dens 0,9 | 0,119 | 0,104 | 0,093 | 0,083 |
+
+Limiar da H1b: o modelo relaxado cabe até ρ≈0,12 (0,11 → 1,90ρ; 0,12 → 1,79ρ). A grade cruza o limiar (0,083 a 0,146), então a decisão depende da tensão real: pontos baixos por 10 cm com agulha 2,5 mm e Amigurumi Círculo (w = 100/n mm).

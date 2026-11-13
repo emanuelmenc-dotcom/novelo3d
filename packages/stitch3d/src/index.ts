@@ -13,3 +13,6 @@ export * from "./relax.ts";
 export * from "./shape.ts";
 export * from "./simulate.ts";
 export * from "./spatial.ts";
+export * from "./yarn-cell.ts";
+export * from "./yarn-diagram.ts";
+export * from "./yarn-relax.ts";

@@ -296,7 +296,7 @@ test("R3d-3: modo completo = rápido, pausa/continua, parar e replay, reaproveit
       return (await status()).info;
     };
     const text = await page.getByLabel("Receita", { exact: true }).inputValue();
-    await call("render.set", { width: 480, height: 270, samples: 1, scope: "all", baseShape: true });
+    await call("render.set", { width: 480, height: 270, samples: 1, scope: "all", baseShape: true, pace: 0 });
 
     // rápido: tudo refeito; guarda o checksum
     await call("render.set", { mode: "fast" });
@@ -341,6 +341,136 @@ test("R3d-3: modo completo = rápido, pausa/continua, parar e replay, reaproveit
     const tension = await finish();
     expect(tension.chunks.rebuilt).toBeGreaterThan(0);
     expect(tension.geomChecksum).not.toBe(fast.geomChecksum);
+  } finally {
+    await client.close();
+  }
+});
+
+/** Abre a ponte MCP e devolve `call`; o chamador fecha o cliente. */
+async function bridge(page: Page, port: number) {
+  const client = new Client({ name: "e2e", version: "0" });
+  await client.connect(
+    new StdioClientTransport({
+      command: process.execPath,
+      args: ["tools/mcp-server/src/server.mjs"],
+      env: { ...process.env, NOVELO_BRIDGE_PORT: String(port) } as Record<string, string>,
+    }),
+  );
+  await page.goto(`/?bridge=${port}`);
+  await expect(page.getByTestId("bridge-state")).toContainText("conectada", { timeout: 15_000 });
+  const call = async (method: string, params: Record<string, unknown> = {}) => {
+    const r = await client.callTool({ name: "novelo_bridge_call", arguments: { method, params } });
+    return JSON.parse((r.content as { text: string }[])[0]?.text ?? "null");
+  };
+  return { client, call };
+}
+
+test("R3d: ponto a ponto no ritmo pedido pausa a meio, congela, salva PNG parcial e conclui igual ao rápido", async ({
+  page,
+}) => {
+  const { client, call } = await bridge(page, 47891);
+  try {
+    type St = { state: string; done: number; total: number; info: { geomChecksum: number } };
+    const status = async (): Promise<St> => call("render.status");
+    await call("render.set", { width: 480, height: 270, samples: 1, scope: "all", pace: 0, mode: "fast" });
+    await call("render.start");
+    await expect.poll(async () => (await status()).state, { timeout: 60_000 }).toBe("done");
+    const want = (await status()).info.geomChecksum;
+
+    await call("render.set", { mode: "full", pace: 400 });
+    await call("render.start");
+    await expect
+      .poll(async () => {
+        const s = await status();
+        return s.total > 0 ? s.done / s.total : 0;
+      })
+      .toBeGreaterThan(0.1);
+    await call("render.pause");
+    await expect.poll(async () => (await status()).state).toBe("paused");
+    const a = await status();
+    expect(a.done / a.total).toBeLessThan(0.95);
+    await page.waitForTimeout(600);
+    expect((await status()).done).toBe(a.done);
+
+    // parar com a imagem parcial: salvar PNG tem de funcionar
+    await call("render.stop");
+    await expect.poll(async () => (await status()).state).toBe("stopped");
+    await call("render.savePng");
+    await expect.poll(() => page.evaluate(() => window.__render?.lastPng()?.bytes ?? 0)).toBeGreaterThan(500);
+
+    // novo Play (mesmo ritmo, mas pausa e continua) termina com a mesma geometria do rápido
+    await call("render.set", { pace: 0 });
+    await call("render.start");
+    await expect.poll(async () => (await status()).state, { timeout: 60_000 }).toBe("done");
+    expect((await status()).info.geomChecksum).toBe(want);
+  } finally {
+    await client.close();
+  }
+});
+
+test("R3d: mudar só a cor do fio reaproveita todos os blocos e a imagem muda", async ({ page }) => {
+  const { client, call } = await bridge(page, 47890);
+  try {
+    type St = { state: string; info: { chunks: { rebuilt: number; reused: number }; geomChecksum: number } };
+    const run = async (): Promise<St> => {
+      await call("render.start");
+      await expect.poll(async () => (await call("render.status")).state, { timeout: 60_000 }).toBe("done");
+      return call("render.status");
+    };
+    await call("render.set", {
+      width: 480,
+      height: 270,
+      samples: 1,
+      scope: "all",
+      pace: 0,
+      mode: "fast",
+      ao: 0,
+    });
+    await call("yarns.set", { yarns: [{ id: "A", name: "a", colorHex: "#5d6b3a" }] });
+    const first = await run();
+    expect(first.info.chunks.rebuilt).toBeGreaterThan(0);
+    const lumaBefore = await page.evaluate(() => window.__render?.meanLuma() ?? 0);
+    await call("yarns.set", { yarns: [{ id: "A", name: "a", colorHex: "#d6c24a" }] });
+    const second = await run();
+    expect(second.info.chunks.rebuilt).toBe(0);
+    expect(second.info.chunks.reused).toBeGreaterThan(0);
+    expect(second.info.geomChecksum).toBe(first.info.geomChecksum);
+    const lumaAfter = await page.evaluate(() => window.__render?.meanLuma() ?? 0);
+    expect(Math.abs(lumaAfter - lumaBefore)).toBeGreaterThan(5);
+  } finally {
+    await client.close();
+  }
+});
+
+test("R3d-4: o AO muda a luz, não muda a geometria e mantém o fundo transparente", async ({ page }) => {
+  const { client, call } = await bridge(page, 47889);
+  try {
+    type St = { state: string; info: { geomChecksum: number } };
+    const run = async (): Promise<St> => {
+      await call("render.start");
+      await expect.poll(async () => (await call("render.status")).state, { timeout: 90_000 }).toBe("done");
+      return call("render.status");
+    };
+    await call("render.set", {
+      width: 640,
+      height: 360,
+      samples: 12,
+      scope: "all",
+      pace: 0,
+      mode: "fast",
+      shadows: true,
+      background: { kind: "transparent" },
+    });
+    await call("render.set", { ao: 0 });
+    const off = await run();
+    const spreadOff = await page.evaluate(() => window.__render?.lumaSpread() ?? 0);
+    await call("render.set", { ao: 1 });
+    const on = await run();
+    const spreadOn = await page.evaluate(() => window.__render?.lumaSpread() ?? 0);
+    expect(on.info.geomChecksum).toBe(off.info.geomChecksum);
+    // o AO escurece as frestas e mantém as faces expostas: o contraste (desvio da luminância) aumenta
+    expect(spreadOn).toBeGreaterThan(spreadOff);
+    expect(await page.evaluate(() => window.__render?.alphaAtCorner())).toBe(0);
   } finally {
     await client.close();
   }

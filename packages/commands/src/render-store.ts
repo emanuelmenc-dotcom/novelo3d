@@ -40,8 +40,14 @@ export interface RenderSettings {
   fitSelection: boolean;
   /** O topo do ponto de base abre e inclina na direção dos filhos (só no Render). */
   baseShape: boolean;
+  /** Fio contínuo dos pontos de haste (pb, mpa, pa, pad); desligado, usa o modelo procedural antigo. */
+  continuousYarn: boolean;
   /** "fast": monta direto com as formas finais; "full": ponto a ponto em ordem de trabalho, refazendo as bases. */
   mode: "fast" | "full";
+  /** Modo completo: pontos revelados por segundo (0 = o mais rápido possível). */
+  pace: number;
+  /** Oclusão de ambiente por sombras acumuladas, 0 a 1 (precisa de pelo menos 8 amostras). */
+  ao: number;
 }
 
 /** Resultado do render por seleção (relatado pelo studio). */
@@ -93,7 +99,10 @@ export const DEFAULT_RENDER: RenderSettings = {
   relaxIterations: 20,
   fitSelection: true,
   baseShape: true,
+  continuousYarn: false,
   mode: "fast",
+  pace: 60,
+  ao: 0.5,
 };
 
 const clone = (s: RenderSettings): RenderSettings => ({
@@ -254,7 +263,10 @@ export type RenderPatch = {
   relaxIterations?: number;
   fitSelection?: boolean;
   baseShape?: boolean;
+  continuousYarn?: boolean;
   mode?: string;
+  pace?: number;
+  ao?: number;
 };
 
 /** Ajustes do render (validados). Mudar ajustes com o render rodando não vale na rodada atual. */
@@ -287,6 +299,13 @@ export function setRenderSettings(p: RenderPatch): RenderStatus {
   if (p.fitSelection !== undefined) {
     if (typeof p.fitSelection !== "boolean") throw new Error("'fitSelection' deve ser verdadeiro ou falso");
     s.fitSelection = p.fitSelection;
+  }
+  if (p.pace !== undefined) s.pace = Math.round(num(p.pace, "pace", 0, 2000));
+  if (p.ao !== undefined) s.ao = num(p.ao, "ao", 0, 1);
+  if (p.continuousYarn !== undefined) {
+    if (typeof p.continuousYarn !== "boolean")
+      throw new Error("'continuousYarn' deve ser verdadeiro ou falso");
+    s.continuousYarn = p.continuousYarn;
   }
   if (p.mode !== undefined) {
     if (p.mode !== "fast" && p.mode !== "full") throw new Error("'mode' deve ser fast ou full");

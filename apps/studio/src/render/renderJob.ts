@@ -20,6 +20,8 @@ declare global {
       stats(): RenderView["stats"];
       coverage(): number;
       alphaAtCorner(): number;
+      meanLuma(): number;
+      lumaSpread(): number;
       lastPng(): { width: number; height: number; bytes: number } | null;
     };
   }
@@ -232,7 +234,7 @@ function servePng(): void {
     while (renderSnapshot().pngRequests > 0) safe(() => dispatch("render.pngServed", {}));
     serving = false;
   };
-  if (v.stats.blocks === 0) {
+  if (!v.hasImage) {
     say("ainda não há imagem: aperte Play antes de salvar o PNG");
     finish();
     return;
@@ -271,6 +273,8 @@ export function installRenderJob(): void {
       stats: () => renderView().stats,
       coverage: () => renderView().coverage(renderSnapshot().settings.background),
       alphaAtCorner: () => renderView().alphaAtCorner(),
+      meanLuma: () => renderView().meanLuma(renderSnapshot().settings.background),
+      lumaSpread: () => renderView().lumaSpread(renderSnapshot().settings.background),
       lastPng: () => lastPng,
     };
   }

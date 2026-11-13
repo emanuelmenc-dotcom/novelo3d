@@ -7,6 +7,7 @@ import {
   centerlines,
   extrude,
   type MeshData,
+  type ModelOptions,
   type ModelSpec,
   RHO_BANDS,
   SIDES,
@@ -91,11 +92,12 @@ export function deformToCurve(
   i: number,
   radius?: number,
   shape?: TopShape,
+  opts?: ModelOptions,
 ): MeshData {
   const zs = spec.mirror ? -1 : 1;
   // o espelho inverte z no modelo; a inclinação medida no mundo (ez) precisa inverter junto (o abaulamento, não)
   const shaped = shape && spec.mirror ? { ...shape, leanZ: -shape.leanZ } : shape;
-  const lines = centerlines(spec, shaped).map((l) => ({
+  const lines = centerlines(spec, shaped, opts).map((l) => ({
     ...l,
     pts: l.pts.map((p) => deformPoint(f, i, [p[0], p[1], p[2] * zs])),
   }));

@@ -96,13 +96,18 @@ test("medição: exemplo inteiro, tudo sujo, com e sem colisão, tensão e fios 
   }
 });
 
-test("20 mil pontos sintéticos em menos de 30 s", { timeout: 120_000 }, () => {
-  const rows = Math.ceil(20000 / 36);
-  const text = `${EXEMPLO.split("\n").slice(0, 6).join("\n")}\nV7–${rows + 6}: 1 pb em cada ponto (36)`;
-  const m = measure(text, true, true);
-  console.log(
-    `R3d-1 sintético (${m.n} pontos): média ${m.meanShift.toFixed(4)}·k, máx ${m.maxShift.toFixed(4)}·k, ${m.ms.toFixed(0)} ms`,
-  );
-  expect(m.n).toBeGreaterThan(15000);
-  expect(m.ms).toBeLessThan(30_000);
-});
+// pesado (concorre com os testes de tempo dos outros pacotes): só roda com NOVELO_BENCH=1
+test.skipIf(!process.env.NOVELO_BENCH)(
+  "20 mil pontos sintéticos em menos de 30 s",
+  { timeout: 120_000 },
+  () => {
+    const rows = Math.ceil(20000 / 36);
+    const text = `${EXEMPLO.split("\n").slice(0, 6).join("\n")}\nV7–${rows + 6}: 1 pb em cada ponto (36)`;
+    const m = measure(text, true, true);
+    console.log(
+      `R3d-1 sintético (${m.n} pontos): média ${m.meanShift.toFixed(4)}·k, máx ${m.maxShift.toFixed(4)}·k, ${m.ms.toFixed(0)} ms`,
+    );
+    expect(m.n).toBeGreaterThan(15000);
+    expect(m.ms).toBeLessThan(30_000);
+  },
+);

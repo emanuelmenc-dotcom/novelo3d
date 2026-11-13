@@ -184,6 +184,23 @@ export function RenderPanel() {
             Enquadrar a seleção
           </label>
         </div>
+        <label className="block">
+          Oclusão de ambiente (AO) {s.ao}{" "}
+          <input
+            type="range"
+            aria-label="Oclusão de ambiente"
+            min={0}
+            max={1}
+            step={0.1}
+            value={s.ao}
+            onChange={(e) => set({ ao: Number(e.target.value) })}
+          />
+        </label>
+        {s.ao > 0 && (s.samples < 8 || !s.shadows) && (
+          <p className="hint" data-testid="render-ao-hint">
+            O AO precisa de sombras e de pelo menos 8 amostras; com menos, é ignorado.
+          </p>
+        )}
         <div className="row">
           <label>
             Modo{" "}
@@ -196,12 +213,32 @@ export function RenderPanel() {
               <option value="full">Completo, ponto a ponto</option>
             </select>
           </label>
+          <span>
+            Velocidade (pontos/s){" "}
+            <NumField
+              label="Velocidade (pontos/s)"
+              value={s.pace}
+              min={0}
+              max={2000}
+              disabled={s.mode !== "full"}
+              onCommit={(v) => set({ pace: v })}
+            />
+          </span>
           {st.info?.chunks && (
             <span className="hint" data-testid="render-chunks">
               blocos refeitos {st.info.chunks.rebuilt} · reaproveitados {st.info.chunks.reused}
             </span>
           )}
         </div>
+        <label>
+          <input
+            type="checkbox"
+            aria-label="Fio contínuo nos pontos de haste"
+            checked={s.continuousYarn}
+            onChange={(e) => set({ continuousYarn: e.target.checked })}
+          />{" "}
+          Fio contínuo (pb, mpa, pa)
+        </label>
         <div className="row">
           <label>
             <input

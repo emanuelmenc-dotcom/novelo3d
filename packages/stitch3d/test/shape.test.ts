@@ -7,9 +7,11 @@ import { describe, expect, test } from "vitest";
 import {
   centerlines,
   computeFrames,
+  deformPoint,
   deformToCurve,
   type ModelSpec,
   NEUTRAL,
+  RHO_BANDS,
   shapedCenterlines,
   shapeKey,
   topShapes,
@@ -89,9 +91,10 @@ describe("forma do topo", () => {
     for (const p of dim?.parents ?? []) expect((sh[p]?.open ?? 0) >= 1).toBe(true);
   });
 
-  test("inclinar o topo desloca só o arco e o topo das pernas, e as pontas ficam onde estavam", () => {
-    const neutral = centerlines(SC);
-    const leaned = centerlines(SC, { open: 1, leanX: 0.2, leanZ: 0.1 });
+  test("inclinar o topo desloca só o arco e o topo das pernas, e as pontas ficam onde estavam (modelo simples)", () => {
+    const simple: ModelSpec = { ...SC, quality: 0 };
+    const neutral = centerlines(simple);
+    const leaned = centerlines(simple, { open: 1, leanX: 0.2, leanZ: 0.1 });
     const arc0 = neutral[0]?.pts ?? [];
     const arc1 = leaned[0]?.pts ?? [];
     expect(arc1[0]).toEqual(arc0[0]);
@@ -200,5 +203,75 @@ describe("forma do topo", () => {
     };
     expect(drift(false)).toBeGreaterThan(0);
     expect(drift(true)).toBeGreaterThan(0);
+  });
+
+  test("fio contínuo (render): a inclinação move o topo, e as pontas E/X e o olho da base ficam onde estavam", () => {
+    const neutral = centerlines(SC)[0]?.pts ?? [];
+    const leaned = centerlines(SC, { open: 2, leanX: 0.2, leanZ: 0.1 })[0]?.pts ?? [];
+    expect(leaned.length).toBe(neutral.length);
+    expect(leaned[0]).toEqual(neutral[0]);
+    expect(leaned[leaned.length - 1]).toEqual(neutral[neutral.length - 1]);
+    // o ponto mais alto (topo) se desloca; o mais baixo (olho da base) não
+    const top = (a: [number, number, number][]) => a.reduce((b, p) => (p[1] > b[1] ? p : b));
+    const low = (a: [number, number, number][]) => a.reduce((b, p) => (p[1] < b[1] ? p : b));
+    expect(Math.abs(top(leaned)[0] - top(neutral)[0])).toBeGreaterThan(0.05);
+    expect(low(leaned)).toEqual(low(neutral));
+  });
+
+  test("pb, mpa e pa têm fio contínuo no render, com as voltas extras do tipo; a edição (Q0) continua simples", () => {
+    for (const type of ["SC", "HDC", "DC", "TR"] as const) {
+      const spec: ModelSpec = { ...SC, type, quality: 1 };
+      const l = centerlines(spec);
+      // um só traço por ponto (as laçadas são voltas do mesmo fio em torno da haste)
+      expect(l.length).toBe(1);
+      const main = l[0]?.pts ?? [];
+      // da entrada à saída: começa em x = -0,5 e termina em x = +0,5
+      expect(main[0]?.[0]).toBeCloseTo(-0.5, 9);
+      expect(main[main.length - 1]?.[0]).toBeCloseTo(0.5, 9);
+      expect(centerlines({ ...spec, quality: 0 }).length).toBeGreaterThanOrEqual(1);
+    }
+    // mais laçadas, mais pontos de controle no traço
+    expect(centerlines({ ...SC, type: "DC", quality: 1 })[0]?.pts.length).toBeGreaterThan(
+      centerlines({ ...SC, type: "SC", quality: 1 })[0]?.pts.length ?? 0,
+    );
+    // diminuição (2 pernas) continua no modelo procedural
+    expect(centerlines({ ...SC, legs: 2 }).length).toBe(3);
+  });
+
+  test("pb no render: trechos não adjacentes do fio ficam afastados de pelo menos 1,5ρ em todas as faixas de fio", () => {
+    for (let band = 0; band < RHO_BANDS.length; band++) {
+      const spec: ModelSpec = { ...SC, quality: 1, band };
+      const rho = RHO_BANDS[band] as number;
+      const pts = centerlines(spec)[0]?.pts ?? [];
+      let min = Number.POSITIVE_INFINITY;
+      for (let a = 0; a < pts.length; a++) {
+        for (let b = a + 12; b < pts.length; b++) {
+          const p = pts[a] as [number, number, number];
+          const q = pts[b] as [number, number, number];
+          min = Math.min(min, Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]));
+        }
+      }
+      expect(min).toBeGreaterThanOrEqual(1.5 * rho - 1e-9);
+    }
+  });
+
+  test("fio contínuo no mundo: a saída do fio do ponto i é a entrada do fio do ponto i+1 (erro < 1e-4), em todas as faixas", () => {
+    const { frames, n } = setup();
+    const spec: ModelSpec = { ...SC, quality: 1 };
+    const pts = centerlines(spec)[0]?.pts ?? [];
+    const first = pts[0] as [number, number, number];
+    const last = pts[pts.length - 1] as [number, number, number];
+    let checked = 0;
+    for (let i = 0; i + 1 < n; i++) {
+      if (frames.next[i] !== i + 1) continue;
+      const out = deformPoint(frames, i, last);
+      const inn = deformPoint(frames, i + 1, first);
+      expect(Math.hypot(out[0] - inn[0], out[1] - inn[1], out[2] - inn[2])).toBeLessThan(1e-4);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(20);
+    // opção por parâmetro (sem estado global): desligar o fio contínuo dá o modelo procedural
+    expect(centerlines(spec, undefined, { customStrands: false }).length).toBe(2);
+    expect(centerlines(spec).length).toBe(1);
   });
 });

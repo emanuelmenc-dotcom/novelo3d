@@ -21,6 +21,12 @@ export interface MeshData {
 export const RHO_BANDS = [0.08, 0.12, 0.16, 0.24, 0.34] as const;
 export const MAX_LEGS = 4;
 
+/** Opções do modelo (parâmetro, não estado global): o render liga e desliga o fio contínuo para comparar. */
+export interface ModelOptions {
+  /** Usa os fios próprios do tipo em qualidade ≥ 1 (padrão true). */
+  customStrands?: boolean;
+}
+
 /** Forma do topo de um ponto de base (R3d): quantos filhos trabalham nele e para onde o arco se inclina. */
 export interface TopShape {
   /** 0 sem filhos, 1 com um filho, 2 com dois ou mais (aumento). */
@@ -141,11 +147,42 @@ function catmull(pts: V3[], sub: number, closed: boolean): V3[] {
   return out;
 }
 
+/**
+ * Forma do topo aplicada a um fio próprio: só a parte alta (y > -0,5) se desloca, com peso crescente até o topo; o
+ * aumento (2 filhos) alarga em x. As pontas e a base ficam onde estão (o fio continua contínuo entre pontos).
+ */
+function shapeCustom(pts: V3[], sh: TopShape): V3[] {
+  return pts.map((p) => {
+    const w = Math.max(0, Math.min(1, (p[1] + 0.5) / 0.5));
+    const edge = 1 - Math.min(1, Math.abs(p[0]) / 0.5) ** 4; // as pontas E/X (|x| = 0,5) não se movem
+    const k = w * edge;
+    const wide = sh.open === 2 ? 1 + 0.15 * k : 1;
+    return [(p[0] + sh.leanX * k) * wide, p[1], p[2] + (sh.leanZ + 0.04 * sh.open) * k];
+  });
+}
+
 /** Polilinhas de controle do tipo (espaço do modelo). */
-function strandsFor(def: StitchTypeDef, legs: number, shape?: TopShape): Strand[] {
+function strandsFor(
+  def: StitchTypeDef,
+  legs: number,
+  shape?: TopShape,
+  quality = 0,
+  band = 2,
+  custom = true,
+): Strand[] {
   const m = def.model;
-  if (m.strands && m.strands.length > 0) {
-    return m.strands.map((s) => ({ pts: s.pts, closed: s.closed === true, sub: 1 }));
+  // fios próprios do tipo (um traço contínuo por ponto), só no render (qualidade ≥ 1): a edição fica com o modelo simples
+  // de poucos triângulos. Com mais de uma perna (diminuição em V) o modelo procedural abaixo continua valendo: o fio
+  // escrito à mão só descreve o ponto de uma base.
+  if (m.strands && m.strands.length > 0 && legs <= 1 && quality >= 1 && custom) {
+    const shaped = shape && !isNeutral(shape) ? shape : null;
+    // frente e trás da haste precisam ficar a pelo menos 2ρ: em fio grosso o modelo se alarga em z
+    const zs = Math.max(1, (RHO_BANDS[band] ?? 0.16) / 0.1);
+    return m.strands.map((st) => ({
+      pts: (shaped ? shapeCustom(st.pts, shaped) : st.pts).map((p): V3 => [p[0], p[1], p[2] * zs]),
+      closed: st.closed === true,
+      sub: st.sub ?? 2,
+    }));
   }
   if (m.gen === "ring") {
     const pts: V3[] = Array.from({ length: 8 }, (_, i) => {
@@ -225,14 +262,16 @@ function strandsFor(def: StitchTypeDef, legs: number, shape?: TopShape): Strand[
 }
 
 /** Linhas centrais do modelo (já subdivididas; mais suaves com a qualidade) e a referência da seção de cada uma. */
-export function centerlines(spec: ModelSpec, shape?: TopShape): Line[] {
+export function centerlines(spec: ModelSpec, shape?: TopShape, opts?: ModelOptions): Line[] {
   const def = stitchType(spec.type);
   if (!def) throw new Error(`tipo de ponto '${spec.type}' não existe no registro`);
-  return strandsFor(def, spec.legs, shape).map((st) => ({
-    pts: catmull(st.pts, st.sub > 0 ? st.sub * (1 + spec.quality) : 0, st.closed),
-    closed: st.closed,
-    ...(st.up ? { up: st.up } : {}),
-  }));
+  return strandsFor(def, spec.legs, shape, spec.quality, spec.band, opts?.customStrands !== false).map(
+    (st) => ({
+      pts: catmull(st.pts, st.sub > 0 ? st.sub * (1 + spec.quality) : 0, st.closed),
+      closed: st.closed,
+      ...(st.up ? { up: st.up } : {}),
+    }),
+  );
 }
 
 const sub3 = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];

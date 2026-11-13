@@ -228,7 +228,7 @@ describe("referencial e matriz por ponto", () => {
     expect(big.n).toBeGreaterThan(20000);
     expect(m.length).toBe(big.n * 16);
     expect(ms).toBeLessThan(600);
-  });
+  }, 30_000); // o layout de 20 mil pontos da preparação passa de 5 s com a máquina ocupada
 });
 
 describe("tubo contínuo (nível de detalhe)", () => {

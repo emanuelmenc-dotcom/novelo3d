@@ -82,6 +82,29 @@ function lengthOf(f: FrameSet, i: number): number {
 }
 
 /**
+ * Como deformPoint, mas aceita x fora de [-0,5; 0,5]: o trecho que passa da saída X cai no ponto seguinte (x - 1) e o que
+ * passa da entrada E, no anterior (x + 1). Sem vizinho, usa o próprio ponto (t fica preso nas pontas).
+ */
+export function deformPointWide(f: FrameSet, i: number, p: V3): V3 {
+  let k = i;
+  let x = p[0];
+  // anda de ponto em ponto enquanto houver vizinho (o fio relaxado pode passar mais de um ponto à frente)
+  while (x > 0.5) {
+    const j = f.next[k] as number;
+    if (j < 0) break;
+    k = j;
+    x -= 1;
+  }
+  while (x < -0.5) {
+    const j = f.prev[k] as number;
+    if (j < 0) break;
+    k = j;
+    x += 1;
+  }
+  return deformPoint(f, k, [x, p[1], p[2]]);
+}
+
+/**
  * Malha do ponto `i` deformada pela curva e extrudada com raio constante `radius` (em unidades do mundo; por padrão a
  * faixa de raio da variante vezes o tamanho do ponto). Os lados e as tampas vêm da qualidade da variante. O espelho da
  * variante vale: o modelo é espelhado em z antes de deformar.
@@ -97,10 +120,18 @@ export function deformToCurve(
   const zs = spec.mirror ? -1 : 1;
   // o espelho inverte z no modelo; a inclinação medida no mundo (ez) precisa inverter junto (o abaulamento, não)
   const shaped = shape && spec.mirror ? { ...shape, leanZ: -shape.leanZ } : shape;
-  const lines = centerlines(spec, shaped, opts).map((l) => ({
-    ...l,
-    pts: l.pts.map((p) => deformPoint(f, i, [p[0], p[1], p[2] * zs])),
-  }));
+  const cell = spec.type === "SC" && spec.legs <= 1 && spec.quality >= 1 ? opts?.cell : undefined;
+  const lines = cell
+    ? [
+        {
+          pts: cell.map((p) => deformPointWide(f, i, [p[0], p[1], p[2] * zs])),
+          closed: false,
+        },
+      ]
+    : centerlines(spec, shaped, opts).map((l) => ({
+        ...l,
+        pts: l.pts.map((p) => deformPoint(f, i, [p[0], p[1], p[2] * zs])),
+      }));
   const r = radius ?? (RHO_BANDS[spec.band] ?? 0.16) * lengthOf(f, i);
   // referência da seção no MUNDO: a normal (ez) do ponto, ou o eixo ey no anel (plano do ponto); a extrusão cai na
   // referência padrão quando ela fica paralela à tangente

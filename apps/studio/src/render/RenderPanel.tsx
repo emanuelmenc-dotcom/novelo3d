@@ -231,14 +231,30 @@ export function RenderPanel() {
           )}
         </div>
         <label>
-          <input
-            type="checkbox"
-            aria-label="Fio contínuo nos pontos de haste"
-            checked={s.continuousYarn}
-            onChange={(e) => set({ continuousYarn: e.target.checked })}
-          />{" "}
-          Fio contínuo (pb, mpa, pa)
+          Modelo do fio{" "}
+          <select
+            aria-label="Modelo do fio"
+            value={s.yarnModel}
+            onChange={(e) => set({ yarnModel: e.target.value })}
+          >
+            <option value="simple">Simples</option>
+            <option value="traced">Fio contínuo (pb, mpa, pa)</option>
+            <option value="relaxed">
+              Relaxado com colisão (experimental, só pb; falha em aumentos, diminuições e curvas)
+            </option>
+          </select>
         </label>
+        <span>
+          Raio do fio relaxado{" "}
+          <NumField
+            label="Raio do fio relaxado"
+            value={s.yarnRho}
+            min={0.06}
+            max={0.12}
+            disabled={s.yarnModel !== "relaxed"}
+            onCommit={(v) => set({ yarnRho: v })}
+          />
+        </span>
         <div className="row">
           <label>
             <input

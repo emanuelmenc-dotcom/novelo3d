@@ -25,6 +25,8 @@ export const MAX_LEGS = 4;
 export interface ModelOptions {
   /** Usa os fios próprios do tipo em qualidade ≥ 1 (padrão true). */
   customStrands?: boolean;
+  /** Fio relaxado do pb (célula periódica de relaxedScCell): vale só para SC com ≤ 1 perna em qualidade ≥ 1. */
+  cell?: V3[];
 }
 
 /** Forma do topo de um ponto de base (R3d): quantos filhos trabalham nele e para onde o arco se inclina. */

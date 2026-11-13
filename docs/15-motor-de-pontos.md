@@ -157,16 +157,16 @@ Cada **parte** tem seu `PointStore`, uids próprios e sobreposições próprias.
 
 - **Fio contínuo de verdade:** as laçadas de mpa, pa e pad deixaram de ser arcos soltos: são voltas (meia volta por laçada, em elipse em torno da haste) do **mesmo traço** que sobe pela frente; cada ponto de haste é um fio só. O trecho de volta pelo topo passa por trás (z < 0), então o fio não se atravessa no topo.
 - **Afastamento:** em `centerlines` o z dos fios próprios é escalado por `max(1, ρ/0,1)` conforme a faixa do fio, para frente e trás da haste ficarem separados; teste de distância mínima entre trechos não adjacentes (≥ 1,5ρ, janela de 12 pontos de controle) nas cinco faixas.
-- **Comparação antes/depois:** novo ajuste `render.set { continuousYarn }` (padrão true; caixa "Fio contínuo (pb, mpa, pa)" no painel). Imagens em `docs/imagens/tecido-{pb,pa}-{antes,depois}.png` (mesma câmera, tecido com aumento e diminuição).
+- **Comparação antes/depois:** (ajuste substituído em H2 por `render.set { yarnModel: simple|traced|relaxed }`; `continuousYarn` deixou de existir; `traced` = o fio contínuo desta etapa, padrão true na época; caixa "Fio contínuo (pb, mpa, pa)" no painel). Imagens em `docs/imagens/tecido-{pb,pa}-{antes,depois}.png` (mesma câmera, tecido com aumento e diminuição).
 - **Limitações da etapa A (a resolver com as etapas seguintes):** (1) diminuições (2 pernas), pbx, corrente e anel seguem no modelo procedural dentro do render: a mesma peça mistura os dois estilos; (2) o topo tem um fio só (x de 0 a 0,5): o V de dois fios, que invade o ponto vizinho, exige as portas entre instâncias (etapa F), já que `deformPoint` limita x a ±0,5; (3) tubo liso, sem torção de cabos; (4) as laçadas do pa ainda parecem contas empilhadas em vista geral.
-- **Versão do tipo:** não foi aumentada (a geometria muda só em qualidade ≥ 1, e o cache de modelos vive só em memória; o hash dos blocos do render já inclui `continuousYarn`).
+- **Versão do tipo:** não foi aumentada (a geometria muda só em qualidade ≥ 1, e o cache de modelos vive só em memória; o hash dos blocos do render já inclui o modelo do fio).
 - **AO:** com o AO ligado a luminância média quase não muda (a luz é redistribuída: frestas mais escuras, faces expostas um pouco mais claras); o teste agora mede o **contraste** (desvio-padrão da luminância dos pixels cobertos), que aumenta com o AO. A linha "menor luminância média" do R3d-4 deve ser lida assim.
 
 ### Etapa A — 2ª revisão do Fable: **resultado visual negativo** (2026-11-13)
 
 - Parecer do Fable: o fio contínuo escrito à mão **não resolve a insatisfação**: o "antes" lê como tecido regular; o "depois" lê como emaranhado de tubos grossos, sem o V do ponto; o pa parece contas empilhadas; o topo da peça é idêntico (diminuições procedurais), então a mistura de estilos pega boa parte da peça. Causa provável: com raio realista, as duas pernas mais o topo não cabem na caixa de um ponto **sem portas entre vizinhos e sem relaxamento com colisão**; escalar z só engrossa. Linha central melhor, sozinha, não basta; o criador por diagrama de nós teria o mesmo problema ao virar 3D.
 - Consequência: as etapas F (portas entre instâncias) e H (relaxamento do fio com colisão) são o caminho crítico do render; proposta: protótipo de H só para o pb antes da janela do criador (etapas C e D). A máquina de comandos e o diagrama 2D (B e C) continuam viáveis e independentes do render.
-- Por isso `continuousYarn` passou a ter padrão **false** (decisão final do usuário). `modelOptions` global foi trocado por parâmetro (`centerlines(spec, shape, opts)`, `deformToCurve(..., opts)`): mesma entrada, mesma saída.
+- Por isso o fio contínuo (hoje `yarnModel: "traced"`) passou a ter padrão **desligado** (decisão final do usuário). `modelOptions` global foi trocado por parâmetro (`centerlines(spec, shape, opts)`, `deformToCurve(..., opts)`): mesma entrada, mesma saída.
 - Continuidade provada em teste: a saída do fio do ponto i = a entrada do ponto i+1 no mundo (erro < 1e-4) em toda a volta de pb. As pontas de tubo cortadas que se veem no "depois" **não** vêm da junção entre pontos: vêm dos pontos que seguem no modelo procedural (diminuições, pbx, corrente, anel), cujas pernas e arcos são tubos soltos com tampas.
 
 ## Etapa H — protótipo de colisão do pb (2026-11-13; plano do Fable, escolha do usuário)
@@ -185,9 +185,25 @@ Entradas (hipóteses, não medições): fio Círculo Amigurumi, TEX 492 (125 g /
 
 d = √(4·TEX/(1000·π·dens)) → 1,02 mm (0,6) e 0,83 mm (0,9). ρ = (d/2)/w:
 
-| w (mm) | 3,5 | 4,0 | 4,5 | 5,0 |
-|---|---|---|---|---|
+| w (mm)   | 3,5   | 4,0   | 4,5   | 5,0   |
+| -------- | ----- | ----- | ----- | ----- |
 | dens 0,6 | 0,146 | 0,128 | 0,114 | 0,102 |
 | dens 0,9 | 0,119 | 0,104 | 0,093 | 0,083 |
 
 Limiar da H1b: o modelo relaxado cabe até ρ≈0,12 (0,11 → 1,90ρ; 0,12 → 1,79ρ). A grade cruza o limiar (0,083 a 0,146), então a decisão depende da tensão real: pontos baixos por 10 cm com agulha 2,5 mm e Amigurumi Círculo (w = 100/n mm).
+
+### H2 — modelo relaxado no render e conclusão (2026-11-13)
+
+- **Código:** `relaxedScCell(rho)` (uma célula por raio, em cache, limite ρ ≤ 0,12), `deformPointWide` (x fora de [-0,5; 0,5] passa para o ponto vizinho, quantos forem precisos), `ModelOptions.cell`, `render.set { yarnModel: "simple"|"traced"|"relaxed", yarnRho: 0,06 a 0,12 (padrão 0,10) }`, seletor no painel (marcado experimental). Vale só para SC com ≤ 1 perna em qualidade ≥ 1. Testes: `yarn-model.test.ts` e um e2e.
+- **Fiada plana** (12 pb sobre 12 pontos): o fim do fio de um ponto coincide com o começo do seguinte (< 1e-6) e a distância mínima entre fios de pontos diferentes é ≥ 1,7ρ.
+- **Esfera de 9 voltas (151 pontos), ρ = 0,10, distâncias normalizadas pela escala do ponto** (escala 1,03; |ex| 0,93 e |ey| 1,13, anisotropia de 22%). Pares de pontos vizinhos (centros a até 2,2 larguras), pela distância mínima entre os fios:
+
+| Grupo                                                                                     | Pares | < 1,0ρ | 1,0 a 1,5ρ | 1,5 a 1,8ρ | ≥ 1,8ρ |
+| ----------------------------------------------------------------------------------------- | ----- | ------ | ---------- | ---------- | ------ |
+| (a) pontos puros (SC, 1 perna, base com um só filho, vizinhos também puros): 54 pontos    | 249   | 5      | 25         | 74         | 145    |
+| (b) o resto dos SC com ≤ 1 perna (aumentos, diminuições, anel, vizinhos deles): 81 pontos | 601   | 88     | 76         | 72         | 365    |
+
+- **Conclusão:** o grupo (a) não chega a 1,7ρ (5 cruzamentos e 12% abaixo de 1,5ρ): **célula periódica única não funciona em peças curvas.** Critério de parada da etapa H cumprido; a regra de costura (usar a célula só em pb de uma perna cujos vizinhos também são puros) não foi implementada porque só valeria se (a) passasse.
+- **Causa provável (não provada):** a metade de baixo da célula (y abaixo de −0,5) é mapeada pelo quadro do ponto filho, que numa peça curva não coincide com o topo real do ponto pai; a anisotropia (22%) reduz as separações em x em cerca de 7 a 10%.
+- **Caminho possível no futuro (não construir agora):** deformar a metade de baixo pelo quadro do ponto pai.
+- **Imagens:** `docs/imagens/h2-esfera-{simple,relaxed}.png`. O modelo simples é desenhado na faixa 0,16 (mais grosso que o fio real, ≈ 0,10), então a comparação não é com a mesma espessura.

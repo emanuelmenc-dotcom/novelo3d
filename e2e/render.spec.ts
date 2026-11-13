@@ -475,3 +475,39 @@ test("R3d-4: o AO muda a luz, não muda a geometria e mantém o fundo transparen
     await client.close();
   }
 });
+
+test("H2: o modelo do fio relaxado muda a malha, é validado e volta ao anterior", async ({ page }) => {
+  const { client, call } = await bridge(page, 47878);
+  try {
+    type St = { state: string; info: { geomChecksum: number; drawn: number } };
+    const run = async (): Promise<St> => {
+      await call("render.start");
+      await expect.poll(async () => (await call("render.status")).state, { timeout: 120_000 }).toBe("done");
+      return call("render.status");
+    };
+    await call("render.set", {
+      width: 480,
+      height: 270,
+      samples: 1,
+      scope: "all",
+      pace: 0,
+      mode: "fast",
+      ao: 0,
+    });
+    const simple = await run();
+    await call("render.set", { yarnModel: "relaxed" });
+    const relaxed = await run();
+    expect(relaxed.info.drawn).toBe(simple.info.drawn);
+    expect(relaxed.info.geomChecksum).not.toBe(simple.info.geomChecksum);
+    expect(await page.evaluate(() => window.__render?.meanLuma() ?? 0)).toBeGreaterThan(5);
+    // outro raio refaz os blocos
+    await call("render.set", { yarnRho: 0.08 });
+    expect((await run()).info.geomChecksum).not.toBe(relaxed.info.geomChecksum);
+    await call("render.set", { yarnModel: "simple" });
+    expect((await run()).info.geomChecksum).toBe(simple.info.geomChecksum);
+    await expect(call("render.set", { yarnModel: "xyz" })).rejects.toThrow();
+    await expect(call("render.set", { yarnRho: 0.3 })).rejects.toThrow();
+  } finally {
+    await client.close();
+  }
+});

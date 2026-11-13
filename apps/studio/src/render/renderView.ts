@@ -14,6 +14,7 @@ import {
   NEUTRAL,
   parseModelKey,
   RHO_BANDS,
+  relaxedScCell,
   relaxSelection,
   shapeKey,
   type TopShape,
@@ -386,6 +387,8 @@ export class RenderView {
     }
     const posInOrder = new Map<number, number>();
     for (let j = 0; j < order.length; j++) posInOrder.set(order[j] as number, j);
+    // modelo relaxado: uma célula por raio, calculada uma vez (acima de 0,12 volta ao modelo traçado)
+    const cell = s.yarnModel === "relaxed" ? (relaxedScCell(s.yarnRho) ?? undefined) : undefined;
     const specKeys = (layout.geoms ?? []).map((k) => strHash(k));
     const radiusOf = (i: number, spec: ModelSpec, nd: { uid?: number }): number => {
       // pequena variação por ponto (±3% no raio), estável: depende só do uid
@@ -407,7 +410,8 @@ export class RenderView {
         mx(q(a[i * 3 + 2]));
       };
       mx(s.quality);
-      mx(s.continuousYarn ? 1 : 0);
+      mx(s.yarnModel === "simple" ? 0 : s.yarnModel === "traced" ? 1 : 2);
+      mx(q(s.yarnRho));
       for (let j = lo; j < hi; j++) {
         const i = order[j] as number;
         const nd = nodes[i];
@@ -460,9 +464,15 @@ export class RenderView {
           continue;
         }
         drawnHere++;
-        const m = deformToCurve(spec, frames, i, radiusOf(i, spec, nd), shapes?.[i], {
-          customStrands: s.continuousYarn,
-        });
+        const useCell = cell && spec.type === "SC" && spec.legs <= 1 && spec.quality >= 1;
+        const m = deformToCurve(
+          spec,
+          frames,
+          i,
+          useCell ? s.yarnRho * frameScale(frames, i) : radiusOf(i, spec, nd),
+          shapes?.[i],
+          { customStrands: s.yarnModel !== "simple", ...(cell ? { cell } : {}) },
+        );
         for (let q = 0; q < m.positions.length; q++) {
           sum ^= Math.round((m.positions[q] as number) * 1e4) | 0;
           sum = Math.imul(sum, 0x01000193);

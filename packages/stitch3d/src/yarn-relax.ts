@@ -4,7 +4,7 @@
 // o ponto anterior e o seguinte). Fase 1 infla o raio de ρ₀ até o alvo; fase 2 aperta (encurta o fio) enquanto a
 // penetração máxima ficar abaixo de 5% de ρ. Determinístico: sem acaso, ordem fixa (Gauss-Seidel). Puro.
 import type { V3 } from "./models.ts";
-import { resample } from "./yarn-cell.ts";
+import { resample, scCellPath } from "./yarn-cell.ts";
 
 /** Pontos mais próximos de dois segmentos (Ericson): distância e parâmetros s (em p) e t (em q). */
 export function segSegDist(p0: V3, p1: V3, q0: V3, q1: V3): { d: number; s: number; t: number } {
@@ -318,4 +318,24 @@ export function relaxCell(path: V3[], opts: CellOptions): CellResult {
     stagesDone,
     minDistEver: Math.min(seen, minDist),
   };
+}
+
+/** Maior raio do fio (em larguras de ponto) para o qual o modelo relaxado foi medido (H1b: 0,12 → 1,79ρ). */
+export const RELAXED_MAX_RHO = 0.12;
+const relaxedCache = new Map<number, V3[]>();
+
+/**
+ * Célula relaxada do ponto baixo para o raio `rho` (cadeia periódica de 97 nós, último = primeiro + (1, 0, 0)), calculada
+ * uma vez por raio (cerca de 0,6 s) e reaproveitada por todos os pontos. Acima de `RELAXED_MAX_RHO` devolve null: o
+ * solver não foi testado ali e o chamador usa o modelo anterior.
+ */
+export function relaxedScCell(rho: number): V3[] | null {
+  if (!(rho > 0) || rho > RELAXED_MAX_RHO) return null;
+  const key = Math.round(rho * 1e4);
+  let cell = relaxedCache.get(key);
+  if (!cell) {
+    cell = relaxCell(scCellPath(), { rho: key / 1e4 }).pts;
+    relaxedCache.set(key, cell);
+  }
+  return cell;
 }

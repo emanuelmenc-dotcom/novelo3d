@@ -41,7 +41,10 @@ export interface RenderSettings {
   /** O topo do ponto de base abre e inclina na direção dos filhos (só no Render). */
   baseShape: boolean;
   /** Fio contínuo dos pontos de haste (pb, mpa, pa, pad); desligado, usa o modelo procedural antigo. */
-  continuousYarn: boolean;
+  /** Modelo do fio: simple (padrão), traced (fio contínuo traçado) ou relaxed (pb relaxado com colisão). */
+  yarnModel: "simple" | "traced" | "relaxed";
+  /** Raio do fio do modelo relaxado, em larguras de ponto (0,06 a 0,12). */
+  yarnRho: number;
   /** "fast": monta direto com as formas finais; "full": ponto a ponto em ordem de trabalho, refazendo as bases. */
   mode: "fast" | "full";
   /** Modo completo: pontos revelados por segundo (0 = o mais rápido possível). */
@@ -99,7 +102,8 @@ export const DEFAULT_RENDER: RenderSettings = {
   relaxIterations: 20,
   fitSelection: true,
   baseShape: true,
-  continuousYarn: false,
+  yarnModel: "simple",
+  yarnRho: 0.1,
   mode: "fast",
   pace: 60,
   ao: 0.5,
@@ -263,7 +267,8 @@ export type RenderPatch = {
   relaxIterations?: number;
   fitSelection?: boolean;
   baseShape?: boolean;
-  continuousYarn?: boolean;
+  yarnModel?: string;
+  yarnRho?: number;
   mode?: string;
   pace?: number;
   ao?: number;
@@ -302,11 +307,12 @@ export function setRenderSettings(p: RenderPatch): RenderStatus {
   }
   if (p.pace !== undefined) s.pace = Math.round(num(p.pace, "pace", 0, 2000));
   if (p.ao !== undefined) s.ao = num(p.ao, "ao", 0, 1);
-  if (p.continuousYarn !== undefined) {
-    if (typeof p.continuousYarn !== "boolean")
-      throw new Error("'continuousYarn' deve ser verdadeiro ou falso");
-    s.continuousYarn = p.continuousYarn;
+  if (p.yarnModel !== undefined) {
+    if (p.yarnModel !== "simple" && p.yarnModel !== "traced" && p.yarnModel !== "relaxed")
+      throw new Error("'yarnModel' deve ser simple, traced ou relaxed");
+    s.yarnModel = p.yarnModel;
   }
+  if (p.yarnRho !== undefined) s.yarnRho = num(p.yarnRho, "yarnRho", 0.06, 0.12);
   if (p.mode !== undefined) {
     if (p.mode !== "fast" && p.mode !== "full") throw new Error("'mode' deve ser fast ou full");
     s.mode = p.mode;

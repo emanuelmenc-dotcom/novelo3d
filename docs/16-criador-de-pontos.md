@@ -74,6 +74,7 @@ Plano do advisor Opus, 2026-11-13. Chamado "criador B–E" nos documentos e rela
 - Comandos, todos chamáveis por MCP: `stitchEditor.state|selectBase|apply|undo|reset|save`.
 - Painel no espaço de trabalho modular: diagrama em cima, botões habilitados por `allowed`, carreira de baixo sintética (5 bases) para escolher.
 - e2e pela ponte: montar pb e pa; conferir que comandos inválidos são recusados e que `finish` só libera com 1 alça.
+- **Ponto a resolver no plano de D:** com a tira de bases deslocada meia coluna (etapa C), a alça puxada na casa i da agulha fica sobre a base i−1. No pb isso lê bem (inserir na base 0 cai na casa 1); no mpa, pa e pad o `insert` cai na casa 2 ou 3 e as pernas descem para a base 1 ou 2 antes de dobrar até a base 0. As folhas da etapa C só mostram pontos prontos e o pb passo a passo, então isso só aparece na janela, a cada passo.
 
 ## E: pontos do usuário no projeto
 

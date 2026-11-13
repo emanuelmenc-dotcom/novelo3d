@@ -118,7 +118,7 @@ function checkDiagram(
         .filter((e) => e["data-through"] !== undefined && e["data-side"] === "back")
         .map((e) => Number(e["data-through"])),
       `${where} draw ${j + 1}`,
-    ).toEqual(through);
+    ).toEqual([...through].reverse());
     // o fio do draw atravessa os furos de exatamente as alças atravessadas, e de mais nenhuma
     const hit = new Set<number>();
     for (const seg of mine) for (const [id, h] of holes) if (crosses(seg, h)) hit.add(id);
@@ -411,26 +411,21 @@ describe("pernas duplas (U comprido)", () => {
   });
 
   test("sem sobreposição nas 300 caminhadas (todos os prefixos), salvo os limites conhecidos, desculpados por par de alças", () => {
-    const counts = { deep: 0, twoBases: 0 };
+    const counts = { deep: 0, cycle: 0 };
     for (let seed = 1; seed <= 300; seed++) {
       for (const state of walk(seed)) {
+        const found = legOverlaps(state, "right");
+        if (found.length === 0) continue;
         const deep = deepIds(state);
-        const base = pulledBase(state);
-        const pulls = new Map<number, number>();
-        for (const b of base.values()) pulls.set(b, (pulls.get(b) ?? 0) + 1);
-        for (const o of legOverlaps(state, "right")) {
-          // (1) um dos dois fios é de uma alça puxada "funda"; (2) as duas são puxadas de bases diferentes, cada uma com 2 ou mais puxadas
-          const [ba, bb] = [base.get(o.a), base.get(o.b)];
-          const twoBases =
-            ba !== undefined &&
-            bb !== undefined &&
-            ba !== bb &&
-            (pulls.get(ba) ?? 0) >= 2 &&
-            (pulls.get(bb) ?? 0) >= 2;
+        const cycles = trackCycles(state, "right");
+        for (const o of found) {
+          // (1) um dos dois fios é de uma alça puxada "funda"; (2) as duas pernas estão no mesmo ciclo de restrições das pistas
+          // (a casa de entrada de cada uma fica a menos de PITCH da descida da outra): nenhuma ordem de pistas resolve
           const isDeep = deep.has(o.a) || deep.has(o.b);
-          expect(isDeep || twoBases, `semente ${seed}: ${cmdText(state)}: ${o.text}`).toBe(true);
+          const inCycle = cycles.get(o.a) !== undefined && cycles.get(o.a) === cycles.get(o.b);
+          expect(isDeep || inCycle, `semente ${seed}: ${cmdText(state)}: ${o.text}`).toBe(true);
           if (isDeep) counts.deep++;
-          else counts.twoBases++;
+          else counts.cycle++;
         }
       }
     }
@@ -438,46 +433,77 @@ describe("pernas duplas (U comprido)", () => {
     expect(counts).toEqual(COUNTS_WALKS);
   });
 
-  test("continuidade: braços saem do U (agulha) ou do fundo do anel e terminam nas pontas da curva; a curva fica no V da sua base", () => {
+  test("continuidade: o fio sai da dobra (agulha) ou das pontas do círculo (anel) e as pernas verdes terminam abertas, no meio do U da sua base", () => {
     const states_ = [...SEQUENCES.flatMap((q) => states(q.cmds))];
     for (let seed = 1; seed <= 60; seed++) states_.push(...walk(seed));
     for (const state of states_) {
       for (const hand of ["right", "left"] as const) {
         const svg = stitchDiagramSvg(state, { hand });
         const els = elements(svg);
-        const where = `${state.cmds.length} cmds ${hand}`;
+        const where = `${cmdText(state)} ${hand}`;
+        expect(svg, where).not.toContain("data-leg-curve");
         const holes = holesOf(els);
-        const v = new Map(
+        const bases = new Map(
           els
             .filter((e) => e["data-base-top"] !== undefined)
             .map((e) => [Number(e["data-base-top"]), e] as const),
         );
-        for (const curve of els.filter((e) => e["data-leg-curve"] !== undefined)) {
-          const id = curve["data-leg-curve"] as string;
-          const pieces = [...legPieces(svg)].filter(([k]) => k.startsWith(`${id}:`));
-          const last = Math.max(...pieces.map(([k]) => Number(k.split(":")[1])));
-          const first = pieces.filter(([k]) => k.endsWith(":0")).flatMap(([, ls]) => ls);
-          const ends = pieces.filter(([k]) => k.endsWith(`:${last}`)).flatMap(([, ls]) => ls);
-          const m = /^M ([\d.-]+) ([\d.-]+) A [\d.]+ [\d.]+ 0 0 [01] ([\d.-]+) ([\d.-]+)/.exec(
-            curve.d ?? "",
-          ) as RegExpExecArray;
-          // as duas últimas peças terminam exatamente nas duas pontas da curva
-          expect(ends.map((e) => `${e.x2},${e.y2}`).sort(), where).toEqual(
-            [`${m[1]},${m[2]}`, `${m[3]},${m[4]}`].sort(),
-          );
-          // as duas primeiras peças começam a ±6: na agulha, na dobra por cima dela (x ± 6, y = 72); num U fechado, nas
-          // pontas do círculo (x, cy ± 6)
-          const loop = els.find((e) => e["data-loop"] === id && e["data-part"] !== undefined) as El;
-          const cx = Number(loop["data-cx"]);
+        for (const arm of els.filter((e) => e["data-part"] === "back" && e["data-leg"] !== undefined)) {
+          const id = arm["data-loop"] as string;
+          const first = [...legPieces(svg)].filter(([k]) => k === `${id}:0`).flatMap(([, ls]) => ls);
+          const cx = Number(arm["data-cx"]);
           const hole = holes.get(Number(id));
+          // as duas primeiras peças começam a ±6: na dobra por cima da agulha (x ± 6, y = 72) ou nas pontas do círculo (x, cy ± 6)
           const expected = hole
             ? [-6, 6].map((dy) => `${cx.toFixed(1)},${(hole.cy + dy).toFixed(1)}`)
             : [-6, 6].map((dx) => `${(cx + dx).toFixed(1)},72.0`);
-          expect(first.map((e) => `${e.x1},${e.y1}`).sort(), where).toEqual(expected.sort());
-          // a curva está dentro do V da sua base
-          const vv = v.get(Number(curve["data-base"])) as El;
-          const mid = (Number(m[1]) + Number(m[3])) / 2;
-          expect(Math.abs(mid - Number(vv["data-cx"])), where).toBeLessThanOrEqual(Number(vv["data-hw"]));
+          expect(first.map((e) => `${e.x1},${e.y1}`).sort(), `${where} alça ${id}`).toEqual(expected.sort());
+        }
+        for (const id of new Set(
+          els.filter((e) => e["data-leg"] !== undefined).map((e) => e["data-leg"] as string),
+        )) {
+          const pieces = [...legPieces(svg)].filter(([k]) => k.startsWith(`${id}:`));
+          const last = Math.max(...pieces.map(([k]) => Number(k.split(":")[1])));
+          const ends = pieces.filter(([k]) => k.endsWith(`:${last}`)).flatMap(([, ls]) => ls);
+          const base = bases.get(Number((ends[0] as El)["data-base"])) as El;
+          // terminam abertas (sem curva): as duas linhas param no meio do U (y = baseY), dentro do interior dele
+          for (const e of ends) {
+            expect(num(e, "y2"), `${where} perna ${id}`).toBeCloseTo(num(base, "data-cy"), 1);
+            expect(Math.abs(num(e, "x2") - num(base, "data-hx")), `${where} perna ${id}`).toBeLessThan(
+              num(base, "data-hw"),
+            );
+          }
+        }
+      }
+    }
+  });
+
+  test("a fileira de bases é uma corrente de U: as duas linhas de cada base entram no U da base vizinha e descem abertas", () => {
+    for (const state of states(SEQUENCES.find((q) => q.file === "puff")?.cmds ?? [])) {
+      for (const hand of ["right", "left"] as const) {
+        const els = elements(stitchDiagramSvg(state, { hand }));
+        const tops = new Map(
+          els
+            .filter((e) => e["data-base-top"] !== undefined)
+            .map((e) => [Number(e["data-base-top"]), e] as const),
+        );
+        for (const [k, top] of tops) {
+          const lines = els.filter((e) => e["data-base-line"] === String(k));
+          expect(lines.length, `base ${k} ${hand}`).toBeGreaterThan(0);
+          // as duas linhas descem (verticais, abertas); as de uma base entram no U da base vizinha (a base 0 vira as suas no próprio fim)
+          const down = lines.filter(
+            (e) =>
+              Math.abs(num(e, "x1") - num(e, "x2")) < 0.05 &&
+              Math.abs(num(e, "y2") - (num(top, "data-cy") + 36)) < 0.1,
+          );
+          expect(down.length, `base ${k} ${hand}`).toBe(2);
+          const [d0, d1] = [down[0] as El, down[1] as El];
+          expect(Math.abs(num(d0, "x1") - num(d1, "x1")), `base ${k} ${hand}`).toBeCloseTo(12, 1);
+          const into = tops.get(k - 1);
+          if (into)
+            expect(Math.abs(num(d0, "x1") - num(into, "data-hx")), `base ${k} ${hand}`).toBeLessThan(
+              num(into, "data-hw"),
+            );
         }
       }
     }
@@ -516,6 +542,46 @@ function legOverlaps(state: B.BuilderState, hand: Hand): Overlap[] {
   return found;
 }
 
+/**
+ * Ciclos de restrições das pistas das pernas (limite conhecido): a descida de A fica a menos de PITCH da casa de entrada de
+ * B e vice-versa, então nenhuma ordem de pistas evita o trecho vertical sobreposto. Lido das coordenadas das linhas: devolve,
+ * para cada alça que está num ciclo, o número do ciclo (as alças do mesmo ciclo mutuamente atingíveis).
+ */
+function trackCycles(state: B.BuilderState, hand: Hand): Map<number, number> {
+  const pieces = [...legPieces(stitchDiagramSvg(state, { hand }))].filter(
+    ([, ls]) => ls[0]?.["data-leg"] !== undefined,
+  );
+  const mid = (ls: El[], k: string): number => (num(ls[0] as El, k) + num(ls[1] as El, k)) / 2;
+  const legs: { id: number; drop: number; land: number }[] = [];
+  for (const id of new Set(pieces.map(([k]) => Number(k.split(":")[0])))) {
+    const mine = pieces
+      .filter(([k]) => k.startsWith(`${id}:`))
+      .sort((p, q) => Number(p[0].split(":")[1]) - Number(q[0].split(":")[1]))
+      .map(([, ls]) => ls);
+    const vertical = mine.filter((ls) => Math.abs(mid(ls, "x1") - mid(ls, "x2")) < 0.05);
+    const hasTrack = mine.some((ls) => Math.abs(mid(ls, "y1") - mid(ls, "y2")) < 0.05);
+    if (!hasTrack || vertical.length === 0) continue; // só as pernas com pista entram nas restrições
+    legs.push({
+      id,
+      drop: mid(vertical[0] as El[], "x1"),
+      land: mid(vertical[vertical.length - 1] as El[], "x1"),
+    });
+  }
+  const n = legs.length;
+  const reach = legs.map((a) => legs.map((b) => a !== b && Math.abs(a.drop - b.land) < 23));
+  for (let k = 0; k < n; k++)
+    for (let i = 0; i < n; i++)
+      for (let j = 0; j < n; j++)
+        if ((reach[i] as boolean[])[k] && (reach[k] as boolean[])[j]) (reach[i] as boolean[])[j] = true;
+  const out = new Map<number, number>();
+  for (let i = 0; i < n; i++) {
+    if (!(reach[i] as boolean[])[i]) continue;
+    const comp = legs.findIndex((_, j) => (reach[i] as boolean[])[j] && (reach[j] as boolean[])[i]);
+    out.set((legs[i] as { id: number }).id, comp);
+  }
+  return out;
+}
+
 type Overlap = { a: number; b: number; text: string };
 
 /** Base de cada alça puxada (uma por `insert`). */
@@ -545,13 +611,13 @@ function deepIds(state: B.BuilderState): Set<number> {
   }
   const out = new Set<number>();
   for (const [id, ks] of kids) {
-    if (base.has(id) && (kids.get(ks[ks.length - 1] as number)?.length ?? 0) > 0) out.add(id);
+    if (base.has(id) && (kids.get(ks[0] as number)?.length ?? 0) > 0) out.add(id);
   }
   return out;
 }
 
 // pares sobrepostos nas 300 caminhadas, por categoria (preenchido na primeira execução)
-const COUNTS_WALKS = { deep: 118, twoBases: 2 };
+const COUNTS_WALKS = { deep: 123, cycle: 7 };
 
 describe("alça fechada: U de lado (sem elipses)", () => {
   const all = (): B.BuilderState[] => {
@@ -592,6 +658,70 @@ describe("alça fechada: U de lado (sem elipses)", () => {
     }
   });
 });
+
+describe("ordem do fio e U cinza inicial", () => {
+  const all = (): B.BuilderState[] => {
+    const out = SEQUENCES.flatMap((q) => states(q.cmds));
+    for (let seed = 1; seed <= 60; seed++) out.push(...walk(seed));
+    return out;
+  };
+
+  test("ordem vertical: o fio encontra primeiro o último anel por que passou (dentro de um draw cy decresce ao longo do through; os anéis de um draw mais novo ficam acima dos do mais antigo)", () => {
+    for (const state of all()) {
+      for (const hand of ["right", "left"] as const) {
+        const holes = holesOf(elements(stitchDiagramSvg(state, { hand })));
+        const draws = drawsOf(state);
+        for (const d of draws) {
+          const ys = d.through.map((id) => (holes.get(id) as Hole).cy);
+          for (let i = 1; i < ys.length; i++) {
+            expect(ys[i] as number, `${cmdText(state)} ${hand} draw ${d.through.join(",")}`).toBeLessThan(
+              ys[i - 1] as number,
+            );
+          }
+        }
+        for (const [i, d2] of draws.entries()) {
+          for (const d1 of draws.slice(0, i).filter((d) => d.top === d2.top)) {
+            const low = Math.max(...d2.through.map((id) => (holes.get(id) as Hole).cy));
+            const high = Math.min(...d1.through.map((id) => (holes.get(id) as Hole).cy));
+            expect(low, `${cmdText(state)} ${hand} draws do mesmo fio`).toBeLessThan(high);
+          }
+        }
+      }
+    }
+  });
+
+  test("só o U cinza inicial tem as pernas para a direita (mão direita); os outros U fechados, para a esquerda; na mão esquerda, o contrário", () => {
+    for (const state of all()) {
+      for (const hand of ["right", "left"] as const) {
+        const els = elements(stitchDiagramSvg(state, { hand }));
+        for (const arm of els.filter((e) => e["data-part"] === "back" && e["data-on-hook"] === "0")) {
+          const first = els.find(
+            (e) => e["data-pair"] === arm["data-loop"] && e["data-seg"] === "0" && e["data-side"] === "back",
+          ) as El;
+          const pointsRight = num(first, "x2") > num(first, "x1");
+          const initial = arm["data-kind"] === "initial";
+          expect(pointsRight, `${cmdText(state)} ${hand} alça ${arm["data-loop"]}`).toBe(
+            initial === (hand === "right"),
+          );
+        }
+      }
+    }
+  });
+});
+
+/** Os `draw` de um estado: quem puxou (o de cima) e as alças atravessadas, na ordem do evento. */
+function drawsOf(state: B.BuilderState): { top: number; through: number[] }[] {
+  const out: { top: number; through: number[] }[] = [];
+  let list = [0];
+  for (const e of state.events) {
+    if (e.added !== undefined) list = [...list, e.added];
+    else if (e.through) {
+      out.push({ top: list[list.length - 1] as number, through: e.through });
+      list = list.filter((id) => !e.through?.includes(id));
+    }
+  }
+  return out;
+}
 
 describe("alça na agulha e ordem dos anéis", () => {
   const all = (): B.BuilderState[] => {

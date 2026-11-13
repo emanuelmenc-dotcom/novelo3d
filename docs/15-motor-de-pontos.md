@@ -1,5 +1,7 @@
 # 15 — Motor de pontos (identidade e propriedades)
 
+> **PAUSADO (D-57, 2026-11-13):** a janela Render, os comandos `render.*` e o 3D realista dos pontos estão desligados (`render` e `realistic3d` em `packages/commands/src/features.ts`). O código e os testes continuam; para retomar, ligue o interruptor e remova o `test.skip` de `e2e/render.spec.ts`. O 3D usa hoje o estilo CrochetPARADE.
+
 Decisão de 2026-11-11 (D-36), otimizada para custo computacional sem perder versatilidade.
 
 ## Problema

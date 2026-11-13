@@ -2,8 +2,12 @@
 // Criador de pontos, etapa D (docs/16): comandos stitchEditor.* pelo dispatch (a mesma via da janela e da ponte MCP).
 import { stitchDiagramSvg } from "@novelo/charts";
 import { stitchBuilder as B } from "@novelo/core";
-import { beforeEach, describe, expect, test } from "vitest";
-import { dispatch } from "../src/index.ts";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
+import { dispatch, setFeature } from "../src/index.ts";
+
+// o criador de pontos está pausado (D-57): estes testes ligam o recurso para o código continuar testado
+beforeAll(() => setFeature("stitchEditor", true));
+afterAll(() => setFeature("stitchEditor", false));
 
 interface View {
   cmds: B.Cmd[];

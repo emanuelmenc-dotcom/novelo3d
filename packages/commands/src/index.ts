@@ -44,6 +44,7 @@ import {
   refreshColumns,
   sizeOfTension,
 } from "./edit-store.ts";
+import { FEATURE_NAMES, featureOfMethod, features } from "./features.ts";
 import { materialsCommands } from "./materials-commands.ts";
 import {
   addRegion,
@@ -102,6 +103,7 @@ export {
 
 import { DEFAULT_PRESET_ID, presetList } from "./presets.ts";
 import {
+  enabledPanels,
   findLeaf,
   hiddenPanels,
   hidePanel,
@@ -109,6 +111,7 @@ import {
   movePanel,
   PANEL_IDS,
   type PanelId,
+  panelEnabled,
   resizeSplit,
   setActive,
   setSizes,
@@ -142,6 +145,7 @@ export {
   TENSION_MAX,
   TENSION_MIN,
 } from "./edit-store.ts";
+export { type Features, features, setFeature } from "./features.ts";
 export {
   addRegion,
   clearPaint,
@@ -186,6 +190,7 @@ export {
   compactLayout,
   DEFAULT_PANEL_MINS,
   type Dir,
+  enabledPanels,
   findLeaf,
   fits,
   HEAD_PX,
@@ -237,8 +242,9 @@ export type Params = Record<string, unknown>;
 const panelOf = (p: Params, k = "panel"): PanelId => {
   const v = p[k];
   if (typeof v !== "string" || !(PANEL_IDS as readonly string[]).includes(v)) {
-    throw new Error(`painel '${String(v)}' inválido (use ${PANEL_IDS.join(", ")})`);
+    throw new Error(`painel '${String(v)}' inválido (use ${enabledPanels().join(", ")})`);
   }
+  if (!panelEnabled(v as PanelId)) throw new Error(`o painel '${v}' está pausado (D-57)`);
   return v as PanelId;
 };
 /** Janela indicada por `leaf` (id) ou pelo painel que ela contém (`panel` / `toPanel`). */
@@ -696,5 +702,11 @@ export const commands: Record<string, Command> = {
 export function dispatch(method: string, params: Params = {}): unknown {
   const fn = commands[method];
   if (!fn) throw new Error(`comando desconhecido: ${method}`);
+  const feature = featureOfMethod(method);
+  if (feature && !features()[feature]) {
+    throw new Error(
+      `recurso pausado: ${FEATURE_NAMES[feature]} (${method}); veja features.ts e a decisão D-57`,
+    );
+  }
   return fn(params);
 }

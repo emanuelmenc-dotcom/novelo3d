@@ -50,12 +50,10 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
   await expect(page.locator("[data-part]")).toHaveCount(2);
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(2 * N);
   await page.getByRole("button", { name: "Ajustar" }).click();
-  // os modelos de ponto de todas as peças chegam ao 3D: tipos variados, diminuição (pernas) e a peça espelhada
+  // 3D no estilo CrochetPARADE (D-57): o fio das duas peças chega ao 3D num lote só. Os modelos de ponto (tipos, pernas,
+  // espelho) voltam a ser conferidos aqui quando `realistic3d` for religado em packages/commands/src/features.ts
   const models = (await page.evaluate(() => window.__view3d?.state().models)) ?? [];
-  expect(models.some((k) => k.includes("|F1"))).toBe(true);
-  expect(models.some((k) => k.includes("|F0"))).toBe(true);
-  expect(models.some((k) => /|L2|/.test(k))).toBe(true);
-  expect(models.some((k) => k.startsWith("RING@"))).toBe(true);
+  expect(models).toEqual(["cp:fio"]);
 
   // lado A: volta de um ponto da peça 1
   const canvas = page.getByTestId("scene").locator("canvas");

@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Vista 3D por ponto: uma malha instanciada (um "casulo" sombreado por ponto), grafo opcional, seleção por clique.
+// Vista 3D por ponto, seleção por clique. Estilo do desenho (D-57): com `features.realistic3d` desligado (o padrão) cada
+// ligação do grafo vira um segmento de fio colorido, como o 3D do CrochetPARADE, e a elipsoide invisível de cada ponto só
+// serve de alvo do clique; ligado, volta o desenho realista (modelos de ponto e tubo do `stitch3d`).
+import { features } from "@novelo/commands";
 import {
   BatchTable,
   buildTubeLod,
@@ -85,6 +88,8 @@ export interface View3D {
   /** Destaca todos os pontos das voltas dadas (índices expandidos) ou limpa com null. */
   highlightRows(rows: number[] | null, part?: string): void;
   setShowGraph(on: boolean): void;
+  /** Só as linhas das ligações (azul: dentro da volta, vermelho: entre voltas), como a vista padrão do CrochetPARADE. */
+  setWire(on: boolean): void;
   /** Cor de base (fio) de um ponto, como #rrggbb; para testes e ferramentas. */
   nodeColor(id: number): string | null;
   /** Seleciona um ponto por id (o mesmo efeito de um clique). */
@@ -227,6 +232,18 @@ export function mountView3D(
   let nodeSlot = new Int32Array(0);
   let tubeMesh: THREE.Mesh | null = null;
   let tubeData: TubeLod | null = null;
+  // estilo CrochetPARADE: um segmento (cilindro fino) por ligação do grafo e, no modo "só linhas", as linhas vermelhas e azuis
+  let edgeMesh: THREE.InstancedMesh | null = null;
+  let edgeA = new Int32Array(0);
+  let edgeB = new Int32Array(0);
+  let wireLines: THREE.LineSegments | null = null;
+  let wire = false;
+  const edgeGeo = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true);
+  const edgeMat = new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0 });
+  const EDGE_TINT = [null, ROW_TINT, SET_TINT, SELECT] as const;
+  const WIRE_ROW = new THREE.Color("#2a6fdb");
+  const WIRE_COL = new THREE.Color("#d63a2a");
+  let isRowEdge = new Uint8Array(0);
   let detail: "auto" | "stitch" | "tube" = "auto";
   let lod: "stitch" | "tube" = "stitch";
   let triangles = 0;
@@ -263,12 +280,22 @@ export function mountView3D(
     if (!mesh) return;
     const c = new THREE.Color();
     if (nodeRGB.length !== nodes.length * 3) nodeRGB = new Float32Array(nodes.length * 3);
+    const nodeState = new Uint8Array(nodes.length);
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i] as NodeMeta;
       c.copy(base[i] as THREE.Color);
-      if (rowSel?.has(n.row) && (!rowPart || n.part === rowPart)) c.copy(ROW_TINT);
-      if (setSel?.has(i)) c.copy(SET_TINT);
-      if (selected === i) c.copy(SELECT);
+      if (rowSel?.has(n.row) && (!rowPart || n.part === rowPart)) {
+        c.copy(ROW_TINT);
+        nodeState[i] = 1;
+      }
+      if (setSel?.has(i)) {
+        c.copy(SET_TINT);
+        nodeState[i] = 2;
+      }
+      if (selected === i) {
+        c.copy(SELECT);
+        nodeState[i] = 3;
+      }
       const b = batchMeshes[nodeBatch[i] as number];
       if (b) b.setColorAt(nodeSlot[i] as number, c);
       nodeRGB[i * 3] = c.r;
@@ -281,6 +308,39 @@ export function mountView3D(
       for (let v = 0; v < vn.length; v++) {
         const k = (vn[v] as number) * 3;
         col.setXYZ(v, nodeRGB[k] as number, nodeRGB[k + 1] as number, nodeRGB[k + 2] as number);
+      }
+    }
+    if (edgeMesh) {
+      // cada segmento leva a cor do fio dos dois pontos que liga; destaque (volta, seleção, ponto) vence a cor do fio
+      const ec = new THREE.Color();
+      for (let k = 0; k < edgeA.length; k++) {
+        const a = edgeA[k] as number;
+        const b = edgeB[k] as number;
+        const tint = EDGE_TINT[Math.max(nodeState[a] as number, nodeState[b] as number)];
+        if (tint) ec.copy(tint);
+        else {
+          ec.setRGB(
+            ((nodeRGB[a * 3] as number) + (nodeRGB[b * 3] as number)) / 2,
+            ((nodeRGB[a * 3 + 1] as number) + (nodeRGB[b * 3 + 1] as number)) / 2,
+            ((nodeRGB[a * 3 + 2] as number) + (nodeRGB[b * 3 + 2] as number)) / 2,
+          );
+        }
+        edgeMesh.setColorAt(k, ec);
+      }
+      if (edgeMesh.instanceColor) edgeMesh.instanceColor.needsUpdate = true;
+      if (wireLines) {
+        // "só linhas": vermelho/azul de fábrica, mas o destaque (volta, ponto, seleção) também aparece
+        const wc = wireLines.geometry.getAttribute("color") as THREE.BufferAttribute;
+        for (let k = 0; k < edgeA.length; k++) {
+          const tint =
+            EDGE_TINT[
+              Math.max(nodeState[edgeA[k] as number] as number, nodeState[edgeB[k] as number] as number)
+            ];
+          const col = tint ?? (isRowEdge[k] ? WIRE_ROW : WIRE_COL);
+          wc.setXYZ(k * 2, col.r, col.g, col.b);
+          wc.setXYZ(k * 2 + 1, col.r, col.g, col.b);
+        }
+        wc.needsUpdate = true;
       }
     }
     for (const b of batchMeshes) if (b.instanceColor) b.instanceColor.needsUpdate = true;
@@ -301,6 +361,15 @@ export function mountView3D(
   };
 
   const applyDetail = () => {
+    if (edgeMesh) {
+      // estilo CrochetPARADE: não há níveis de detalhe
+      lod = "stitch";
+      edgeMesh.visible = !wire;
+      if (wireLines) wireLines.visible = wire;
+      triangles = edgeMesh.count * 12;
+      invalidate();
+      return;
+    }
     lod = detail === "auto" ? (nodes.length > 60000 ? "tube" : "stitch") : detail;
     if (visual) visual.visible = lod === "stitch" || !tubeMesh;
     if (tubeMesh) tubeMesh.visible = lod === "tube";
@@ -386,6 +455,73 @@ export function mountView3D(
     setSel = next;
   };
 
+  /** Estilo CrochetPARADE: um segmento de fio por ligação do grafo e as linhas vermelhas (colunas) e azuis (voltas). */
+  const buildEdges = (data: LayoutData) => {
+    const e = data.edges;
+    const p = data.positions;
+    const m = Math.floor(e.length / 2);
+    edgeA = new Int32Array(m);
+    edgeB = new Int32Array(m);
+    const pa = new THREE.Vector3();
+    const pb = new THREE.Vector3();
+    let total = 0;
+    for (let k = 0; k < m; k++) {
+      const a = e[k * 2] as number;
+      const b = e[k * 2 + 1] as number;
+      edgeA[k] = a;
+      edgeB[k] = b;
+      pa.set(p[a * 3] as number, p[a * 3 + 1] as number, p[a * 3 + 2] as number);
+      pb.set(p[b * 3] as number, p[b * 3 + 1] as number, p[b * 3 + 2] as number);
+      total += pa.distanceTo(pb);
+    }
+    const radius = 0.085 * (m > 0 && total > 0 ? total / m : 1);
+    const im = new THREE.InstancedMesh(edgeGeo, edgeMat, Math.max(1, m));
+    im.count = m;
+    im.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    const up = new THREE.Vector3(0, 1, 0);
+    const dir = new THREE.Vector3();
+    const q4 = new THREE.Quaternion();
+    const pos = new THREE.Vector3();
+    const sc = new THREE.Vector3();
+    const m4 = new THREE.Matrix4();
+    const wireVerts = new Float32Array(m * 6);
+    const wireCols = new Float32Array(m * 6);
+    const rowColor = WIRE_ROW;
+    const colColor = WIRE_COL;
+    isRowEdge = new Uint8Array(m);
+    for (let k = 0; k < m; k++) {
+      const a = edgeA[k] as number;
+      const b = edgeB[k] as number;
+      pa.set(p[a * 3] as number, p[a * 3 + 1] as number, p[a * 3 + 2] as number);
+      pb.set(p[b * 3] as number, p[b * 3 + 1] as number, p[b * 3 + 2] as number);
+      dir.subVectors(pb, pa);
+      const len = dir.length();
+      if (len > 1e-9) dir.divideScalar(len);
+      else dir.copy(up);
+      q4.setFromUnitVectors(up, dir);
+      pos.addVectors(pa, pb).multiplyScalar(0.5);
+      sc.set(radius, Math.max(len, 1e-6), radius);
+      im.setMatrixAt(k, m4.compose(pos, q4, sc));
+      // ligação dentro da volta em azul; ligação entre voltas (coluna) em vermelho, como a vista padrão do CrochetPARADE
+      const sameRow = (nodes[a] as NodeMeta).row === (nodes[b] as NodeMeta).row;
+      isRowEdge[k] = sameRow ? 1 : 0;
+      const col = sameRow ? rowColor : colColor;
+      wireVerts.set([pa.x, pa.y, pa.z, pb.x, pb.y, pb.z], k * 6);
+      wireCols.set([col.r, col.g, col.b, col.r, col.g, col.b], k * 6);
+    }
+    im.instanceMatrix.needsUpdate = true;
+    im.frustumCulled = false;
+    im.setColorAt(0, new THREE.Color("#ffffff"));
+    edgeMesh = im;
+    scene.add(im);
+    const wg = new THREE.BufferGeometry();
+    wg.setAttribute("position", new THREE.BufferAttribute(wireVerts, 3));
+    wg.setAttribute("color", new THREE.BufferAttribute(wireCols, 3));
+    wireLines = new THREE.LineSegments(wg, new THREE.LineBasicMaterial({ vertexColors: true }));
+    wireLines.frustumCulled = false;
+    scene.add(wireLines);
+  };
+
   const setData = (data: LayoutData | null) => {
     invalidate();
     // mesma geometria (só cor, fio ou seleção mudaram): atualiza as cores sem recriar malhas, linhas nem a câmera
@@ -421,6 +557,17 @@ export function mountView3D(
       tubeMesh.geometry.dispose();
       tubeMesh = null;
       tubeData = null;
+    }
+    if (edgeMesh) {
+      scene.remove(edgeMesh);
+      edgeMesh.dispose();
+      edgeMesh = null;
+    }
+    if (wireLines) {
+      scene.remove(wireLines);
+      wireLines.geometry.dispose();
+      (wireLines.material as THREE.Material).dispose();
+      wireLines = null;
     }
     if (pickMesh) {
       pickScene.remove(pickMesh);
@@ -459,25 +606,47 @@ export function mountView3D(
     // mesmo referencial do modelo do ponto: a elipsoide de seleção cobre o ponto do topo à base (centro na meia haste)
     const sizes = nodes.map((nd) => nd.scale ?? nd.size ?? 1);
     const ranges = data.parts?.map((q) => ({ offset: q.offset, count: q.count }));
-    const mats = computeMatrices({
-      positions: data.positions,
-      parents: nodes.map((nd) => nd.parents),
-      size: sizes,
-      ...(ranges ? { ranges } : {}),
-    });
     centers = new Float32Array(n * 3);
-    const mid = new THREE.Matrix4().makeTranslation(0, -0.5, 0);
-    const mp = new THREE.Matrix4();
-    for (let i = 0; i < n; i++) {
-      mp.fromArray(mats, i * 16).multiply(mid);
-      mesh.setMatrixAt(i, mp);
-      centers[i * 3] = mp.elements[12] as number;
-      centers[i * 3 + 1] = mp.elements[13] as number;
-      centers[i * 3 + 2] = mp.elements[14] as number;
+    if (!features().realistic3d) {
+      // estilo CrochetPARADE: a elipsoide invisível de clique fica sobre o ponto do grafo, onde o fio passa
+      const mp = new THREE.Matrix4();
+      for (let i = 0; i < n; i++) {
+        const sz = (sizes[i] as number) * 0.8;
+        const x = p[i * 3] as number;
+        const y = p[i * 3 + 1] as number;
+        const z = p[i * 3 + 2] as number;
+        mp.makeScale(sz, sz, sz).setPosition(x, y, z);
+        mesh.setMatrixAt(i, mp);
+        centers[i * 3] = x;
+        centers[i * 3 + 1] = y;
+        centers[i * 3 + 2] = z;
+      }
+      modelKeys = ["cp:fio"];
+      nodeBatch = new Int32Array(n);
+      nodeSlot = new Int32Array(n);
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+      buildEdges(data);
+    } else {
+      const mats = computeMatrices({
+        positions: data.positions,
+        parents: nodes.map((nd) => nd.parents),
+        size: sizes,
+        ...(ranges ? { ranges } : {}),
+      });
+      const mid = new THREE.Matrix4().makeTranslation(0, -0.5, 0);
+      const mp = new THREE.Matrix4();
+      for (let i = 0; i < n; i++) {
+        mp.fromArray(mats, i * 16).multiply(mid);
+        mesh.setMatrixAt(i, mp);
+        centers[i * 3] = mp.elements[12] as number;
+        centers[i * 3 + 1] = mp.elements[13] as number;
+        centers[i * 3 + 2] = mp.elements[14] as number;
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+      buildVisual(data, mats, sizes, ranges);
     }
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-    buildVisual(data, mats, sizes, ranges);
     applyDetail();
     buildMs = performance.now() - t0;
     rebuildSel();
@@ -831,6 +1000,10 @@ export function mountView3D(
       showGraph = on;
       if (lines) lines.visible = on;
     },
+    setWire(on) {
+      wire = on;
+      applyDetail();
+    },
     select: choose,
     setTool(t) {
       tool = t;
@@ -889,6 +1062,11 @@ export function mountView3D(
       tubeMat.dispose();
       for (const b of batchMeshes) b.dispose();
       tubeMesh?.geometry.dispose();
+      edgeMesh?.dispose();
+      edgeGeo.dispose();
+      edgeMat.dispose();
+      wireLines?.geometry.dispose();
+      (wireLines?.material as THREE.Material | undefined)?.dispose();
       renderer.domElement.removeEventListener("pointermove", onMove);
       cancelAnimationFrame(raf);
       cube.dispose();
@@ -914,7 +1092,7 @@ export function mountView3D(
         frames,
         meshBuilds,
         triangles,
-        batches: batchMeshes.length,
+        batches: edgeMesh ? 1 : batchMeshes.length,
         models: modelKeys,
         buildMs,
         lod,

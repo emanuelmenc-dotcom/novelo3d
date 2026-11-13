@@ -1,5 +1,7 @@
 # Criador de pontos (etapas B a E)
 
+> **PAUSADO (D-57, 2026-11-13):** a janela Criador de pontos e os comandos `stitchEditor.*` estão desligados (`stitchEditor` em `packages/commands/src/features.ts`). Código e testes continuam; para retomar, ligue o interruptor e remova o `test.skip` de `e2e/criador.spec.ts`.
+
 Plano do advisor Opus, 2026-11-13. Chamado "criador B–E" nos documentos e relatórios, porque "Plano D" é o app desktop em Electron.
 
 **Aviso:** com a etapa H encerrada (D-54), o criador não melhora o visual 3D. Pontos feitos nele são desenhados com o modelo procedural existente mais próximo. O valor do criador está em definir, diagramar e validar pontos.

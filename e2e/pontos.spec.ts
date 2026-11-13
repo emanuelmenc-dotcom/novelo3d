@@ -270,11 +270,12 @@ test("R1: nível tubo troca a malha mas a seleção por forma continua", async (
   const st = () => page.evaluate(() => window.__view3d?.state());
   const stitch = await st();
   expect(stitch?.lod).toBe("stitch");
-  expect(stitch?.batches).toBeGreaterThan(1);
+  // 3D no estilo CrochetPARADE (D-57): um lote de fio e sem nível tubo; o desenho realista (vários lotes, tubo com menos
+  // triângulos) volta ao ligar `realistic3d` em packages/commands/src/features.ts
+  expect(stitch?.batches).toBe(1);
+  expect(stitch?.triangles).toBeGreaterThan(0);
   await detail("tube");
-  const tube = await st();
-  expect(tube?.lod).toBe("tube");
-  expect((tube?.triangles ?? 0) * 3).toBeLessThan(stitch?.triangles ?? 0);
+  expect((await st())?.lod).toBe("stitch");
   const canvas = page.getByTestId("scene").locator("canvas");
   const box = await canvas.boundingBox();
   if (!box) throw new Error("sem canvas");
@@ -288,4 +289,53 @@ test("R1: nível tubo troca a malha mas a seleção por forma continua", async (
   await page.screenshot({ path: "test-results/r1-tubo.png" });
   await detail("auto");
   expect((await st())?.lod).toBe("stitch");
+});
+
+test("D-57: 3D no estilo CrochetPARADE: fio por ligação, clique acha o ponto e 'Só linhas' não perde a seleção", async ({
+  page,
+}) => {
+  await open(page);
+  const st = () => page.evaluate(() => window.__view3d?.state());
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await page.getByTestId("scene").locator("canvas").screenshot({ path: "test-results/cp-fio-grande.png" });
+  const s = await st();
+  expect(s?.models).toEqual(["cp:fio"]);
+  expect(s?.batches).toBe(1);
+  // clicar no centro projetado de um ponto visível seleciona exatamente esse ponto
+  const visible = await page.evaluate(() => window.__view3d?.visibleNodes() ?? []);
+  expect(visible.length).toBeGreaterThan(20);
+  const target = visible[Math.floor(visible.length / 2)] as number;
+  const xy = await page.evaluate(() => window.__view3d?.projectAll() ?? []);
+  const box = await page.getByTestId("scene").locator("canvas").boundingBox();
+  if (!box) throw new Error("sem canvas");
+  await page.mouse.click(box.x + (xy[target * 2] as number), box.y + (xy[target * 2 + 1] as number));
+  expect((await st())?.selected).toBe(target);
+  // clicar no meio do segmento entre dois pontos vizinhos (o fio que se vê) seleciona um dos dois
+  const vset = new Set(visible);
+  const pair = visible.find(
+    (i) =>
+      vset.has(i + 1) &&
+      Math.hypot(
+        (xy[i * 2] as number) - (xy[(i + 1) * 2] as number),
+        (xy[i * 2 + 1] as number) - (xy[(i + 1) * 2 + 1] as number),
+      ) < 60,
+  );
+  if (pair === undefined) throw new Error("sem par de pontos vizinhos visíveis");
+  const mx = ((xy[pair * 2] as number) + (xy[(pair + 1) * 2] as number)) / 2;
+  const my = ((xy[pair * 2 + 1] as number) + (xy[(pair + 1) * 2 + 1] as number)) / 2;
+  await page.mouse.click(box.x + mx, box.y + my);
+  // o ponto achado pode ser outro (um de outra volta que cobre o pixel), mas tem de estar ao lado do segmento clicado
+  const hit = (await st())?.selected;
+  expect(hit).not.toBeNull();
+  const near = Math.hypot(
+    (xy[(hit as number) * 2] as number) - mx,
+    (xy[(hit as number) * 2 + 1] as number) - my,
+  );
+  expect(near).toBeLessThan(60);
+  await page.mouse.click(box.x + (xy[target * 2] as number), box.y + (xy[target * 2 + 1] as number));
+  await page.getByTestId("wire-toggle").check();
+  expect((await st())?.selected).toBe(target);
+  await page.screenshot({ path: "test-results/cp-so-linhas.png" });
+  await page.getByTestId("wire-toggle").uncheck();
+  await page.screenshot({ path: "test-results/cp-fio.png" });
 });

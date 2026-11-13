@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Máquina de estados e ajustes do render (R3b).
-import { afterEach, expect, test } from "vitest";
-import { dispatch, renderSnapshot } from "../src/index.ts";
+import { afterAll, afterEach, beforeAll, expect, test } from "vitest";
+import { dispatch, renderSnapshot, setFeature } from "../src/index.ts";
 
+// o render está pausado (D-57): estes testes ligam o recurso para o código continuar testado
+beforeAll(() => setFeature("render", true));
+afterAll(() => setFeature("render", false));
 afterEach(() => dispatch("render.reset", {}));
 
 test("estado inicial é idle com ajustes padrão", () => {

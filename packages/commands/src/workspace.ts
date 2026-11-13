@@ -3,6 +3,8 @@
 // agrupa painéis em abas, pode ser encolhida numa barra e receber painéis arrastados. Funções puras e testáveis;
 // a interface (studio) só desenha esta árvore. Sem DOM.
 
+import { type Features, features } from "./features.ts";
+
 export const PANEL_IDS = [
   "recipe",
   "verify",
@@ -17,6 +19,18 @@ export const PANEL_IDS = [
   "stitchEditor",
 ] as const;
 export type PanelId = (typeof PANEL_IDS)[number];
+
+/** Painéis que pertencem a um recurso pausável (features.ts): enquanto o recurso está desligado, o painel não existe. */
+const PANEL_FEATURE: Partial<Record<PanelId, keyof Features>> = {
+  render: "render",
+  stitchEditor: "stitchEditor",
+};
+export const panelEnabled = (p: PanelId): boolean => {
+  const f = PANEL_FEATURE[p];
+  return f === undefined || features()[f];
+};
+/** Painéis que existem agora (os do recurso desligado ficam de fora). */
+export const enabledPanels = (): PanelId[] => PANEL_IDS.filter(panelEnabled);
 
 export const PANEL_TITLES: Record<PanelId, string> = {
   recipe: "Receita",
@@ -149,8 +163,13 @@ function renorm(sizes: number[]): number[] {
 
 function normalizeNode(node: Node): Node | null {
   if (node.type === "leaf") {
-    if (node.tabs.length === 0) return null;
-    return { ...node, active: Math.min(Math.max(node.active, 0), node.tabs.length - 1) };
+    // painéis de recurso pausado somem de qualquer layout (preset, salvo ou vindo de fora); ao religar o recurso, voltam a
+    // aparecer como painéis ocultos
+    const tabs = node.tabs.filter(panelEnabled);
+    if (tabs.length === 0) return null;
+    const shown = node.tabs[node.active];
+    const active = shown !== undefined && tabs.includes(shown) ? tabs.indexOf(shown) : 0;
+    return { ...node, tabs, active: Math.min(Math.max(active, 0), tabs.length - 1) };
   }
   const kids: Node[] = [];
   const sizes: number[] = [];
@@ -388,7 +407,7 @@ export function showPanel(layout: Layout, panel: PanelId): Layout {
 
 export function hiddenPanels(layout: Layout): PanelId[] {
   const present = new Set(panelsIn(layout));
-  return PANEL_IDS.filter((p) => !present.has(p));
+  return PANEL_IDS.filter((p) => !present.has(p) && panelEnabled(p));
 }
 
 // ---------------------------------------------------------------- tamanhos mínimos e modo compacto

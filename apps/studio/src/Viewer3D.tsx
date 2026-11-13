@@ -22,6 +22,8 @@ declare global {
 export function Viewer3D(props: {
   layout: LayoutData | null;
   showGraph: boolean;
+  /** Só as linhas das ligações (estilo CrochetPARADE). */
+  wire?: boolean;
   rows: number[] | null;
   /** Peça cujas voltas/seleção aparecem destacadas (montagem). */
   activePart?: string;
@@ -67,6 +69,9 @@ export function Viewer3D(props: {
   useEffect(() => {
     view.current?.setShowGraph(props.showGraph);
   }, [props.showGraph]);
+  useEffect(() => {
+    view.current?.setWire(props.wire ?? false);
+  }, [props.wire]);
   useEffect(() => {
     view.current?.highlightRows(props.rows, props.activePart);
   }, [props.rows, props.activePart]);

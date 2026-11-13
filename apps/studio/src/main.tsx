@@ -8,6 +8,7 @@ import {
   exportEditAll,
   exportPaintAll,
   exportParts,
+  features,
   loadEditAll,
   loadPaintAll,
   loadParts,
@@ -235,6 +236,7 @@ function App() {
   const [page, setPage] = useState(0);
   const [bridge, setBridge] = useState<BridgeState>("off");
   const [showGraph, setShowGraph] = useState(false);
+  const [wire, setWire] = useState(false);
   const [selLabel, setSelLabel] = useState<string | null>(null);
   const [selNode, setSelNode] = useState<NodeMeta | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -560,6 +562,17 @@ function App() {
             <input type="checkbox" checked={showGraph} onChange={(e) => setShowGraph(e.target.checked)} />{" "}
             Mostrar grafo (ligações)
           </label>
+          {!features().realistic3d && (
+            <label>
+              <input
+                type="checkbox"
+                data-testid="wire-toggle"
+                checked={wire}
+                onChange={(e) => setWire(e.target.checked)}
+              />{" "}
+              Só linhas (vermelho/azul)
+            </label>
+          )}
           {layout && (
             <span className="hint">
               {layout.stats.nodes} nós · aresta média {layout.stats.meanEdge.toFixed(2)} · {layout.stats.mode}
@@ -584,6 +597,7 @@ function App() {
         <Viewer3D
           layout={layout}
           showGraph={showGraph}
+          wire={wire}
           rows={highlighted}
           {...(multi ? { activePart: partsState.active } : {})}
           cube={settings.interface.viewCube}

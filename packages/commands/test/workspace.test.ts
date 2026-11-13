@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Modelo do espaço de trabalho (árvore de janelas), presets, layouts do usuário e comandos workspace.*.
-import { afterEach, describe, expect, test } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 import {
   buildLayout,
   compactLayout,
@@ -22,6 +22,7 @@ import {
   resizeSplit,
   type Split,
   setActive,
+  setFeature,
   showPanel,
   toggleCollapse,
   validateLayout,
@@ -29,6 +30,16 @@ import {
   workspaceSnapshot,
 } from "../src/index.ts";
 
+// render e criador de pontos estão pausados (D-57); estes testes de layout ligam os dois para cobrir o conjunto completo
+// de painéis (o comportamento com eles desligados está em features.test.ts)
+beforeAll(() => {
+  setFeature("render", true);
+  setFeature("stitchEditor", true);
+});
+afterAll(() => {
+  setFeature("render", false);
+  setFeature("stitchEditor", false);
+});
 afterEach(() => resetWorkspace());
 
 const classic = (): Layout => buildLayout(PRESET_SPECS[0]?.spec as never);

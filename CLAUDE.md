@@ -37,6 +37,7 @@ Aplicativo web local para projetar amigurumis: modelagem 3D por peças, regiões
 | Algoritmo receita → geometria e tutorial        | `docs/09-motor-reverso.md`                   |
 | Formato do gráfico, PDF e tutorial 3D           | `docs/10-saidas-receita-grafico-tutorial.md` |
 | Motor de pontos, seleção, tensão, peças         | `docs/15-motor-de-pontos.md`                 |
+| Criador de pontos (etapas B a E, plano)         | `docs/16-criador-de-pontos.md`               |
 | Telas e interações                              | `docs/11-interface.md`                       |
 | Marcos e critérios de aceite                    | `docs/12-roadmap.md`                         |
 | Casos de teste com valores esperados            | `docs/13-plano-de-testes.md`                 |

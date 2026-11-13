@@ -1,34 +1,45 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Diagrama de nós esquemático do criador de pontos (etapa C, docs/16): as alças na agulha e os laços já fechados, lidos
-// dos eventos da máquina de estados. Por cima/por baixo vem da ordem de desenho (costas do anel, fio, frente do anel com
-// halo), não de cálculo de cruzamentos; a ligação "o fio passa por este anel" vem do layout: cada laço fechado tem a sua
-// faixa, e o fio de um laço só passa pelos furos dos laços que ele atravessou. Puro: mesma entrada, mesma string SVG.
+// dos eventos da máquina de estados. Cada alça é um fio em duas linhas (GAP uma da outra): na agulha o fio passa por cima
+// dela, com uma linha atrás e outra na frente; as duas linhas descem pelos anéis que a alça atravessou e, se ela veio de
+// uma base, até a base. Por cima/por baixo vem da ordem de desenho (costas, agulha, fios, frentes com halo), não de
+// cálculo de cruzamentos; a ligação "o fio passa por este anel" vem do layout. Puro: mesma entrada, mesma string SVG.
 import { stitchBuilder as B } from "@novelo/core";
 
 const BG = "#faf7ef";
 const COLOR: Record<B.LoopKind, string> = { initial: "#6b7280", yo: "#c2410c", pulled: "#2d6a4f" };
 const BASE_COLOR = "#9ca3af";
 /** Espaço entre as alças na agulha; as casas ficam entre as faixas (meia faixa de diferença), longe dos furos. */
-const SLOT = 60;
+const SLOT = 80;
 const HOOK_Y = 80;
+/** Até onde (abaixo da agulha) descem, abertas, as duas linhas de uma alça que só fica na agulha. */
 const HOOK_RY = 20;
-const CLOSED_RX = 15;
-const CLOSED_RY = 6;
-/** Distância vertical do fundo de um laço ao primeiro laço que o fio dele atravessa. */
-const LEVEL = 26;
-/** Degrau vertical entre laços sucessivos do mesmo fio. */
-const ROW = 14;
-const BASE_X0 = 60;
-/** Os V das bases ficam meia coluna à direita das faixas: nenhum anel fechado cai sobre um V; só as pernas ligam anel e base. */
-const BASE_SHIFT = 30;
-/** Largura de uma faixa (folha da árvore); no mínimo 2 × CLOSED_RX mais folga. */
-const LANE_W = 60;
 const STRAND_W = 5;
-/** Distância entre as duas linhas de uma perna (U); constante em todo o desenho. */
+/** Distância entre as duas linhas de um fio; constante em todo o desenho. */
 const GAP = 12;
 const HALF = GAP / 2;
-/** Passo entre pernas vizinhas (pistas e casas do V): GAP + traço + folga. */
+/** Passo entre fios vizinhos (pistas e casas do V): GAP + traço + folga. */
 const PITCH = GAP + STRAND_W + 6;
+/** Onde o fio dobra por cima da agulha: a dobra fica acima dela e as duas linhas descem, uma de cada lado. */
+const BEND_Y = HOOK_Y - 8;
+/** Anel fechado: elipse deitada, larga o bastante para duas passagens de fio (a que o atravessa e a dele mesmo). */
+const CLOSED_RX = 22;
+const CLOSED_RY = 6;
+/** Deslocamento, dentro do furo, do fio que atravessa o anel (PASS) e do fio do próprio anel (OWN). */
+const PASS = -PITCH / 2;
+const OWN = PITCH / 2;
+/** Altura da primeira camada de anéis abaixo da agulha, e distância de uma camada à seguinte (a partir da última linha). */
+const FIRST = 42;
+const LEVEL = 56;
+/** Distância entre as linhas de anéis de uma mesma camada: todo anel tem a sua altura, então nenhuma pista se encosta. */
+const ROW = 42;
+/** Folga acima de cada anel para a pista horizontal do fio que vai entrar nele. */
+const ENTER = 22;
+const BASE_X0 = 80;
+/** Os V das bases ficam meia coluna à direita das faixas: nenhum anel fechado cai sobre um V; só os fios ligam anel e base. */
+const BASE_SHIFT = 40;
+/** Largura de uma faixa (folha da árvore); no mínimo 2 × CLOSED_RX mais folga. */
+const LANE_W = 80;
 
 export interface StitchDiagramOptions {
   /** Quantas bases (topos da carreira de baixo) desenhar. Padrão: o maior entre 5 e (maior base usada + 2). */
@@ -57,6 +68,23 @@ interface Draw {
 interface Pos {
   x: number;
   y: number;
+}
+
+/** Caminho (linha central) do fio de uma alça; as duas linhas são o deslocamento de ±GAP/2 dele. */
+interface Path {
+  id: number;
+  pts: Pos[];
+  /** Por trecho: número do `draw` a que ele pertence (fio que atravessa anéis); null nas pernas e nos braços soltos. */
+  tags: (number | null)[];
+  /** Por trecho: anel que ele atravessa. */
+  through: (number | null)[];
+  /** Índice do primeiro trecho que já é perna (da última passagem por anéis até a base). */
+  legFrom: number;
+  base?: number;
+  /** Onde a perna começa a descer para a pista (x) e em que altura (y). */
+  drop: number;
+  land: number;
+  track: number;
 }
 
 const f = (v: number): string => v.toFixed(1);
@@ -93,6 +121,37 @@ function history(state: B.BuilderState): { info: Map<number, Info>; draws: Draw[
 const closedArc = (c: Pos, front: boolean): string =>
   `M ${f(c.x - CLOSED_RX)} ${f(c.y)} A ${CLOSED_RX} ${CLOSED_RY} 0 0 ${front ? 0 : 1} ${f(c.x + CLOSED_RX)} ${f(c.y)}`;
 
+type Line = { p: Pos; dir: Pos };
+
+/**
+ * Deslocamento de uma polilinha ortogonal por `d`, com quinas em ângulo reto: a distância entre as duas linhas (d e -d)
+ * é 2d em todos os trechos. Trechos seguidos na mesma direção são aceitos.
+ */
+function offset(pts: Pos[], d: number): Pos[] {
+  const ls: Line[] = pts.slice(0, -1).map((p, i) => {
+    const q = pts[i + 1] as Pos;
+    const len = Math.hypot(q.x - p.x, q.y - p.y);
+    const dir = { x: (q.x - p.x) / len, y: (q.y - p.y) / len };
+    return { p: { x: p.x - dir.y * d, y: p.y + dir.x * d }, dir };
+  });
+  const res: Pos[] = [(ls[0] as Line).p];
+  for (let i = 1; i < ls.length; i++) {
+    const [a, b] = [ls[i - 1] as Line, ls[i] as Line];
+    const det = a.dir.x * b.dir.y - a.dir.y * b.dir.x;
+    if (Math.abs(det) < 1e-9) {
+      const q = pts[i] as Pos;
+      res.push({ x: q.x - a.dir.y * d, y: q.y + a.dir.x * d });
+      continue;
+    }
+    const t = ((b.p.x - a.p.x) * b.dir.y - (b.p.y - a.p.y) * b.dir.x) / det;
+    res.push({ x: a.p.x + a.dir.x * t, y: a.p.y + a.dir.y * t });
+  }
+  const last = pts[pts.length - 1] as Pos;
+  const end = ls[ls.length - 1] as Line;
+  res.push({ x: last.x - end.dir.y * d, y: last.y + end.dir.x * d });
+  return res;
+}
+
 export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptions = {}): string {
   const { info, draws, peak } = history(state);
   const bases = B.basesOf(state.cmds);
@@ -101,7 +160,11 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
 
   // árvore: o fio de um laço atravessa, na ordem, os laços que os seus `draw` fecharam (os "filhos" dele)
   const children = new Map<number, number[]>();
-  for (const d of draws) children.set(d.top, [...(children.get(d.top) ?? []), ...d.through]);
+  const levelOf = new Map<number, number>();
+  for (const d of draws) {
+    children.set(d.top, [...(children.get(d.top) ?? []), ...d.through]);
+    for (const id of d.through) levelOf.set(id, d.level);
+  }
 
   // faixas: cada folha tem a sua; um laço com filhos fica na faixa do primeiro filho, os outros filhos vêm depois
   const laneOf = new Map<number, number>();
@@ -125,21 +188,36 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
   };
   const roots = state.loops.map((l) => l.id);
   for (const r of roots) for (const k of children.get(r) ?? []) assign(k);
+  // A ordem dos anéis é a da agulha no momento em que foram puxados: o mais perto da ponta (o primeiro do `draw`) fica do
+  // lado da ponta. No desenho da mão esquerda a ponta está à direita, então o primeiro filho recebe a faixa mais à direita.
+  const laneX = (lane: number): number => BASE_X0 + (nextLane - 1 - lane) * LANE_W;
 
-  // alturas: os filhos descem em degraus a partir do fundo do pai; cada subárvore pende da sua faixa
-  const closed = new Map<number, Pos>();
-  let maxY = HOOK_Y + HOOK_RY;
-  const place = (id: number, bottom: number): void => {
-    for (const [i, k] of (children.get(id) ?? []).entries()) {
-      const y = bottom + LEVEL + ROW * i;
-      closed.set(k, { x: BASE_X0 + (laneOf.get(k) as number) * LANE_W, y });
-      maxY = Math.max(maxY, y + CLOSED_RY);
-      place(k, y + CLOSED_RY);
+  // Alturas, em camadas por profundidade (filhos da agulha, netos, ...). Dentro de uma camada cada anel tem a sua linha,
+  // na ordem do `draw` e, entre pais, na ordem da árvore: assim as pistas horizontais dos fios nunca se encostam e os
+  // filhos de um mesmo pai ficam em linhas seguidas.
+  const bands: number[][] = [];
+  const walk = (id: number, depth: number): void => {
+    for (const k of children.get(id) ?? []) {
+      const band = bands[depth] ?? [];
+      bands[depth] = band;
+      band.push(k);
+      walk(k, depth + 1);
     }
   };
-  for (const r of roots) place(r, HOOK_Y + HOOK_RY);
+  for (const r of roots) walk(r, 0);
+  const closed = new Map<number, Pos>();
+  let maxY = HOOK_Y + HOOK_RY;
+  let rowY = HOOK_Y + HOOK_RY + FIRST;
+  for (const band of bands) {
+    for (const [i, k] of band.entries()) {
+      const y = rowY + ROW * i;
+      closed.set(k, { x: laneX(laneOf.get(k) as number), y });
+      maxY = Math.max(maxY, y + CLOSED_RY + 14);
+    }
+    rowY += ROW * (band.length - 1) + LEVEL;
+  }
 
-  // A coluna de cada base alarga para caber o leque das suas pernas: o espaço entre duas bases é múltiplo de 60 (assim os
+  // A coluna de cada base alarga para caber o leque dos seus fios: o espaço entre duas bases é múltiplo de 80 (assim os
   // V continuam longe das faixas e das casas da agulha) e deixa no mínimo PITCH entre a última casa de uma e a primeira
   // da seguinte.
   const pulledPerBase = new Map<number, number>();
@@ -152,76 +230,107 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
   const fan = (b: number): number => (Math.max(1, pulledPerBase.get(b) ?? 0) - 1) * PITCH;
   const baseCenters: number[] = [BASE_X0 + BASE_SHIFT];
   for (let b = 1; b < nb; b++) {
-    const gap = 60 * Math.ceil(((fan(b - 1) + fan(b)) / 2 + PITCH) / 60);
+    const gap = 80 * Math.ceil(((fan(b - 1) + fan(b)) / 2 + PITCH) / 80);
     baseCenters.push((baseCenters[b - 1] as number) + gap);
   }
   const baseX = (b: number): number => baseCenters[b] as number;
 
-  // largura múltipla de 60: as casas da agulha, ancoradas na ponta, ficam sempre a 30 px das faixas
+  // largura múltipla de 80: as casas da agulha, ancoradas na ponta, ficam sempre a 40 px das faixas
   const width =
     Math.ceil(
       Math.max(
         320,
         (baseCenters[nb - 1] as number) + BASE_X0,
-        BASE_X0 + Math.max(0, nextLane - 1) * LANE_W + 60,
-        30 + (peak - 1) * SLOT + 130,
-      ) / 60,
-    ) * 60;
+        BASE_X0 + Math.max(0, nextLane - 1) * LANE_W + 80,
+        40 + (peak - 1) * SLOT + 140,
+      ) / 80,
+    ) * 80;
 
   // Tudo é calculado no desenho da mão esquerda (ponta da agulha à direita) e espelhado na saída (x -> largura - x) na
   // mão direita. As alças da agulha ficam ancoradas na ponta: a mais nova está na ponta e as mais antigas deslizam
-  // 60 px em direção ao cabo a cada alça nova (e de volta quando um `draw` as remove).
+  // 80 px em direção ao cabo a cada alça nova (e de volta quando um `draw` as remove).
   const mirrored = (opts.hand ?? "right") === "right";
   const X = (x: number): number => (mirrored ? width - x : x);
   const onHook = new Map<number, Pos>();
   for (const [i, l] of state.loops.entries()) {
-    onHook.set(l.id, { x: width - 30 - (state.loops.length - 1 - i) * SLOT, y: HOOK_Y });
+    onHook.set(l.id, { x: width - 40 - (state.loops.length - 1 - i) * SLOT, y: HOOK_Y });
   }
   const centerOf = (id: number): Pos => (onHook.get(id) ?? closed.get(id)) as Pos;
   const isHook = (id: number): boolean => onHook.has(id);
   const ids = [...info.keys()].filter((id) => onHook.has(id) || closed.has(id)).sort((a, b) => a - b);
+  const kindOf = (id: number): B.LoopKind => (info.get(id) as Info).kind;
+  const baseOf = (id: number): number | undefined =>
+    kindOf(id) === "pulled" ? (info.get(id) as Info).base : undefined;
 
-  // Pernas: cada alça puxada de uma base é um U comprido. Os dois braços descem da alça (da agulha ou do fundo do anel) a
-  // GAP um do outro, atravessam numa pista própria abaixo de todos os anéis e entram na base na sua casa do V; a curva
-  // do U fica por baixo do V. Só há trechos retos (horizontais e verticais), então o deslocamento ±GAP/2 da linha central
-  // mantém a distância entre os braços constante e nada se sobrepõe.
-  interface Pair {
-    id: number;
-    base: number;
-    drop: number;
-    y0: number;
-    land: number;
-    track: number;
-  }
-  const pairs: Pair[] = [];
-  const byBase = new Map<number, number[]>();
+  // Caminhos dos fios. Cada alça na agulha tem um (dois braços que passam por cima da agulha); cada anel fechado tem um se
+  // ele atravessa outros anéis ou se veio de uma base. O caminho sai da alça (da agulha, ou do fundo do anel), passa pelo
+  // furo de cada anel que a alça atravessou, na ordem do `draw`, e então (se veio de uma base) segue até a base; senão,
+  // termina aberto logo abaixo do último anel (ou da agulha).
+  const paths: Path[] = [];
   for (const id of ids) {
-    const inf = info.get(id) as Info;
-    if (inf.kind === "pulled" && inf.base !== undefined)
-      byBase.set(inf.base, [...(byBase.get(inf.base) ?? []), id]);
+    const kids = children.get(id) ?? [];
+    if (!isHook(id) && kids.length === 0 && baseOf(id) === undefined) continue;
+    const c = centerOf(id);
+    const start: Pos = isHook(id) ? { x: c.x, y: BEND_Y } : { x: c.x + OWN, y: c.y + CLOSED_RY };
+    const pts: Pos[] = [start];
+    const tags: (number | null)[] = [];
+    const through: (number | null)[] = [];
+    let cur = start;
+    let pending: number | null = null;
+    const push = (p: Pos, tag: number | null): void => {
+      if (Math.hypot(p.x - cur.x, p.y - cur.y) < 0.01) return;
+      pts.push(p);
+      tags.push(tag);
+      through.push(pending);
+      pending = null;
+      cur = p;
+    };
+    for (const [i, k] of kids.entries()) {
+      const kc = closed.get(k) as Pos;
+      const lvl = levelOf.get(k) as number;
+      const prev = i === 0 ? lvl : (levelOf.get(kids[i - 1] as number) as number);
+      push({ x: cur.x, y: kc.y - ENTER }, prev);
+      push({ x: kc.x + PASS, y: kc.y - ENTER }, lvl);
+      pending = k;
+    }
+    const lastKid = kids[kids.length - 1];
+    if (lastKid !== undefined) {
+      push({ x: cur.x, y: (closed.get(lastKid) as Pos).y + 14 }, levelOf.get(lastKid) as number);
+    } else if (baseOf(id) === undefined) {
+      push({ x: cur.x, y: HOOK_Y + HOOK_RY }, null);
+    }
+    const base = baseOf(id);
+    paths.push({
+      id,
+      pts,
+      tags,
+      through,
+      legFrom: pts.length - 1,
+      ...(base === undefined ? {} : { base }),
+      drop: cur.x,
+      land: cur.x,
+      track: -1,
+    });
   }
+
+  // Pernas: a alça puxada de uma base segue, a GAP entre as duas linhas, por uma pista própria abaixo de todos os anéis até
+  // a sua casa do V; a curva fica por baixo do V. Só há trechos retos (horizontais e verticais), então o deslocamento
+  // ±GAP/2 da linha central mantém a distância entre as linhas constante e nada se sobrepõe.
+  const legs = paths.filter((p) => p.base !== undefined);
+  const byBase = new Map<number, Path[]>();
+  for (const p of legs) byBase.set(p.base as number, [...(byBase.get(p.base as number) ?? []), p]);
   const vHalf = new Map<number, number>();
   for (const [b, list] of byBase) {
-    list.sort((p, q) => centerOf(p).x - centerOf(q).x || p - q);
+    list.sort((p, q) => p.drop - q.drop || p.id - q.id);
     vHalf.set(b, Math.max(14, ((list.length - 1) * PITCH) / 2 + HALF + STRAND_W + 4));
-    for (const [i, id] of list.entries()) {
-      const c = centerOf(id);
-      pairs.push({
-        id,
-        base: b,
-        drop: c.x,
-        y0: isHook(id) ? HOOK_Y : c.y + CLOSED_RY,
-        land: baseX(b) + (i - (list.length - 1) / 2) * PITCH,
-        track: -1,
-      });
-    }
+    for (const [i, p] of list.entries()) p.land = baseX(b) + (i - (list.length - 1) / 2) * PITCH;
   }
   // Ordem das pistas, de cima para baixo. Regra: quanto mais longe da base a alça cai, mais baixa a pista (sem cruzar dentro
   // da mesma base). Restrição: se a casa de entrada de B fica a menos de PITCH da descida de A, a pista de B é mais baixa
   // que a de A, senão o trecho vertical de B (que começa na sua pista) se sobreporia ao de A (que termina na pista dele).
-  const dist = (p: Pair): number => Math.abs(p.land - p.drop);
-  const todo = pairs.filter((p) => dist(p) > 0.5).sort((p, q) => dist(p) - dist(q) || p.id - q.id);
-  const tracked: Pair[] = [];
+  const dist = (p: Path): number => Math.abs(p.land - p.drop);
+  const todo = legs.filter((p) => dist(p) > 0.5).sort((p, q) => dist(p) - dist(q) || p.id - q.id);
+  const tracked: Path[] = [];
   while (todo.length > 0) {
     // o primeiro (pela regra) a que nenhum outro ainda sem pista precisa vir antes; se houver ciclo, o primeiro da fila
     const k = todo.findIndex((b) => todo.every((a) => a === b || Math.abs(a.drop - b.land) >= PITCH));
@@ -233,6 +342,18 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
   const baseY = railY + 24 + tracked.length * PITCH;
   const curveY = baseY + HALF;
   const height = baseY + 44;
+  for (const p of legs) {
+    if (p.track < 0) p.land = p.drop;
+    if (p.track >= 0) {
+      const ty = railY + 12 + p.track * PITCH;
+      p.pts.push({ x: p.drop, y: ty }, { x: p.land, y: ty });
+      p.tags.push(null, null);
+      p.through.push(null, null);
+    }
+    p.pts.push({ x: p.land, y: curveY });
+    p.tags.push(null);
+    p.through.push(null);
+  }
 
   const out: string[] = [];
   out.push(
@@ -249,68 +370,87 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
     );
   }
 
-  // Deslocamento de uma polilinha ortogonal por `d`, com quinas em ângulo reto (a distância entre as duas linhas é 2d).
-  const offset = (pts: Pos[], d: number): Pos[] => {
-    const ls = pts.slice(0, -1).map((p, i) => {
-      const q = pts[i + 1] as Pos;
-      const len = Math.hypot(q.x - p.x, q.y - p.y);
-      const dir = { x: (q.x - p.x) / len, y: (q.y - p.y) / len };
-      return { p: { x: p.x - dir.y * d, y: p.y + dir.x * d }, dir };
-    });
-    const res: Pos[] = [(ls[0] as (typeof ls)[0]).p];
-    for (let i = 1; i < ls.length; i++) {
-      const [a, b] = [ls[i - 1] as (typeof ls)[0], ls[i] as (typeof ls)[0]];
-      const det = a.dir.x * b.dir.y - a.dir.y * b.dir.x;
-      const t = ((b.p.x - a.p.x) * b.dir.y - (b.p.y - a.p.y) * b.dir.x) / det;
-      res.push({ x: a.p.x + a.dir.x * t, y: a.p.y + a.dir.y * t });
-    }
-    const last = pts[pts.length - 1] as Pos;
-    const end = ls[ls.length - 1] as (typeof ls)[0];
-    res.push({ x: last.x - end.dir.y * d, y: last.y + end.dir.x * d });
-    return res;
-  };
+  const backs: string[] = [];
+  const fronts: string[] = [];
+  const middle: string[] = [];
 
-  const legs: string[] = [];
-  const armBack = new Map<number, string>();
-  const armFront = new Map<number, string>();
-  const curves: string[] = [];
-  for (const p of pairs) {
+  // anéis fechados (elipses deitadas): costas antes da agulha e dos fios, frente depois
+  const ring = (id: number, front: boolean): string => {
+    const c = centerOf(id);
+    const m: Pos = { x: X(c.x), y: c.y };
+    const d = closedArc(m, front);
+    const attrs = `data-loop="${id}" data-kind="${kindOf(id)}" data-on-hook="0" data-part="${front ? "front" : "back"}" data-cx="${f(m.x)}" data-cy="${f(m.y)}"`;
+    const draw = `<path ${attrs} d="${d}" fill="none" stroke="${COLOR[kindOf(id)]}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
+    // a frente leva um halo na cor do fundo: corta o que passa por trás dela
+    return front
+      ? `<path d="${d}" fill="none" stroke="${BG}" stroke-width="${STRAND_W + 5}" stroke-linecap="butt"/>${draw}`
+      : draw;
+  };
+  for (const id of ids) {
+    if (isHook(id)) continue;
+    backs.push(ring(id, false));
+    fronts.push(ring(id, true));
+  }
+
+  // fios: as duas linhas de cada caminho; nas alças da agulha, o primeiro trecho (e a dobra) cruzam a agulha
+  const sweep = mirrored ? 0 : 1;
+  for (const p of paths) {
     const hook = isHook(p.id);
-    const mid: Pos[] = [{ x: p.drop, y: p.y0 }];
-    if (p.track >= 0) {
-      const ty = railY + 12 + p.track * PITCH;
-      mid.push({ x: p.drop, y: ty }, { x: p.land, y: ty });
-    }
-    mid.push({ x: p.land, y: curveY });
+    const color = COLOR[kindOf(p.id)];
+    const c = centerOf(p.id);
     for (const [side, d] of [
       ["back", HALF],
       ["front", -HALF],
     ] as const) {
-      const line = offset(mid, d);
+      const line = offset(p.pts, d);
       for (let k = 0; k + 1 < line.length; k++) {
         const [a, b] = [line[k] as Pos, line[k + 1] as Pos];
-        const arm =
-          hook && k === 0
-            ? ` data-loop="${p.id}" data-kind="pulled" data-on-hook="1" data-part="${side}" data-cx="${f(X(p.drop))}" data-cy="${HOOK_Y}"`
-            : "";
-        const el = `<line data-leg="${p.id}" data-base="${p.base}" data-side="${side}" data-seg="${k}"${arm} x1="${f(X(a.x))}" y1="${f(a.y)}" x2="${f(X(b.x))}" y2="${f(b.y)}" stroke="${COLOR.pulled}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
-        if (arm && side === "back") armBack.set(p.id, el);
-        else if (arm) {
-          // a frente do braço leva um halo na cor do fundo: corta a agulha que passa por trás dela
-          armFront.set(
-            p.id,
-            `<line x1="${f(X(a.x))}" y1="${f(a.y)}" x2="${f(X(b.x))}" y2="${f(b.y)}" stroke="${BG}" stroke-width="${STRAND_W + 5}" stroke-linecap="butt"/>${el}`,
-          );
-        } else legs.push(el);
+        const tag = p.tags[k] ?? null;
+        const thr = p.through[k] ?? null;
+        let attrs = `data-pair="${p.id}" data-side="${side}" data-seg="${k}"`;
+        if (p.base !== undefined && k >= p.legFrom) attrs += ` data-leg="${p.id}" data-base="${p.base}"`;
+        if (tag !== null) attrs += ` data-strand="${p.id}" data-draw="${tag}"`;
+        if (thr !== null) attrs += ` data-through="${thr}"`;
+        const arm = hook && k === 0;
+        if (arm) {
+          attrs += ` data-loop="${p.id}" data-kind="${kindOf(p.id)}" data-on-hook="1" data-part="${side}" data-cx="${f(X(c.x))}" data-cy="${HOOK_Y}"`;
+        }
+        const coords = `x1="${f(X(a.x))}" y1="${f(a.y)}" x2="${f(X(b.x))}" y2="${f(b.y)}"`;
+        const el = `<line ${attrs} ${coords} stroke="${color}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
+        if (!arm) {
+          middle.push(el);
+          continue;
+        }
+        // o braço atrás da agulha vai antes dela; o da frente vai depois, com halo na cor do fundo
+        const bend =
+          side === "back"
+            ? `M ${f(X(c.x - HALF))} ${BEND_Y} A ${HALF} ${HALF} 0 0 ${sweep} ${f(X(c.x))} ${BEND_Y - HALF}`
+            : `M ${f(X(c.x))} ${BEND_Y - HALF} A ${HALF} ${HALF} 0 0 ${sweep} ${f(X(c.x + HALF))} ${BEND_Y}`;
+        const arc = `<path data-bend="${p.id}" data-side="${side}" d="${bend}" fill="none" stroke="${color}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
+        if (side === "back") backs.push(arc, el);
+        else {
+          const halo = (g: string): string =>
+            `<${g} stroke="${BG}" stroke-width="${STRAND_W + 5}" stroke-linecap="butt" fill="none"/>`;
+          fronts.push(halo(`path d="${bend}"`), arc, halo(`line ${coords}`), el);
+        }
       }
     }
-    curves.push(
+  }
+  for (const p of legs) {
+    middle.push(
       `<path data-leg-curve="${p.id}" data-base="${p.base}" d="M ${f(X(p.land - HALF))} ${f(curveY)} A ${HALF} ${HALF} 0 0 ${mirrored ? 1 : 0} ${f(X(p.land + HALF))} ${f(curveY)}" fill="none" stroke="${COLOR.pulled}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`,
     );
   }
-  out.push(...legs, ...curves);
 
-  // bases (topos da carreira de baixo): por cima das curvas, então a alça puxada passa por baixo do V
+  // 1) costas, 2) agulha, 3) fios, 4) bases (por cima das curvas: a alça passa por baixo do V), 5) frentes
+  out.push(...backs);
+  // agulha: corpo, cabo (grosso, na ponta oposta aos laços) e a pontinha do gancho, no lado da ponta
+  out.push(
+    `<line data-hook="1" x1="${f(X(16))}" y1="${HOOK_Y}" x2="${f(X(width - 16))}" y2="${HOOK_Y}" stroke="#374151" stroke-width="7" stroke-linecap="round"/>`,
+    `<line data-hook-handle="1" x1="${f(X(10))}" y1="${HOOK_Y}" x2="${f(X(80))}" y2="${HOOK_Y}" stroke="#6b7280" stroke-width="15" stroke-linecap="round"/>`,
+    `<path data-hook-tip="1" d="M ${f(X(width - 18))} ${HOOK_Y} L ${f(X(width - 6))} ${HOOK_Y} L ${f(X(width - 12))} ${HOOK_Y + 9}" fill="none" stroke="#374151" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`,
+  );
+  out.push(...middle);
   for (let b = 0; b < nb; b++) {
     const x = X(baseX(b));
     const hw = vHalf.get(b) ?? 14;
@@ -318,59 +458,7 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
       `<path data-base-top="${b}" data-cx="${f(x)}" data-hw="${f(hw)}" d="M ${f(x - hw)} ${f(baseY - 14)} L ${f(x)} ${f(baseY)} L ${f(x + hw)} ${f(baseY - 14)}" fill="none" stroke="${BASE_COLOR}" stroke-width="${STRAND_W}" stroke-linecap="round" stroke-linejoin="round"/>`,
     );
   }
-
-  // Alça na agulha que não veio de uma base: um U pendurado na agulha (metade de trás e metade da frente).
-  const uHalf = (c: Pos, front: boolean): string => {
-    const x = (v: number): string => f(X(v));
-    const sweep = mirrored ? 1 : 0;
-    return front
-      ? `M ${x(c.x)} ${f(c.y + HOOK_RY)} A ${HALF} ${HALF} 0 0 ${sweep} ${x(c.x + HALF)} ${f(c.y + HOOK_RY - HALF)} L ${x(c.x + HALF)} ${f(c.y)}`
-      : `M ${x(c.x - HALF)} ${f(c.y)} L ${x(c.x - HALF)} ${f(c.y + HOOK_RY - HALF)} A ${HALF} ${HALF} 0 0 ${sweep} ${x(c.x)} ${f(c.y + HOOK_RY)}`;
-  };
-
-  const ring = (id: number, front: boolean): string => {
-    const inf = info.get(id) as Info;
-    const c = centerOf(id);
-    const hook = isHook(id);
-    // a alça puxada que está na agulha é o U comprido: os braços são as primeiras peças das pernas
-    if (hook && inf.kind === "pulled" && inf.base !== undefined)
-      return (front ? armFront : armBack).get(id) ?? "";
-    const m: Pos = { x: X(c.x), y: c.y };
-    const d = hook ? uHalf(c, front) : closedArc(m, front);
-    const attrs = `data-loop="${id}" data-kind="${inf.kind}" data-on-hook="${hook ? 1 : 0}" data-part="${front ? "front" : "back"}" data-cx="${f(m.x)}" data-cy="${f(m.y)}"`;
-    const draw = `<path ${attrs} d="${d}" fill="none" stroke="${COLOR[inf.kind]}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
-    // a frente leva um halo na cor do fundo: corta o que passa por trás dela
-    return front
-      ? `<path d="${d}" fill="none" stroke="${BG}" stroke-width="${STRAND_W + 5}" stroke-linecap="butt"/>${draw}`
-      : draw;
-  };
-
-  // 1) costas dos anéis, 2) agulha, 3) fios, 4) frentes dos anéis: o fio passa entre as costas e a frente
-  for (const id of ids) out.push(ring(id, false));
-  // agulha: corpo, cabo (grosso, na ponta oposta aos laços) e a pontinha do gancho, no lado da ponta
-  out.push(
-    `<line data-hook="1" x1="${f(X(16))}" y1="${HOOK_Y}" x2="${f(X(width - 16))}" y2="${HOOK_Y}" stroke="#374151" stroke-width="7" stroke-linecap="round"/>`,
-    `<line data-hook-handle="1" x1="${f(X(10))}" y1="${HOOK_Y}" x2="${f(X(80))}" y2="${HOOK_Y}" stroke="#6b7280" stroke-width="15" stroke-linecap="round"/>`,
-    `<path data-hook-tip="1" d="M ${f(X(width - 18))} ${HOOK_Y} L ${f(X(width - 6))} ${HOOK_Y} L ${f(X(width - 12))} ${HOOK_Y + 9}" fill="none" stroke="#374151" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`,
-  );
-  // o fio de cada laço sai do fundo dele, passa pelo centro de cada anel na ordem de `through` e sai pela frente do último
-  const resume = new Map<number, Pos>();
-  for (const d of draws) {
-    const top = centerOf(d.top);
-    let from = resume.get(d.top) ?? { x: top.x, y: top.y + (isHook(d.top) ? HOOK_RY : CLOSED_RY) };
-    const color = COLOR[(info.get(d.top) as Info).kind];
-    const seg = (a: Pos, b: Pos, extra: string): string =>
-      `<line data-strand="${d.top}" data-draw="${d.level}" ${extra} x1="${f(X(a.x))}" y1="${f(a.y)}" x2="${f(X(b.x))}" y2="${f(b.y)}" stroke="${color}" stroke-width="${STRAND_W}" stroke-linecap="round"/>`;
-    for (const id of d.through) {
-      const c = centerOf(id);
-      out.push(seg(from, c, `data-through="${id}"`));
-      from = c;
-    }
-    const exit: Pos = { x: from.x, y: from.y + CLOSED_RY + 4 };
-    out.push(seg(from, exit, `data-exit="1"`));
-    resume.set(d.top, exit);
-  }
-  for (const id of ids) out.push(ring(id, true));
+  out.push(...fronts);
   out.push("</svg>");
   return out.join("\n");
 }

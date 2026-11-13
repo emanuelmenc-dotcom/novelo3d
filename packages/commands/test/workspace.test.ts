@@ -89,7 +89,7 @@ describe("mover painéis", () => {
     const l = classic();
     const target = leafOfPanel(l, "chart")?.id as string;
     const m = movePanel(l, "verify", target, "center");
-    expect(findLeaf(m, target)?.tabs).toEqual(["chart", "view3d", "verify"]);
+    expect(findLeaf(m, target)?.tabs).toEqual(["chart", "view3d", "stitchEditor", "verify"]);
     expect(leafOfPanel(m, "verify")?.id).toBe(target);
     expect(leaves(m)).toHaveLength(leaves(l).length - 1);
     // a coluna que tinha 2 janelas virou uma só: sem divisão com um único filho

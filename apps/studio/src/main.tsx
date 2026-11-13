@@ -38,6 +38,7 @@ import { makeHandlers, subscribeTools, toolSnapshot, viewerTool } from "./pointt
 import { RenderPanel } from "./render/RenderPanel.tsx";
 import { installRenderJob, renderGeomChanged, setRenderSource } from "./render/renderJob.ts";
 import { SettingsDialog } from "./SettingsDialog.tsx";
+import { StitchEditorPanel } from "./StitchEditorPanel.tsx";
 import "./styles.css";
 import { Viewer3D } from "./Viewer3D.tsx";
 import type { LayoutData, NodeMeta } from "./view3d.ts";
@@ -608,6 +609,8 @@ function App() {
     materials: () => <MaterialsPanel version={pver} />,
 
     render: () => <RenderPanel />,
+
+    stitchEditor: () => <StitchEditorPanel />,
 
     points: () => <PointsPanel text={text} dialect={dialect} selNode={selNode} />,
 

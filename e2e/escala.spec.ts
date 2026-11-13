@@ -95,7 +95,7 @@ test("janela estreita: vira abas, mantém o layout salvo e o 3D continua utiliz�
   await expect(page.getByTestId("workspace")).toHaveAttribute("data-compact", "true");
   await expect(page.locator("section.ws-leaf")).toHaveCount(1);
   const tabs = page.getByRole("tablist").first().getByRole("tab");
-  await expect(tabs).toHaveCount(10);
+  await expect(tabs).toHaveCount(11);
   await page.screenshot({ path: "test-results/estreita-abas.png" });
 
   // cada painel continua acessível pelas abas

@@ -25,7 +25,7 @@ export const PRESET_SPECS: Preset[] = [
           dir: "column",
           sizes: [0.7, 0.3],
           children: [
-            { leaf: ["chart", "view3d"] },
+            { leaf: ["chart", "view3d", "stitchEditor"] },
             { leaf: ["cp", "yarns", "points", "assembly", "materials", "render"] },
           ],
         },
@@ -45,7 +45,7 @@ export const PRESET_SPECS: Preset[] = [
           dir: "column",
           sizes: [0.74, 0.26],
           children: [
-            { leaf: ["view3d"] },
+            { leaf: ["view3d", "stitchEditor"] },
             { leaf: ["chart", "cp", "yarns", "points", "assembly", "materials", "render"] },
           ],
         },
@@ -60,7 +60,7 @@ export const PRESET_SPECS: Preset[] = [
       dir: "row",
       sizes: [0.48, 0.52],
       children: [
-        { leaf: ["chart"] },
+        { leaf: ["chart", "stitchEditor"] },
         {
           dir: "column",
           sizes: [0.28, 0.3, 0.42],
@@ -84,7 +84,7 @@ export const PRESET_SPECS: Preset[] = [
         { leaf: ["recipe"] },
         { leaf: ["verify"] },
         { dir: "row", sizes: [0.5, 0.5], children: [{ leaf: ["chart"] }, { leaf: ["view3d"] }] },
-        { leaf: ["cp", "yarns", "points", "assembly", "materials", "render"] },
+        { leaf: ["cp", "yarns", "points", "assembly", "materials", "render", "stitchEditor"] },
       ],
     },
   },
@@ -104,6 +104,7 @@ export const PRESET_SPECS: Preset[] = [
         "assembly",
         "materials",
         "render",
+        "stitchEditor",
       ],
     },
   },

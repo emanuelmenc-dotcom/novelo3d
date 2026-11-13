@@ -161,6 +161,23 @@ export function allowed(state: BuilderState): Allowed {
   return { yo: n < MAX_LOOPS, insert: n < MAX_LOOPS, drawMax: n - 1, finish: false };
 }
 
+/**
+ * Índices de base que `insert` aceitaria agora numa carreira de `count` bases (0 a count - 1): a mesma regra de `apply`, escrita
+ * à parte (sem chamar `apply`) para a interface habilitar as bases certas; o teste confere as duas contra todas as sequências.
+ */
+export function insertBases(state: BuilderState, count: number): number[] {
+  if (state.finished || state.loops.length >= MAX_LOOPS) return [];
+  // ponto pronto (1 alça depois de um draw): só o fim do ponto é aceito
+  if (state.loops.length === 1 && drawsOf(state.cmds) >= 1) return [];
+  const bases = basesOf(state.cmds);
+  const last = bases[bases.length - 1];
+  if (last === undefined) return Array.from({ length: Math.max(0, count) }, (_, i) => i);
+  // a mesma base se repete (puff); a próxima só se ainda couber outra base distinta
+  const out = [last];
+  if (bases.length < MAX_BASES) out.push(last + 1);
+  return out.filter((b) => b < count);
+}
+
 export function replay(
   cmds: readonly Cmd[],
 ): { ok: true; state: BuilderState } | { ok: false; reason: Reason; at: number } {

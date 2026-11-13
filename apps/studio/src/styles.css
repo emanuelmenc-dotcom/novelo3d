@@ -732,3 +732,17 @@ input.num {
   width: 100%;
   min-width: 4rem;
 }
+
+/* Criador de pontos (etapa D): o diagrama ocupa a largura do painel; o quadro tem proporção fixa (não pula entre os passos) */
+.stitch-editor-diagram {
+  width: 100%;
+  background: #faf7ef;
+  border: 1px solid #d6d0c0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.stitch-editor-diagram svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}

@@ -55,6 +55,9 @@ export interface StitchDiagramOptions {
    * demais crescendo para a esquerda (4 3 2 1 0). "left": o espelho exato desse desenho.
    */
   hand?: "right" | "left";
+  /** Largura e altura mínimas do desenho (a largura sobe para múltiplo de 80), para a janela não pular entre os passos. */
+  minWidth?: number;
+  minHeight?: number;
 }
 
 interface Info {
@@ -156,7 +159,8 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
   const { info, draws, peak } = history(state);
   const bases = B.basesOf(state.cmds);
   const maxBase = bases.length ? Math.max(...bases) : -1;
-  const nb = Math.max(opts.bases ?? 5, maxBase + 2);
+  // com `bases` dado, a carreira tem exatamente essas bases (ou o que a maior base usada exigir); sem ele, folga de uma base
+  const nb = opts.bases === undefined ? Math.max(5, maxBase + 2) : Math.max(opts.bases, maxBase + 1);
 
   // árvore: o fio de um laço atravessa, na ordem, os laços que os seus `draw` fecharam (os "filhos" dele)
   const children = new Map<number, number[]>();
@@ -240,6 +244,7 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
     Math.ceil(
       Math.max(
         320,
+        opts.minWidth ?? 0,
         (baseCenters[nb - 1] as number) + BASE_X0,
         BASE_X0 + Math.max(0, nextLane - 1) * LANE_W + 80,
         40 + (peak - 1) * SLOT + 140,
@@ -366,7 +371,7 @@ export function stitchDiagramSvg(state: B.BuilderState, opts: StitchDiagramOptio
 
   const railY = maxY + 24;
   const baseY = railY + 24 + BASE_R + tracked.length * PITCH;
-  const height = baseY + 64;
+  const height = Math.max(baseY + 64, opts.minHeight ?? 0);
   for (const p of legs) {
     if (p.track < 0) p.land = p.drop;
     if (p.track >= 0) {

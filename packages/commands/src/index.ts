@@ -75,6 +75,7 @@ import {
   stopRender,
 } from "./render-store.ts";
 import { getSettings, resetSettings, type SettingsPatch, setSettings } from "./settings.ts";
+import { stitchEditorCommands } from "./stitch-editor-commands.ts";
 
 export {
   CUBE_POSITIONS,
@@ -178,6 +179,7 @@ export {
   renderSnapshot,
   subscribeRender,
 } from "./render-store.ts";
+export { stitchEditorState, stitchEditorVersion, subscribeStitchEditor } from "./stitch-editor-store.ts";
 export {
   BAR_PX,
   buildLayout,
@@ -384,6 +386,7 @@ export const commands: Record<string, Command> = {
   ...editCommands,
   ...partsCommands(layoutOut),
   ...materialsCommands((m, p) => dispatch(m, p)),
+  ...stitchEditorCommands,
   "system.ping": () => ({ pong: true }),
 
   // --- janela de render (R3): máquina de estados síncrona; o studio executa e relata o progresso

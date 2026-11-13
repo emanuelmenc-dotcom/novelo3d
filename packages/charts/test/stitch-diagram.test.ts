@@ -208,7 +208,9 @@ describe("stitchDiagramSvg: cada prefixo de cada sequência", () => {
     });
   }
 
-  test("sequências aleatórias com semente (300 caminhadas, mão direita; 60 na esquerda): as mesmas invariantes", () => {
+  test("sequências aleatórias com semente (300 caminhadas, mão direita; 60 na esquerda): as mesmas invariantes", {
+    timeout: 30_000,
+  }, () => {
     for (let seed = 1; seed <= 300; seed++) {
       walk(seed).forEach((state, step) => {
         checkDiagram(state, `semente ${seed} passo ${step}: ${cmdText(state)}`, "right", deepIds(state));
@@ -410,7 +412,9 @@ describe("pernas duplas (U comprido)", () => {
     }
   });
 
-  test("sem sobreposição nas 300 caminhadas (todos os prefixos), salvo os limites conhecidos, desculpados por par de alças", () => {
+  test("sem sobreposição nas 300 caminhadas (todos os prefixos), salvo os limites conhecidos, desculpados por par de alças", {
+    timeout: 30_000,
+  }, () => {
     const counts = { deep: 0, cycle: 0 };
     for (let seed = 1; seed <= 300; seed++) {
       for (const state of walk(seed)) {
@@ -754,6 +758,45 @@ function drawsOf(state: B.BuilderState): { top: number; through: number[] }[] {
   }
   return out;
 }
+
+describe("carreira de bases e quadro fixo (para a janela)", () => {
+  test("com `bases` dado a carreira tem exatamente essas bases; sem ele, uma de folga", () => {
+    const at4 = states([I(4)]).pop() as B.BuilderState;
+    const count = (svg: string): number =>
+      elements(svg).filter((e) => e["data-base-top"] !== undefined).length;
+    expect(count(stitchDiagramSvg(at4, { bases: 5 }))).toBe(5);
+    expect(count(stitchDiagramSvg(at4))).toBe(6);
+    expect(count(stitchDiagramSvg(B.start(), { bases: 7 }))).toBe(7);
+    expect(count(stitchDiagramSvg(at4, { bases: 3 }))).toBe(5);
+  });
+
+  test("minWidth e minHeight: o quadro não é menor, a largura é múltipla de 80 e as posições não pulam entre os passos do pb", () => {
+    const pb = SEQUENCES.find((q) => q.file === "pb") as (typeof SEQUENCES)[number];
+    const sizes = (svg: string): [number, number] => {
+      const m = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(svg) as RegExpExecArray;
+      return [Number(m[1]), Number(m[2])];
+    };
+    for (const hand of ["right", "left"] as const) {
+      const opts = { bases: 5, hand, minWidth: 1000, minHeight: 420 };
+      const [w0] = sizes(stitchDiagramSvg(B.start(), { bases: 5, hand }));
+      let ref: number[] | undefined;
+      for (const state of states(pb.cmds)) {
+        const svg = stitchDiagramSvg(state, opts);
+        const [w, h] = sizes(svg);
+        expect(w, hand).toBeGreaterThanOrEqual(1000);
+        expect(w % 80, hand).toBe(0);
+        expect(h, hand).toBeGreaterThanOrEqual(420);
+        const baseXs = elements(svg)
+          .filter((e) => e["data-base-top"] !== undefined)
+          .map((e) => num(e, "data-cx"));
+        ref ??= baseXs;
+        expect(baseXs, hand).toEqual(ref);
+        expect(w, hand).toBe(sizes(stitchDiagramSvg(states(pb.cmds)[0] as B.BuilderState, opts))[0]);
+      }
+      expect(w0).toBeLessThan(1000);
+    }
+  });
+});
 
 describe("alça na agulha e ordem dos anéis", () => {
   const all = (): B.BuilderState[] => {

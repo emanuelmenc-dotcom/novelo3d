@@ -274,3 +274,84 @@ describe("modos de inserção", () => {
     expect({ ...flo, modes: [] }).toEqual({ ...both, modes: [] });
   });
 });
+
+describe("insertBases concorda com apply", () => {
+  test("para cada prefixo das 9 sequências e cada tamanho de carreira, as bases aceitas são as de apply(insert)", () => {
+    for (const row of TABLE) {
+      let s = B.start();
+      const states = [s];
+      for (const c of row.cmds) {
+        s = (B.apply(s, c) as { ok: true; state: B.BuilderState }).state;
+        states.push(s);
+      }
+      for (const state of states) {
+        for (let count = 1; count <= 8; count++) {
+          const accepted = Array.from({ length: count }, (_, b) => b).filter((b) => B.apply(state, I(b)).ok);
+          expect(B.insertBases(state, count), `${row.name} ${count}`).toEqual(accepted);
+        }
+      }
+    }
+  });
+
+  test("sem base ainda: todas; com base: a última e a seguinte; limites de alças e de bases distintas", () => {
+    expect(B.insertBases(B.start(), 5)).toEqual([0, 1, 2, 3, 4]);
+    const s1 = run([I(2)]).state;
+    expect(B.insertBases(s1, 5)).toEqual([2, 3]);
+    expect(B.insertBases(s1, 3)).toEqual([2]);
+    const s4 = run([I(0), I(1), I(2), I(3)]).state;
+    expect(B.insertBases(s4, 8)).toEqual([3]);
+    expect(B.insertBases(run([Y, D(1), F]).state, 5)).toEqual([]);
+  });
+});
+
+describe("insertBases concorda com apply também em caminhadas aleatórias", () => {
+  // gerador com semente (mulberry32); o fast-check não está instalado
+  const rng = (seed: number) => {
+    let a = seed >>> 0;
+    return (): number => {
+      a = (a + 0x6d2b79f5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  };
+
+  test("200 caminhadas de até 30 comandos (inclui chegar ao limite de alças): para cada prefixo e cada tamanho de carreira", () => {
+    let reachedMax = 0;
+    for (let seed = 1; seed <= 200; seed++) {
+      const r = rng(seed);
+      let s = B.start();
+      const len = 1 + Math.floor(r() * 30);
+      for (let i = 0; i <= len; i++) {
+        for (let count = 1; count <= 8; count++) {
+          const accepted = Array.from({ length: count }, (_, b) => b).filter((b) => B.apply(s, I(b)).ok);
+          expect(B.insertBases(s, count), `semente ${seed} passo ${i} carreira ${count}`).toEqual(accepted);
+        }
+        if (s.loops.length >= B.MAX_LOOPS) reachedMax++;
+        const al = B.allowed(s);
+        const options: B.Cmd[] = [];
+        if (al.yo) options.push(Y);
+        // mais inserções do que o normal, para chegar ao limite de alças e ao de bases
+        const bases = B.basesOf(s.cmds);
+        const last = bases[bases.length - 1];
+        if (al.insert)
+          options.push(
+            I(last ?? Math.floor(r() * 4)),
+            I(last ?? 0),
+            ...(last === undefined ? [] : [I(last + 1)]),
+          );
+        for (let k = 1; k <= al.drawMax; k++) options.push(D(k));
+        if (al.finish) options.push(F);
+        // na maior parte das vezes só laçadas e inserções (para chegar ao limite de alças); às vezes puxa ou termina
+        const growth = options.filter((c) => c.kind === "yo" || c.kind === "insert");
+        const pool = growth.length > 0 && r() < 0.9 ? growth : options;
+        const pick = pool[Math.floor(r() * pool.length)];
+        if (!pick) break;
+        const next = B.apply(s, pick);
+        if (next.ok) s = next.state;
+      }
+    }
+    expect(reachedMax).toBeGreaterThan(0);
+  });
+});

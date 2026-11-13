@@ -40,7 +40,7 @@ test("layout padrão: o clássico de 3 colunas, com gráfico e 3D em abas", asyn
   const chartTabs = page
     .getByRole("tablist")
     .filter({ has: page.getByRole("tab", { name: "Gráfico circular" }) });
-  await expect(chartTabs.getByRole("tab")).toHaveText(["Gráfico circular", "3D"]);
+  await expect(chartTabs.getByRole("tab")).toHaveText(["Gráfico circular", "3D", "Criador de pontos"]);
   await page.screenshot({ path: "test-results/ws-classico.png" });
 });
 
@@ -92,7 +92,12 @@ test("arrastar abas: para outra janela (vira aba) e para a borda (divide)", asyn
   // o texto CP vira aba da janela do gráfico
   await page.getByRole("tab", { name: "Texto CrochetPARADE" }).dragTo(page.locator('[data-panel="chart"]'));
   const tabs = page.getByRole("tablist").filter({ has: page.getByRole("tab", { name: "Gráfico circular" }) });
-  await expect(tabs.getByRole("tab")).toHaveText(["Gráfico circular", "3D", "Texto CrochetPARADE"]);
+  await expect(tabs.getByRole("tab")).toHaveText([
+    "Gráfico circular",
+    "3D",
+    "Criador de pontos",
+    "Texto CrochetPARADE",
+  ]);
   // a aba recebida fica ativa: o texto CP aparece no lugar do gráfico
   await expect(page.getByLabel("Texto CrochetPARADE", { exact: true })).toBeVisible();
   await expect(page.getByTestId("chart")).toHaveCount(0);
@@ -123,7 +128,7 @@ test("presets: Foco no 3D, Tudo em abas e volta ao clássico", async ({ page }) 
   await page.getByRole("button", { name: "Layout" }).click();
   await page.getByRole("menuitemradio", { name: /Tudo em abas/ }).click();
   await expect(page.locator("section.ws-leaf")).toHaveCount(1);
-  await expect(page.getByRole("tab")).toHaveCount(10);
+  await expect(page.getByRole("tab")).toHaveCount(11);
   await page.getByRole("tab", { name: "Receita", exact: true }).click();
   await expect(page.getByLabel("Receita", { exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/ws-abas.png" });

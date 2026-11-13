@@ -14,6 +14,7 @@ export const PANEL_IDS = [
   "assembly",
   "materials",
   "render",
+  "stitchEditor",
 ] as const;
 export type PanelId = (typeof PANEL_IDS)[number];
 
@@ -28,6 +29,7 @@ export const PANEL_TITLES: Record<PanelId, string> = {
   assembly: "Montagem",
   materials: "Materiais",
   render: "Render",
+  stitchEditor: "Criador de pontos",
 };
 
 export type Zone = "center" | "left" | "right" | "top" | "bottom";
@@ -410,6 +412,7 @@ export const DEFAULT_PANEL_MINS: PanelMins = {
   assembly: { w: 260, h: 200 },
   materials: { w: 280, h: 200 },
   render: { w: 320, h: 260 },
+  stitchEditor: { w: 320, h: 240 },
 };
 
 /** Mínimos com o 3D ajustado: largura `min3d` e altura 80% dela. */

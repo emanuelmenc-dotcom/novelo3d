@@ -148,6 +148,8 @@ export interface View3D {
   };
 }
 
+/** Diâmetro do alvo de clique do estilo CrochetPARADE, em ligações (aresta média = 1): grande o bastante para fechar a malha. */
+const PICK_DIAMETER = 1.45;
 const YARN: Record<string, string> = { A: "#5d6b3a", B: "#f4f1e8" };
 const SELECT = new THREE.Color("#e8590c");
 const ROW_TINT = new THREE.Color("#f2b134");
@@ -617,11 +619,12 @@ export function mountView3D(
       // estilo CrochetPARADE: a elipsoide invisível de clique fica sobre o ponto do grafo, onde o fio passa
       const mp = new THREE.Matrix4();
       for (let i = 0; i < n; i++) {
-        const sz = (sizes[i] as number) * 1.2;
+        const sz = (sizes[i] as number) * PICK_DIAMETER;
         const x = p[i * 3] as number;
         const y = p[i * 3 + 1] as number;
         const z = p[i * 3 + 2] as number;
-        mp.makeScale(sz, sz, sz).setPosition(x, y, z);
+        // a malha `geo` é achatada (0,98 / 0,82 / 0,78): desfaz o achatamento para o alvo de clique ser uma esfera
+        mp.makeScale(sz / 0.98, sz / 0.82, sz / 0.78).setPosition(x, y, z);
         mesh.setMatrixAt(i, mp);
         centers[i * 3] = x;
         centers[i * 3 + 1] = y;

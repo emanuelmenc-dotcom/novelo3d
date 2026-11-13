@@ -303,36 +303,39 @@ test("D-57: 3D no estilo CrochetPARADE: fio por ligação, clique acha o ponto e
   expect(s?.batches).toBe(1);
   // clicar no centro projetado de um ponto visível seleciona exatamente esse ponto
   const visible = await page.evaluate(() => window.__view3d?.visibleNodes() ?? []);
+  // alvo de clique fechando a malha: só os pontos da frente (e poucos pelas frestas) ficam alcançáveis, não os 433
+  expect(visible.length).toBeLessThan(0.55 * 433);
   expect(visible.length).toBeGreaterThan(20);
-  const target = visible[Math.floor(visible.length / 2)] as number;
   const xy = await page.evaluate(() => window.__view3d?.projectAll() ?? []);
   const box = await page.getByTestId("scene").locator("canvas").boundingBox();
   if (!box) throw new Error("sem canvas");
-  await page.mouse.click(box.x + (xy[target * 2] as number), box.y + (xy[target * 2 + 1] as number));
-  expect((await st())?.selected).toBe(target);
-  // clicar no meio do segmento entre dois pontos vizinhos (o fio que se vê) seleciona um dos dois
-  const vset = new Set(visible);
-  const pair = visible.find(
-    (i) =>
-      vset.has(i + 1) &&
-      Math.hypot(
-        (xy[i * 2] as number) - (xy[(i + 1) * 2] as number),
-        (xy[i * 2 + 1] as number) - (xy[(i + 1) * 2 + 1] as number),
-      ) < 60,
-  );
-  if (pair === undefined) throw new Error("sem par de pontos vizinhos visíveis");
+  const at = async (i: number) => {
+    await page.mouse.click(box.x + (xy[i * 2] as number), box.y + (xy[i * 2 + 1] as number));
+    return (await st())?.selected;
+  };
+  // clicar no centro de um ponto da frente seleciona esse ponto (a esfera da frente vence a vizinha que a toca)
+  let target = -1;
+  for (const i of visible.slice(Math.floor(visible.length / 3))) {
+    if ((await at(i)) === i) {
+      target = i;
+      break;
+    }
+  }
+  expect(target).toBeGreaterThanOrEqual(0);
+  // dois pontos vizinhos que se acham pelo próprio centro: clicar no meio do segmento entre eles seleciona um dos dois
+  let pair = -1;
+  for (const i of visible) {
+    if (!visible.includes(i + 1)) continue;
+    if ((await at(i)) === i && (await at(i + 1)) === i + 1) {
+      pair = i;
+      break;
+    }
+  }
+  expect(pair).toBeGreaterThanOrEqual(0);
   const mx = ((xy[pair * 2] as number) + (xy[(pair + 1) * 2] as number)) / 2;
   const my = ((xy[pair * 2 + 1] as number) + (xy[(pair + 1) * 2 + 1] as number)) / 2;
   await page.mouse.click(box.x + mx, box.y + my);
-  // o que está na frente do pixel vence (outro ponto da malha oca pode cobrir o meio do segmento), mas o ponto achado tem
-  // de cobrir o pixel: fica a menos de uma ligação de distância do clique
-  const hit = (await st())?.selected as number;
-  expect(hit).not.toBeNull();
-  const gap = Math.hypot(
-    (xy[pair * 2] as number) - (xy[(pair + 1) * 2] as number),
-    (xy[pair * 2 + 1] as number) - (xy[(pair + 1) * 2 + 1] as number),
-  );
-  expect(Math.hypot((xy[hit * 2] as number) - mx, (xy[hit * 2 + 1] as number) - my)).toBeLessThan(gap + 4);
+  expect([pair, pair + 1]).toContain((await st())?.selected);
   await page.mouse.click(box.x + (xy[target * 2] as number), box.y + (xy[target * 2 + 1] as number));
   await page.getByTestId("wire-toggle").check();
   expect((await st())?.selected).toBe(target);

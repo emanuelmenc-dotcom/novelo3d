@@ -15,23 +15,29 @@ Plano do advisor Opus, 2026-11-13. Chamado "criador B–E" nos documentos e rela
 - `allowed(estado)` devolve os comandos habilitados.
 - Sequências (derivação do advisor; escrever o modelo e esta tabela aqui antes de codar e mandar para revisão):
 
-| Ponto                        | Sequência                                                                                          |
-| ---------------------------- | -------------------------------------------------------------------------------------------------- |
-| corrente                     | yo, draw 1                                                                                         |
-| pbx (baixíssimo)             | insert, draw 1                                                                                     |
-| pb                           | insert, yo, draw 2                                                                                 |
-| mpa                          | yo, insert, yo, draw 3                                                                             |
-| pa                           | yo, insert, (yo, draw 2) ×2                                                                        |
-| pad                          | yo, yo, insert, (yo, draw 2) ×3                                                                    |
-| pb2juntos                    | insert a, insert b, yo, draw 3                                                                     |
-| puff (mpa ×4 na mesma base)  | repetir (yo, insert) 4 vezes, cada uma sem fechar (deixa 2 alças), depois yo, draw de todas        |
-| bobble (pa ×4 na mesma base) | repetir (yo, insert, yo, draw 2) 4 vezes, cada uma deixando 1 alça extra, depois yo, draw de todas |
+| Ponto                        | Sequência                                                                                                        |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| corrente                     | yo, draw 1                                                                                                       |
+| pbx (baixíssimo)             | insert, draw 1                                                                                                   |
+| pb                           | insert, yo, draw 2                                                                                               |
+| mpa                          | yo, insert, yo, draw 3                                                                                           |
+| pa                           | yo, insert, (yo, draw 2) ×2                                                                                      |
+| pad                          | yo, yo, insert, (yo, draw 2) ×3                                                                                  |
+| pb2juntos                    | insert a, insert b, yo, draw 3                                                                                   |
+| puff (mpa ×4 na mesma base)  | (yo, insert) ×4 na mesma base, depois yo, draw 9 (alças após cada par: 3, 5, 7, 9; yo: 10; draw: 1)              |
+| bobble (pa ×4 na mesma base) | (yo, insert, yo, draw 2) ×4 na mesma base, depois yo, draw 5 (alças após cada grupo: 2, 3, 4, 5; yo: 6; draw: 1) |
 
-- Antes de codar: ler os campos que `registry.ts` realmente tem para pernas e altura e derivar a saída do ponto desses campos, sem inventar campos novos.
-- Teste 1: cada linha da tabela produz as pernas e a altura do registro.
-- Oráculo de consumo (inspirado na tabela da documentação do Knotly, só a convenção): corrente 0 → 1; pontos básicos 1 → 1; aumento 1 → 2 (dois pontos terminados na mesma base); pb2juntos 2 → 1; pular 1 → 0. Cada sequência deve produzir o consumo e a produção certos.
-- Teste 2: passos inválidos são recusados (`finish` com 2 alças, `draw(k ≥ alças)`, `insert` sem base escolhida).
+- **Registro (correção do advisor):** o registro **não tem** campo de pernas nem de altura. `wraps` (0/1/2/3) é um parâmetro visual ajustado à mão (mpa e pa têm uma laçada antes de inserir, mas `wraps` 1 e 2); as pernas vêm dos pais no grafo. Então cada sequência é mapeada a um **id de tipo** e `wraps` e `lengthFactor` são lidos do registro, não calculados. O registro não é alterado.
+- **Módulo:** `packages/core/src/stitches/builder.ts`, puro, exportado pelo core. Sem comandos, interface nem mudança no registro.
+  - Cada alça tem id estável: `{id, kind: "initial" | "yo" | "pulled", base?, mode?}`. O estado guarda o registro de eventos; cada `draw` guarda os ids das alças atravessadas (a etapa C usa isso).
+  - Funções: `start()`, `apply(estado, cmd)` → `{ok, state} | {ok: false, reason}` (nunca lança nem altera a entrada), `allowed(estado)` → `{yo, insert, drawMax, finish}`, `replay(cmds)`, `undo(estado)` = `replay(cmds sem o último)`, `summarize(estado)` → `{type, legs, bases, consumed, produced, exact, modes, wraps, lengthFactor}`.
+  - Regras: `draw(k)` exige 1 ≤ k ≤ alças − 1; `finish` exige exatamente 1 alça e pelo menos um `draw` feito; depois de `finish` tudo é recusado; `insert` exige base (índice na carreira de baixo); a mesma base pode se repetir (puff), mas só a última; bases distintas são consecutivas e crescentes (a receita só consome topos contíguos); no máximo 4 bases distintas (`MAX_LEGS` do stitch3d) e 16 alças.
+- **Regra do tipo mais próximo** (reproduz exatamente cada tipo embutido): sem `insert` → CH; com `insert` e nenhuma `yo` → SL; senão conta as `yo` antes do primeiro `insert`: 0 → SC; 1 com exatamente um `draw` → HDC; 1 com dois ou mais `draw` → DC; 2 ou mais → TR (não há DTR). `legs` = bases distintas; `consumed` = `legs`; `produced` = 1. `exact` = a sequência (tipos de comando e k, ignorando as bases) é igual à canônica de um tipo embutido. Puff vira HDC com 1 perna, bobble vira DC com 1 perna, pb2juntos vira SC com 2 pernas.
+- **Limites conhecidos:** puff e bobble desenham e consomem fio como o ponto-componente (HDC e DC), então o consumo de fio é subestimado (para a etapa E, sem resolver agora). Ponto personalizado com 2 ou mais pernas e tipo diferente de SC não tem `Op` na receita hoje.
+- **Escopo:** a etapa B constrói **um ponto**. Aumento (1 → 2) e pular (1 → 0) são nível de receita e ficam em `simulate.ts`; corrente 0 → 1, pontos básicos 1 → 1, pb2juntos 2 → 1.
+- **Testes** (`packages/core/test/`): (1) o pb do usuário (insert, yo, draw 2, finish) com 2, 3 e 1 alças e resultado SC, 1 perna, exato; (2) a tabela dos 9 pontos com a contagem de alças passo a passo e o resumo final; (3) oráculo executável com o pipeline do próprio repositório: para cada tipo embutido mais pb2juntos, uma receita mínima por `parsePattern` e `buildGraph`, e o número de pais do nó é igual a `legs`; (4) recusas (`finish` no início e com 2 alças, `draw(0)` e `draw(alças)`, `insert` sem base, base que pula (a, a+2) ou volta, quinta base distinta, limite de alças, qualquer comando depois de `finish`); (5) `allowed` concorda com `apply` em cada passo de cada sequência; (6) pureza (a entrada não muda; `replay` = passo a passo; `undo` = `replay` sem o último); (7) o modo FLO de um `insert` é guardado em `modes` e não muda mais nada.
 - Fora do escopo: pipoca com alça solta, tunisiano, broomstick/hairpin, costura.
+- **Nota para a etapa D:** "puxe pelas duas alças selecionadas" na interface é escolher k alças contadas da ponta da agulha; seleção não contígua é recusada, o que coincide com `draw(k)`.
 
 ## Cobertura conferida contra a biblioteca da DulceBella (2026-11-13)
 

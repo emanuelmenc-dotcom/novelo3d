@@ -1,0 +1,17 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.6/schema.json",
+  "files": {
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/dist",
+      "!referencia",
+      "!tools/mcp-server/node_modules",
+      "!playwright-report",
+      "!test-results",
+      "!.claude"
+    ]
+  },
+  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 110 },
+  "linter": { "enabled": true, "rules": { "recommended": true } }
+}

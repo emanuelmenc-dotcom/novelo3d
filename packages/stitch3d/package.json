@@ -1,0 +1,17 @@
+{
+  "name": "@novelo/stitch3d",
+  "version": "0.0.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@novelo/core": "*"
+  },
+  "devDependencies": {
+    "@novelo/layout": "*",
+    "@novelo/notation": "*"
+  }
+}

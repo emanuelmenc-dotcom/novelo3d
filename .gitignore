@@ -1,0 +1,14 @@
+# dependências e saídas de build
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.log
+
+# material de receita comercial, só para uso pessoal — NUNCA publicar
+referencia/sessao-sapo/
+
+# sistema
+.DS_Store
+Thumbs.db

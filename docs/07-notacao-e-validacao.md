@@ -178,4 +178,5 @@ Convenção de letras usada por outras ferramentas de amigurumi (a documentaçã
 - **O "x" não é sinal de vezes em XVA:** `(X, V) 3X` é o grupo mais 3 pb. As letras `a` e `e` não são palavras de ligação.
 - **Escrita:** `R0: MR` no começo, `6X`, `6 (X, V)`, aumento de 3 como `W`.
 - **Fora do escopo** (viram erro `UNKNOWN_TERM`): Q, puff, bobble, pipoca; aumentos e diminuições que não são de pb (TV, FV, EV, TW, FW, EW, TA, FA, pois `Op` só tem pb nesses casos); posições `Sn`; partes `Pn`; costura; carreiras de ida e volta.
-- **Detecção automática:** por último, depois de pt-BR, en-US e en-UK, e só com linhas `R<n>:` formadas só por letras XVA, números e parênteses.
+- **Detecção automática:** por último, depois de pt-BR, en-US e en-UK. A linha `R<n>:` conta só se tiver apenas letras XVA, números, `ch`, `sl` e parênteses **e** pelo menos um termo exclusivo do XVA (`x v w a t f e k`, `MR[N]` ou o rótulo `R0:`); números, `ch` e `sl` sozinhos não bastam. Se o XVA foi detectado (não escolhido na mão) e o texto tem `dc` ou `tr`, o erro `AMBIGUOUS_DIALECT` continua: os termos de en-US misturados são suposição. O sinal `×` continua valendo como "vezes" em XVA; a letra `x` não.
+- **Receita com trocas de fio** (`printPatternWithYarns`) também escreve `R0: MR` à parte; o texto das trocas ("start with yarn", "change to yarn") é só de exibição, não é lido de volta.

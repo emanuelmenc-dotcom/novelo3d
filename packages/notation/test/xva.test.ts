@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Dialeto XVA (X pb, V aumento, A diminuição, T mpa, F pa, E pad; R0: MR): leitura, escrita e detecção.
-import { buildGraph, expandPattern } from "@novelo/core";
+import { buildGraph, expandPattern, paintedYarns } from "@novelo/core";
 import { describe, expect, test } from "vitest";
-import { parsePattern, printPattern } from "../src/index.ts";
+import { parsePattern, printPattern, printPatternWithYarns } from "../src/index.ts";
 
 const BOLA_XVA = ["R0: MR", "R1: 6X", "R2: 6V", "R3: 6 (X, V)", "R4: 18X", "R5: 6 (X, A)", "R6: 6A"].join(
   "\n",
@@ -101,6 +101,55 @@ describe("XVA", () => {
     expect(parsePattern("R1: 6X\nR2-R4: 6V, 3X").detected).toBe("xva");
     expect(parsePattern(BOLA_PT).detected).toBe("pt-BR");
     expect(parsePattern("Rnd 1: 6 sc in magic ring").detected).toBe("en-US");
+  });
+
+  test("receita UK só com números, ch e dc não vira XVA: continua ambígua (sem decidir dc em silêncio)", () => {
+    const uk = parsePattern("R1: ch 7\nR2: 6 dc in 2nd ch from hook");
+    expect(uk.detected).toBeUndefined();
+    expect(uk.issues.some((i) => i.code === "AMBIGUOUS_DIALECT")).toBe(true);
+    expect(parsePattern("R1: 20 ch").detected).toBeUndefined();
+    // XVA detectado + dc: ainda pergunta; escolhido na mão, não pergunta
+    const mix = "R0: MR\nR1: 6X\nR2: 6 dc";
+    expect(parsePattern(mix).issues.some((i) => i.code === "AMBIGUOUS_DIALECT")).toBe(true);
+    expect(parsePattern(mix, { dialect: "xva" }).issues.some((i) => i.code === "AMBIGUOUS_DIALECT")).toBe(
+      false,
+    );
+  });
+
+  test("o sinal × continua valendo como vezes em XVA, e o x não", () => {
+    const a = produced("R1: 6X\nR2: (X, V) ×3", "xva");
+    expect(a.r.issues).toEqual([]);
+    expect(a.rows).toEqual([6, 9]);
+  });
+
+  test("ida e volta com corr (não conta): pt-BR → XVA → leitura dá as mesmas contagens e nenhum aviso", () => {
+    const pt = parsePattern("V1: 6 pb no anel mágico (6)\nV2: 1 corr (não conta), 6 pb (6)", {
+      dialect: "pt-BR",
+    }).pattern;
+    const back = parsePattern(printPattern(pt, "xva"), { dialect: "xva" });
+    expect(back.issues).toEqual([]);
+    expect(expandPattern(back.pattern).map((e) => e.produced)).toEqual(
+      expandPattern(pt).map((e) => e.produced),
+    );
+  });
+
+  test("receita com trocas de fio em XVA: sem pintura é igual à impressa normal; com troca, R0: MR e a troca aparecem", () => {
+    const pat = parsePattern(BOLA_XVA, { dialect: "xva" }).pattern;
+    const g = buildGraph(pat);
+    const sem = printPatternWithYarns(pat, paintedYarns(g, []), "xva");
+    expect(sem.text).toBe(printPattern(pat, "xva"));
+    const com = printPatternWithYarns(
+      pat,
+      paintedYarns(g, [{ kind: "rows", yarn: "B", from: 4, to: 4 }]),
+      "xva",
+    );
+    const linhas = com.text.split("\n");
+    expect(linhas[0]).toBe("R0: MR");
+    expect(com.changes.length).toBe(2);
+    expect(linhas.some((l) => l.startsWith("R4: change to yarn B"))).toBe(true);
+    // a linha de volta sem mudar fio continua legível em XVA
+    const back = parsePattern(printPattern(pat, "xva"), { dialect: "xva" });
+    expect(back.issues).toEqual([]);
   });
 
   test("ida e volta: pt-BR → XVA → leitura dá as mesmas contagens, e a saída tem R0: MR", () => {

@@ -26,7 +26,10 @@ export function detectDialect(text: string): Dialect | undefined {
   // XVA por último: linhas "R3: 8 (X, V)" só com letras do XVA, números e parênteses
   const xvaLine =
     /^\s*r\d+(?:\s*[-–]\s*r?\d+)?\s*:\s*(?:[\d\s(),]|xv|xw|xa|mr(?:\[\d+\])?|ch|sl|[xvwatfek])+\s*$/;
-  if (t.split(/\r?\n/).some((l) => xvaLine.test(l))) return "xva";
+  // e só conta a linha que tem pelo menos um termo exclusivo do XVA (letras, MR[N] ou R0): números, "ch" e "sl" não bastam,
+  // senão uma receita UK "R2: 6 dc in 2nd ch" seria lida como XVA e o "dc" viraria US sem aviso
+  const xvaOnly = /(?<![a-z])(?:xv|xw|xa|[xvwatfek])(?![a-z])|\bmr\[|^\s*r0\s*:/;
+  if (t.split(/\r?\n/).some((l) => xvaLine.test(l) && xvaOnly.test(l))) return "xva";
   return undefined;
 }
 
@@ -108,7 +111,7 @@ function parseLine(body: string, dialect: Dialect, issues: Issue[], row: number,
     if (ctx.toks[j] === "rep" || ctx.toks[j] === "repeat" || ctx.toks[j] === "repetir") j++;
     const t = ctx.toks[j];
     const next = ctx.toks[j + 1];
-    // em XVA o "x" é o ponto baixo, não um sinal de vezes: "(X, V) 3X" é um grupo e 3 pb
+    // em XVA a letra "x" é o ponto baixo, não um sinal de vezes: "(X, V) 3X" é um grupo e 3 pb ("×" continua valendo)
     const xTimes = dialect !== "xva";
     const m1 = t && xTimes ? /^x(\d+)$/.exec(t) : null;
     if (m1) {
@@ -120,14 +123,14 @@ function parseLine(body: string, dialect: Dialect, issues: Issue[], row: number,
       ctx.i = j + 1;
       return Number(m2[1]);
     }
-    if (xTimes && (t === "x" || t === "×") && next && /^\d+$/.test(next)) {
+    if ((t === "×" || (xTimes && t === "x")) && next && /^\d+$/.test(next)) {
       ctx.i = j + 2;
       return Number(next);
     }
     if (
       t &&
       /^\d+$/.test(t) &&
-      (next === "times" || next === "vezes" || next === "vez" || (xTimes && (next === "x" || next === "×")))
+      (next === "times" || next === "vezes" || next === "vez" || next === "×" || (xTimes && next === "x"))
     ) {
       ctx.i = j + 2;
       return Number(t);
@@ -261,6 +264,14 @@ export function parsePattern(text: string, options: ParseOptions = {}): ParseRes
   const detected = detectDialect(text);
   const issues: Issue[] = [];
   let dialect = options.dialect ?? detected;
+  // XVA detectado sozinho herda os termos de en-US: dc e tr continuam ambíguos (escolher XVA na mão vale como decisão)
+  if (!options.dialect && detected === "xva" && /\b(dc|tr)\b/i.test(text)) {
+    issues.push({
+      code: "AMBIGUOUS_DIALECT",
+      severity: "error",
+      message: "'dc' e 'tr' significam pontos diferentes em US e UK. Escolha o dialeto da receita.",
+    });
+  }
   if (!dialect) {
     if (/\b(dc|tr)\b/i.test(text)) {
       issues.push({

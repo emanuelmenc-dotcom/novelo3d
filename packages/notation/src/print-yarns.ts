@@ -78,7 +78,8 @@ export function printPatternWithYarns(
       segs.forEach((s, i) => {
         let t = segText(foldKeys(s.atoms.map(atomKey)), dialect);
         if (i === segs.length - 1 && r.row.start === "magicRing") {
-          t += dialect === "pt-BR" ? " no anel mágico" : " in magic ring";
+          // em XVA o anel vai numa linha "R0: MR" à parte
+          if (dialect !== "xva") t += dialect === "pt-BR" ? " no anel mágico" : " in magic ring";
         }
         bodies.push(t);
       });
@@ -115,6 +116,7 @@ export function printPatternWithYarns(
   for (const e of entries) {
     const a = e.first.round;
     const label = e.count > 1 ? `${a}–${a + e.count - 1}` : String(a);
+    if (dialect === "xva" && e.first.row.start === "magicRing") lines.push("R0: MR");
     lines.push(`${PREFIX[dialect][e.first.row.kind]}${label}: ${e.body} (${e.first.produced})`);
   }
   return { text: lines.join("\n"), changes };

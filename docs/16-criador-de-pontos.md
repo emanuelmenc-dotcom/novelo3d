@@ -33,6 +33,12 @@ Plano do advisor Opus, 2026-11-13. Chamado "criador B–E" nos documentos e rela
 - Teste 2: passos inválidos são recusados (`finish` com 2 alças, `draw(k ≥ alças)`, `insert` sem base escolhida).
 - Fora do escopo: pipoca com alça solta, tunisiano, broomstick/hairpin, costura.
 
+## Cobertura conferida contra a biblioteca da DulceBella (2026-11-13)
+
+- **Cobertos pela máquina de estados:** pontos básicos e fechados, conjuntos e dc2tog, puff, bobble, bean.
+- **Nível da receita, não do criador:** ponto em V, conchas e leques (vários pontos na mesma base); ponto musgo e a maioria dos "pontos de biblioteca" (combinações de pontos básicos em várias carreiras). Pertencem à notação e a macros.
+- **Limites conhecidos de B a E (não cobertos):** pontos spike (entram 2 ou mais carreiras abaixo; a faixa de baixo só mostra a carreira anterior); pontos cruzados e entrelaçados (exigem por cima/por baixo em relação a um ponto já feito, que a pilha de alças não representa); pipoca; pontos de relevo (FLO, BLO, FP, BP ficam guardados mas desenham com o modelo padrão; o FP DC ribbing é um caso popular).
+
 ## C: diagrama de nós esquemático (SVG puro)
 
 - Faixa de baixo: os topos da carreira de baixo. Alças empilhadas sobre o desenho da agulha. A cada `draw`, a alça nova passa por cima e por baixo das alças que atravessa.

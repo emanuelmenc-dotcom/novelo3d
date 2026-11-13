@@ -171,6 +171,14 @@ Busca por "amigurumi crochet calculator tools". Veredito do advisor Opus: **nada
 - **Artigos não lidos:** bridges2024-369 (PDF binário, sem extrator de texto na máquina) e a página da Eurographics (403). Se algum descrever o fio ponto a ponto, será a referência de um caminho futuro; não reabre a etapa H.
 - **Já existe no projeto:** dialetos pt-BR, US e UK no `notation`; consumo de fio por ponto (`core`); escala da interface (não é tensão).
 
+## 8.2 Bibliotecas de pontos indicadas pelo usuário (2026-11-13)
+
+Veredito do advisor Opus: nenhuma ajuda na geometria 3D e nenhuma pode ser copiada para o repositório; servem de lista de conferência.
+
+- **Planilha "Crochet"** (Google Sheets, aba "Stitches", cerca de 229 linhas; as abas Yarn, Reference e Techniques não foram lidas): descreve **padrões de textura** de várias carreiras (Alpine, Bavarian, Basketweave...) com colunas de tecido (fechado/aberto), textura (3D/plana), tags de padrão, carreira ou volta, trabalho em cores, reversível, consumo de fio, caimento, complexidade, velocidade, espessura, múltiplo de pontos e repetição de carreira. Não traz alças nem instruções, e muitos campos estão vazios. Sem dono nem licença visíveis: direitos reservados por padrão, então não copiar a compilação. Uso futuro possível: uma "biblioteca de texturas" (recurso, não correção de modelo), só com permissão do autor, de preferência sob licença CC.
+- **DulceBella Designs** (dulcebelladesigns.com/crochet-stitch-library): 38 pontos em 9 categorias (as listagens de pontos aparecem em nome, miniatura e dificuldade; as páginas individuais não foram lidas). © 2026, sem termos de reuso: não copiar texto, fotos nem instruções. Útil só para conferir a cobertura do criador.
+- Dados de equivalência de fio e agulha: usar fontes públicas padronizadas (CYC), não estas planilhas.
+
 ## 9. Fontes
 
 - [CrochetPARADE (site)](https://www.crochetparade.org/) · [código](https://codeberg.org/crochetparade/CrochetPARADE) · [Remesher (código)](https://codeberg.org/crochetparade/CrochetPARADE_Remesher) · [anúncio do Remesher](https://crochetparade.org/crochetforum/showthread.php?tid=59)

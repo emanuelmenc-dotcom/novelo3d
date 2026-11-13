@@ -51,7 +51,8 @@ export type Reason =
   | "bad_k"
   | "k_too_big"
   | "need_one_loop"
-  | "no_draw_yet";
+  | "no_draw_yet"
+  | "stitch_done";
 
 export type Applied = { ok: true; state: BuilderState } | { ok: false; reason: Reason };
 
@@ -85,6 +86,9 @@ const drawsOf = (cmds: readonly Cmd[]): number => cmds.filter((c) => c.kind === 
 export function apply(state: BuilderState, cmd: Cmd): Applied {
   if (state.finished) return { ok: false, reason: "finished" };
   const n = state.loops.length;
+  // com 1 alça depois de pelo menos um draw o ponto está pronto: só "fim do ponto" é aceito (senão dois pb viram um pb2juntos)
+  if (n === 1 && drawsOf(state.cmds) >= 1 && cmd.kind !== "finish")
+    return { ok: false, reason: "stitch_done" };
   switch (cmd.kind) {
     case "yo": {
       if (n >= MAX_LOOPS) return { ok: false, reason: "max_loops" };
@@ -152,12 +156,9 @@ function next(
 export function allowed(state: BuilderState): Allowed {
   const n = state.loops.length;
   if (state.finished) return { yo: false, insert: false, drawMax: 0, finish: false };
-  return {
-    yo: n < MAX_LOOPS,
-    insert: n < MAX_LOOPS,
-    drawMax: n - 1,
-    finish: n === 1 && drawsOf(state.cmds) >= 1,
-  };
+  // ponto pronto (1 alça depois de um draw): só o fim do ponto está liberado
+  if (n === 1 && drawsOf(state.cmds) >= 1) return { yo: false, insert: false, drawMax: 0, finish: true };
+  return { yo: n < MAX_LOOPS, insert: n < MAX_LOOPS, drawMax: n - 1, finish: false };
 }
 
 export function replay(

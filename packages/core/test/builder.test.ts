@@ -134,38 +134,29 @@ describe("tabela dos 9 pontos", () => {
   });
 });
 
-describe("oráculo do próprio pipeline: o número de pais do nó é igual a legs", () => {
-  const sc = (n: number): Op => ({ kind: "stitch", code: "SC", count: n });
-  const base: Pattern["rows"] = [{ label: "1", kind: "round", ops: [sc(6)], start: "magicRing" }];
-  const cases: [string, Op, number][] = [
-    ["SL", { kind: "stitch", code: "SL", count: 6 }, 1],
-    ["SC", { kind: "stitch", code: "SC", count: 6 }, 1],
-    ["HDC", { kind: "stitch", code: "HDC", count: 6 }, 1],
-    ["DC", { kind: "stitch", code: "DC", count: 6 }, 1],
-    ["TR", { kind: "stitch", code: "TR", count: 6 }, 1],
-    ["SC (pb2juntos)", { kind: "dec", k: 2, count: 3 }, 2],
+describe("oráculo do próprio pipeline: o resumo da máquina bate com o que o grafo produz", () => {
+  // cada linha da tabela vira uma operação da receita a partir do RESUMO (não de constantes), e o nó gerado tem de ter
+  // o mesmo tipo e o mesmo número de pais (pernas)
+  const opFor = (type: string, legs: number): Op =>
+    legs >= 2
+      ? { kind: "dec", k: legs, count: 3 }
+      : { kind: "stitch", code: type as "SL" | "SC" | "HDC" | "DC" | "TR", count: 6 };
+  const ring: Pattern["rows"] = [
+    { label: "1", kind: "round", ops: [{ kind: "stitch", code: "SC", count: 6 }], start: "magicRing" },
   ];
-  for (const [name, op, legs] of cases) {
-    test(`${name}: ${legs} pai(s)`, () => {
-      const g = buildGraph({ dialect: "en-US", rows: [...base, { label: "2", kind: "round", ops: [op] }] });
-      const second = g.rows[g.rows.length - 1];
-      expect(g.nodes[second?.first ?? 0]?.parents.length).toBe(legs);
+  for (const row of TABLE) {
+    test(`${row.name}: tipo e pais do nó = resumo`, () => {
+      const sum = B.summarize(run(row.cmds).state);
+      const rows: Pattern["rows"] =
+        sum.type === "CH"
+          ? [{ label: "1", kind: "round", ops: [{ kind: "stitch", code: "CH", count: 3 }] }]
+          : [...ring, { label: "2", kind: "round", ops: [opFor(sum.type as string, sum.legs)] }];
+      const g = buildGraph({ dialect: "en-US", rows });
+      const node = g.nodes[g.rows[g.rows.length - 1]?.first ?? 0];
+      expect(node?.code).toBe(sum.type);
+      expect(node?.parents.length).toBe(sum.legs);
     });
   }
-  test("CH: nenhum pai", () => {
-    const g = buildGraph({
-      dialect: "en-US",
-      rows: [{ label: "1", kind: "round", ops: [{ kind: "stitch", code: "CH", count: 3 }] }],
-    });
-    expect(g.nodes[0]?.parents.length).toBe(0);
-  });
-
-  test("as pernas da tabela dos tipos exatos batem com as do grafo", () => {
-    const want: Record<string, number> = { CH: 0, SL: 1, SC: 1, HDC: 1, DC: 1, TR: 1 };
-    for (const row of TABLE.filter((r) => r.exact)) {
-      expect(row.legs).toBe(want[row.type]);
-    }
-  });
 });
 
 describe("recusas", () => {
@@ -178,6 +169,20 @@ describe("recusas", () => {
   test("finish no começo e com 2 alças", () => {
     expect(reason(B.start(), F)).toBe("no_draw_yet");
     expect(reason(after(Y), F)).toBe("need_one_loop");
+  });
+
+  test("ponto pronto (1 alça depois de um draw): só o fim do ponto é aceito; dois pb não viram pb2juntos", () => {
+    const pb = after(I(0), Y, D(2));
+    for (const c of [I(1), I(0), Y, D(1)]) expect(reason(pb, c)).toBe("stitch_done");
+    expect(reason(pb, F)).toBe("ok");
+    expect(B.allowed(pb)).toEqual({ yo: false, insert: false, drawMax: 0, finish: true });
+    // a sequência de dois pb seguidos é recusada já no segundo insert
+    expect(B.replay([I(0), Y, D(2), I(1), Y, D(2)])).toEqual({ ok: false, reason: "stitch_done", at: 3 });
+    // as 9 sequências da tabela nunca passam por 1 alça no meio (só no fim)
+    for (const row of TABLE) {
+      const mid = run(row.cmds.slice(0, -1)).trace.slice(0, -1);
+      expect(mid.every((n) => n > 1)).toBe(true);
+    }
   });
 
   test("draw(0), draw(alças) e k inválido", () => {

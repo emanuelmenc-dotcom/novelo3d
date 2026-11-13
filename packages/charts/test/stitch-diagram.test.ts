@@ -87,7 +87,12 @@ function crosses(e: El, h: Hole): boolean {
 }
 
 /** Todas as invariantes do diagrama de um estado (alças, ligações do fio, pernas, determinismo). */
-function checkDiagram(state: B.BuilderState, where: string, hand: Hand = "right", legHoles = true): void {
+function checkDiagram(
+  state: B.BuilderState,
+  where: string,
+  hand: Hand = "right",
+  deep: Set<number> = new Set(),
+): void {
   const svg = stitchDiagramSvg(state, { hand });
   const els = elements(svg);
   const at = (pred: (e: El) => boolean): number => els.findIndex(pred);
@@ -136,7 +141,7 @@ function checkDiagram(state: B.BuilderState, where: string, hand: Hand = "right"
       where,
     ).toBe(true);
   }
-  for (const leg of els.filter((e) => legHoles && e["data-leg"] !== undefined)) {
+  for (const leg of els.filter((e) => e["data-leg"] !== undefined && !deep.has(Number(e["data-leg"])))) {
     for (const [id, h] of holes)
       expect(crosses(leg, h), `${where} perna de ${leg["data-leg"]} no anel ${id}`).toBe(false);
   }
@@ -202,13 +207,13 @@ describe("stitchDiagramSvg: cada prefixo de cada sequência", () => {
   test("sequências aleatórias com semente (300 caminhadas, mão direita; 60 na esquerda): as mesmas invariantes", () => {
     for (let seed = 1; seed <= 300; seed++) {
       walk(seed).forEach((state, step) => {
-        checkDiagram(state, `semente ${seed} passo ${step}: ${cmdText(state)}`, "right", !deepPulled(state));
+        checkDiagram(state, `semente ${seed} passo ${step}: ${cmdText(state)}`, "right", deepIds(state));
         if (seed <= 60)
           checkDiagram(
             state,
             `semente ${seed} passo ${step} (canhoto): ${cmdText(state)}`,
             "left",
-            !deepPulled(state),
+            deepIds(state),
           );
       });
     }
@@ -390,24 +395,43 @@ describe("pernas duplas (U comprido)", () => {
     for (const seq of SEQUENCES) {
       for (const [step, state] of states(seq.cmds).entries()) {
         for (const hand of ["right", "left"] as const) {
-          expect(legOverlaps(state, hand).join(" | "), `${seq.file} passo ${step} ${hand}`).toBe("");
+          expect(
+            legOverlaps(state, hand)
+              .map((o) => o.text)
+              .join(" | "),
+            `${seq.file} passo ${step} ${hand}`,
+          ).toBe("");
         }
       }
     }
   });
 
-  test("sem sobreposição nas 300 caminhadas (todos os prefixos), salvo os limites conhecidos (2 bases com 2 ou mais puxadas; alça puxada funda)", () => {
+  test("sem sobreposição nas 300 caminhadas (todos os prefixos), salvo os limites conhecidos, desculpados por par de alças", () => {
+    const counts = { deep: 0, twoBases: 0 };
     for (let seed = 1; seed <= 300; seed++) {
       for (const state of walk(seed)) {
-        const found = legOverlaps(state, "right");
-        if (found.length === 0) continue;
-        // limite conhecido (docs/16): cada par cai a menos de um passo de onde o outro desce, e nenhuma ordem de pistas resolve
-        expect(
-          pullyBases(state) >= 2 || deepPulled(state),
-          `semente ${seed}: ${cmdText(state)}: ${found[0]}`,
-        ).toBe(true);
+        const deep = deepIds(state);
+        const base = pulledBase(state);
+        const pulls = new Map<number, number>();
+        for (const b of base.values()) pulls.set(b, (pulls.get(b) ?? 0) + 1);
+        for (const o of legOverlaps(state, "right")) {
+          // (1) um dos dois fios é de uma alça puxada "funda"; (2) as duas são puxadas de bases diferentes, cada uma com 2 ou mais puxadas
+          const [ba, bb] = [base.get(o.a), base.get(o.b)];
+          const twoBases =
+            ba !== undefined &&
+            bb !== undefined &&
+            ba !== bb &&
+            (pulls.get(ba) ?? 0) >= 2 &&
+            (pulls.get(bb) ?? 0) >= 2;
+          const isDeep = deep.has(o.a) || deep.has(o.b);
+          expect(isDeep || twoBases, `semente ${seed}: ${cmdText(state)}: ${o.text}`).toBe(true);
+          if (isDeep) counts.deep++;
+          else counts.twoBases++;
+        }
       }
     }
+    // contagem de pares sobrepostos em 300 caminhadas (docs/16); se mudar, o desenho mudou
+    expect(counts).toEqual(COUNTS_WALKS);
   });
 
   test("continuidade: braços saem do U (agulha) ou do fundo do anel e terminam nas pontas da curva; a curva fica no V da sua base", () => {
@@ -461,8 +485,8 @@ describe("pernas duplas (U comprido)", () => {
 });
 
 /** Trechos retos paralelos de alças diferentes que se sobrepõem em menos de 10 px (linhas de alças diferentes). */
-function legOverlaps(state: B.BuilderState, hand: Hand): string[] {
-  const found: string[] = [];
+function legOverlaps(state: B.BuilderState, hand: Hand): Overlap[] {
+  const found: Overlap[] = [];
   const axis = (e: El): "v" | "h" | "d" =>
     Math.abs(num(e, "x1") - num(e, "x2")) < 0.05
       ? "v"
@@ -481,45 +505,53 @@ function legOverlaps(state: B.BuilderState, hand: Hand): string[] {
       const [sa, sb] = [span(a), span(b)];
       if (Math.min(sa[1], sb[1]) - Math.max(sa[0], sb[0]) <= 1) continue;
       if (Math.abs(num(a, `${q}1`) - num(b, `${q}1`)) < 10) {
-        found.push(
-          `${a["data-pair"]}:${a["data-seg"]}[${a.x1},${a.y1}>${a.x2},${a.y2}] x ${b["data-pair"]}:${b["data-seg"]}[${b.x1},${b.y1}>${b.x2},${b.y2}]`,
-        );
+        found.push({
+          a: Number(a["data-pair"]),
+          b: Number(b["data-pair"]),
+          text: `${a["data-pair"]}:${a["data-seg"]}[${a.x1},${a.y1}>${a.x2},${a.y2}] x ${b["data-pair"]}:${b["data-seg"]}[${b.x1},${b.y1}>${b.x2},${b.y2}]`,
+        });
       }
     }
   }
   return found;
 }
 
+type Overlap = { a: number; b: number; text: string };
+
+/** Base de cada alça puxada (uma por `insert`). */
+function pulledBase(state: B.BuilderState): Map<number, number> {
+  const out = new Map<number, number>();
+  for (const e of state.events)
+    if (e.added !== undefined && e.cmd.kind === "insert" && e.cmd.base !== undefined)
+      out.set(e.added, e.cmd.base);
+  return out;
+}
+
 /**
- * Limite conhecido: uma alça puxada de uma base que atravessa anéis (`insert, draw`) e cujo último anel atravessado tem
- * filhos. A perna dela desce pela faixa desse anel e passa por dentro dos anéis de baixo.
+ * Alças puxadas "fundas" (limite conhecido): puxadas de uma base, atravessam anéis (`insert, draw`) e o último anel que
+ * atravessam tem filhos. A perna delas desce pela faixa desse anel e passa por dentro dos anéis de baixo.
  */
-function deepPulled(state: B.BuilderState): boolean {
-  const kind = new Map<number, string>([[0, "initial"]]);
+function deepIds(state: B.BuilderState): Set<number> {
+  const base = pulledBase(state);
   const kids = new Map<number, number[]>();
   let list = [0];
   for (const e of state.events) {
-    if (e.added !== undefined) {
-      kind.set(e.added, e.cmd.kind === "insert" ? "pulled" : "yo");
-      list = [...list, e.added];
-    } else if (e.through) {
+    if (e.added !== undefined) list = [...list, e.added];
+    else if (e.through) {
       const top = list[list.length - 1] as number;
       kids.set(top, [...(kids.get(top) ?? []), ...e.through]);
       list = list.filter((id) => !e.through?.includes(id));
     }
   }
-  return [...kids].some(
-    ([id, ks]) => kind.get(id) === "pulled" && (kids.get(ks[ks.length - 1] as number)?.length ?? 0) > 0,
-  );
+  const out = new Set<number>();
+  for (const [id, ks] of kids) {
+    if (base.has(id) && (kids.get(ks[ks.length - 1] as number)?.length ?? 0) > 0) out.add(id);
+  }
+  return out;
 }
 
-/** Quantas bases têm 2 ou mais alças puxadas (uma por `insert`). */
-function pullyBases(state: B.BuilderState): number {
-  const n = new Map<number, number>();
-  for (const c of state.cmds)
-    if (c.kind === "insert" && c.base !== undefined) n.set(c.base, (n.get(c.base) ?? 0) + 1);
-  return [...n.values()].filter((k) => k >= 2).length;
-}
+// pares sobrepostos nas 300 caminhadas, por categoria (preenchido na primeira execução)
+const COUNTS_WALKS = { deep: 118, twoBases: 3 };
 
 describe("alça na agulha e ordem dos anéis", () => {
   const all = (): B.BuilderState[] => {

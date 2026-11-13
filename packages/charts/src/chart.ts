@@ -512,7 +512,7 @@ export function renderChart(pattern: Pattern, options: ChartOptions = {}): Chart
       symAm(s, C, COLOR.black);
       used.add("am");
     }
-    const firstDrawn = rowsAll.findIndex((e, i) => !(spec.ref && i === 0) && !e.plain);
+    const firstDrawn = rowsAll.findIndex((e, i) => !(spec.ref && i === 0) && !e.plain && e.items.length > 0);
     if (firstDrawn >= 0) {
       const e = rowsAll[firstDrawn] as Entry;
       const it0 = e.items[0] as Item;
@@ -528,8 +528,9 @@ export function renderChart(pattern: Pattern, options: ChartOptions = {}): Chart
     if (le.plain) {
       endMark(s, frame(C, lr, (plainAngle[lastIdx] ?? Math.PI / 2) - ((1.28 * 12) / 2 + 3.2 + 2) / lr).o);
     } else {
-      const itn = le.items[le.items.length - 1] as Item;
-      endMark(s, frame(C, lr + g * 4.2, itn.a).o);
+      // volta sem pontos (receita incompleta): sem marca de fim
+      const itn = le.items[le.items.length - 1];
+      if (itn) endMark(s, frame(C, lr + g * 4.2, itn.a).o);
     }
     used.add("fim");
     if (hasPlain) used.add("liso");

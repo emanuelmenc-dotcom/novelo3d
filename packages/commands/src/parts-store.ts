@@ -432,6 +432,13 @@ const isPart = (p: unknown): p is Part => {
   );
 };
 
+/** Quantas peças válidas há em `raw` (0 se nenhuma ou se as ligações entre peças não fecham). */
+export function validPartCount(raw: unknown): number {
+  const list = (raw as Partial<PartsJson> | undefined)?.parts;
+  const parts = Array.isArray(list) ? list.filter(isPart) : [];
+  return parts.every((p) => !p.source || parts.some((q) => q.id === p.source)) ? parts.length : 0;
+}
+
 /** Carrega as peças gravadas; sem nada válido, começa com uma peça só usando `fallback` como receita. */
 export function loadParts(raw: unknown, fallback: { text: string; dialect?: Dialect }): PartsState {
   const o = (raw ?? {}) as Partial<PartsJson>;

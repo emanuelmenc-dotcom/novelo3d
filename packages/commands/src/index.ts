@@ -57,6 +57,7 @@ import {
   setYarns,
 } from "./paint-store.ts";
 import { partsCommands } from "./parts-commands.ts";
+import { projectCommands } from "./project-commands.ts";
 import {
   completeRender,
   failRender,
@@ -393,6 +394,7 @@ export const commands: Record<string, Command> = {
   ...partsCommands(layoutOut),
   ...materialsCommands((m, p) => dispatch(m, p)),
   ...stitchEditorCommands,
+  ...projectCommands,
   "system.ping": () => ({ pong: true }),
 
   // --- janela de render (R3): máquina de estados síncrona; o studio executa e relata o progresso

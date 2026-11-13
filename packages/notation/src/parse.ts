@@ -65,6 +65,24 @@ function prep(raw: string): string {
   return t;
 }
 
+/** Limites contra receita gigante (um erro, não a aba travada): número, pontos por volta e pontos no total. */
+export const MAX_NUMBER = 99_999;
+export const MAX_ROW_STITCHES = 20_000;
+export const MAX_TOTAL_STITCHES = 50_000;
+
+/** Pontos que uma lista de operações produz, no pior caso ("rest" conta como 0: depende da volta anterior). */
+function sizeOf(ops: Op[]): number {
+  let n = 0;
+  for (const o of ops) {
+    if (o.kind === "stitch" || o.kind === "skip" || o.kind === "slInto")
+      n += typeof o.count === "number" ? o.count : 0;
+    else if (o.kind === "inc") n += typeof o.count === "number" ? o.count * o.k : 0;
+    else if (o.kind === "dec") n += o.count;
+    else if (o.kind === "repeat") n += o.times * sizeOf(o.ops);
+  }
+  return n;
+}
+
 const TOKEN = /\d*[a-z]+\d*[a-z]*\d*|\d+|@[a-z]+|[()[\]*,;×–—-]/g;
 
 const LABEL =
@@ -102,8 +120,13 @@ function interpret(chunk: string, dialect: Dialect) {
 }
 
 function parseLine(body: string, dialect: Dialect, issues: Issue[], row: number, label: string) {
-  const ctx: LineCtx = { toks: prep(body).match(TOKEN) ?? [], i: 0, dialect, issues, row, label };
   const bad = (code: string, message: string) => issues.push({ code, message, severity: "error", row });
+  const found = prep(body).match(TOKEN) ?? [];
+  if (found.some((t) => /\d{6,}/.test(t))) {
+    bad("NUMBER_TOO_LARGE", `Volta ${label}: número maior que ${MAX_NUMBER}.`);
+    return { ops: [] as Op[], start: undefined };
+  }
+  const ctx: LineCtx = { toks: found, i: 0, dialect, issues, row, label };
 
   const parseTimes = (): number => {
     const save = ctx.i;
@@ -257,6 +280,10 @@ function parseLine(body: string, dialect: Dialect, issues: Issue[], row: number,
   };
 
   const ops = parseOps();
+  if (sizeOf(ops) > MAX_ROW_STITCHES) {
+    bad("ROW_TOO_LARGE", `Volta ${label}: mais de ${MAX_ROW_STITCHES} pontos numa volta.`);
+    return { ops: [] as Op[], start: ctx.start };
+  }
   return { ops, start: ctx.start };
 }
 
@@ -286,6 +313,7 @@ export function parsePattern(text: string, options: ParseOptions = {}): ParseRes
   const rows: Row[] = [];
   let nextNumber = 1;
   let pendingRing: { n: number | undefined; at: number } | undefined;
+  let total = 0;
   for (const raw of text.split(/\r?\n/)) {
     let line = raw.trim();
     if (line === "" || line.startsWith("#") || line.startsWith("//")) continue;
@@ -298,6 +326,15 @@ export function parsePattern(text: string, options: ParseOptions = {}): ParseRes
       const a = Number(lm[2]);
       const b = lm[3] === undefined ? a : Number(lm[3]);
       repeat = Math.max(1, b - a + 1);
+      if (a > MAX_NUMBER || b > MAX_NUMBER || repeat > 1000) {
+        issues.push({
+          code: "NUMBER_TOO_LARGE",
+          message: `Volta ${a}–${b}: faixa grande demais (máximo 1000 voltas, números até ${MAX_NUMBER}).`,
+          severity: "error",
+          row: rows.length,
+        });
+        repeat = 1;
+      }
       label = repeat > 1 ? `${a}–${b}` : String(a);
       nextNumber = b + 1;
       if (lm[1] && /^(c|carr|carreira|row)$/i.test(lm[1])) kind = "row";
@@ -319,7 +356,21 @@ export function parsePattern(text: string, options: ParseOptions = {}): ParseRes
       line = line.slice(0, tm.index);
     }
     const instruction = line.trim();
-    const { ops, start } = parseLine(instruction, dialect, issues, rows.length, label);
+    const parsed = parseLine(instruction, dialect, issues, rows.length, label);
+    const start = parsed.start;
+    let ops = parsed.ops;
+    const size = sizeOf(ops) * repeat;
+    total += size;
+    if (total > MAX_TOTAL_STITCHES) {
+      issues.push({
+        code: "PATTERN_TOO_LARGE",
+        message: `A receita passa de ${MAX_TOTAL_STITCHES} pontos; a volta ${label} foi ignorada.`,
+        severity: "error",
+        row: rows.length,
+      });
+      ops = [];
+      total -= size; // a volta ignorada não conta: as seguintes continuam sujeitas ao mesmo teto
+    }
     const row: Row = { label, kind, ops, sourceText: instruction };
     if (start) row.start = start;
     else if (pendingRing && pendingRing.at === rows.length) row.start = "magicRing";

@@ -189,7 +189,19 @@ header {
   gap: 0.5rem;
 }
 header span {
+  margin-left: 0.75rem;
+}
+header [data-testid="bridge-state"] {
   margin-left: auto;
+}
+header .btn {
+  margin-left: 1rem;
+  font: inherit;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--line);
+  border-radius: 0.375rem;
+  background: #fff;
+  cursor: pointer;
 }
 .overlay {
   position: fixed;

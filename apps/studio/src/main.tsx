@@ -116,7 +116,7 @@ try {
 } catch {
   // idem: layout padrão
 }
-installRenderJob();
+if (features().render) installRenderJob(); // render pausado (D-57): sem assinatura nem trabalho em segundo plano
 
 /** Escala da interface e do texto: variáveis lidas pelo CSS (html: 16px x --ui; textos: x --text). */
 function applyScale(s: { interface: { scale: number; textScale: number } }) {
@@ -147,54 +147,57 @@ function readJson(key: string): unknown {
   loadPaintAll(readJson(PROJECT_KEY), root);
   loadEditAll(readJson(EDIT_KEY), root);
 }
+// gravação no navegador: se falhar (espaço cheio, armazenamento bloqueado), a tela avisa em vez de calar
+// (uma chave grande pode falhar enquanto outra pequena grava: o aviso vale enquanto qualquer uma falhar)
+const failedKeys = new Set<string>();
+let saveFailed = false;
+const saveListeners = new Set<() => void>();
+function put(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+    failedKeys.delete(key);
+  } catch {
+    failedKeys.add(key);
+  }
+  const failed = failedKeys.size > 0;
+  if (failed !== saveFailed) {
+    saveFailed = failed;
+    for (const fn of saveListeners) fn();
+  }
+}
+const subscribeSave = (fn: () => void) => {
+  saveListeners.add(fn);
+  return () => void saveListeners.delete(fn);
+};
+const saveFailedNow = () => saveFailed;
 let editTimer: ReturnType<typeof setTimeout> | undefined;
 subscribeEdit(() => {
   // grava com atraso: um arrasto de pincel dispara muitas edições seguidas
   clearTimeout(editTimer);
   editTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(EDIT_KEY, JSON.stringify(exportEditAll(partsSnapshot().parts.map((q) => q.id))));
-    } catch {
-      // sem persistência: vale só nesta sessão
-    }
+    put(EDIT_KEY, JSON.stringify(exportEditAll(partsSnapshot().parts.map((q) => q.id))));
   }, 400);
 });
 subscribePaint(() => {
-  try {
-    localStorage.setItem(PROJECT_KEY, JSON.stringify(exportPaintAll(partsSnapshot().parts.map((q) => q.id))));
-  } catch {
-    // sem persistência: vale só nesta sessão
-  }
+  put(PROJECT_KEY, JSON.stringify(exportPaintAll(partsSnapshot().parts.map((q) => q.id))));
 });
 let partsTimer: ReturnType<typeof setTimeout> | undefined;
 subscribeParts(() => {
   clearTimeout(partsTimer);
   partsTimer = setTimeout(() => {
-    try {
-      const ids = partsSnapshot().parts.map((q) => q.id);
-      localStorage.setItem(PARTS_KEY, JSON.stringify(exportParts()));
-      // copiar, remover/desfazer e destacar peças mexem nas edições e na pintura delas: grava junto
-      localStorage.setItem(EDIT_KEY, JSON.stringify(exportEditAll(ids)));
-      localStorage.setItem(PROJECT_KEY, JSON.stringify(exportPaintAll(ids)));
-    } catch {
-      // sem persistência: vale só nesta sessão
-    }
+    const ids = partsSnapshot().parts.map((q) => q.id);
+    put(PARTS_KEY, JSON.stringify(exportParts()));
+    // copiar, remover/desfazer e destacar peças mexem nas edições e na pintura delas: grava junto
+    put(EDIT_KEY, JSON.stringify(exportEditAll(ids)));
+    put(PROJECT_KEY, JSON.stringify(exportPaintAll(ids)));
   }, 300);
 });
 subscribeSettings((s) => {
   applyScale(s);
-  try {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-  } catch {
-    // sem persistência: vale só nesta sessão
-  }
+  put(SETTINGS_KEY, JSON.stringify(s));
 });
 subscribeWorkspace((w) => {
-  try {
-    localStorage.setItem(WORKSPACE_KEY, JSON.stringify(w));
-  } catch {
-    // sem persistência: vale só nesta sessão
-  }
+  put(WORKSPACE_KEY, JSON.stringify(w));
 });
 
 const call = <T,>(method: string, params: Record<string, unknown>): T => dispatch(method, params) as T;
@@ -205,6 +208,17 @@ function App() {
   const rootPart = rootOf(partsState.active);
   const text = rootPart.text;
   const dialect = rootPart.dialect ?? "auto";
+  // receita grande: gráfico e 3D levam segundos, então só recalculam quando a digitação para (receita pequena: na hora)
+  const slowCalc = useRef(false);
+  const slow = slowCalc.current; // lido uma vez por desenho: o cálculo deste desenho só vale para o próximo
+  const [calc, setCalc] = useState({ text, dialect });
+  useEffect(() => {
+    if (!slow) return void setCalc({ text, dialect });
+    const t = setTimeout(() => setCalc({ text, dialect }), 700);
+    return () => clearTimeout(t);
+  }, [text, dialect, slow]);
+  const ct = slow ? calc.text : text;
+  const cd = slow ? calc.dialect : dialect;
   const setText = (t: string) =>
     dispatch("parts.setText", {
       id: rootPart.id,
@@ -261,15 +275,17 @@ function App() {
   // biome-ignore lint/correctness/useExhaustiveDependencies: a pintura e a paleta (estado dos comandos) também invalidam
   const view = useMemo(() => {
     try {
-      const params = { text, dialect };
+      const params = { text: ct, dialect: cd };
+      const t0 = performance.now();
       const verify = call<VerifyOut>("pattern.verify", params);
       const chart = call<ChartOut>("chart.render", { ...params, beginner });
       const cp = call<{ text: string; issues: Issue[] }>("pattern.toCp", params);
+      slowCalc.current = performance.now() - t0 > 150;
       return { verify, chart, cp, error: null as string | null };
     } catch (e) {
       return { verify: null, chart: null, cp: null, error: (e as Error).message };
     }
-  }, [text, dialect, beginner, paintState, pver]);
+  }, [ct, cd, beginner, paintState, pver]);
 
   // posições 3D só são calculadas quando o painel 3D está à vista
   // biome-ignore lint/correctness/useExhaustiveDependencies: a pintura e a paleta (estado dos comandos) também invalidam
@@ -278,22 +294,22 @@ function App() {
     try {
       return multi
         ? call<LayoutOut>("assembly.layout", { include: true })
-        : call<LayoutOut>("graph.layout", { text, dialect, include: true });
+        : call<LayoutOut>("graph.layout", { text: ct, dialect: cd, include: true });
     } catch {
       return null;
     }
-  }, [show3d, showRender, multi, partsState.version, text, dialect, paintState, pver]);
+  }, [show3d, showRender, multi, partsState.version, ct, cd, paintState, pver]);
   // uids selecionados, em azul no 3D
   // biome-ignore lint/correctness/useExhaustiveDependencies: a versão da edição indica mudança da seleção
   const selection = useMemo(() => {
     if (!show3d) return null;
     try {
-      const r = dispatch("selection.get", { text, dialect, all: true }) as { uids: number[] };
+      const r = dispatch("selection.get", { text: ct, dialect: cd, all: true }) as { uids: number[] };
       return r.uids;
     } catch {
       return null;
     }
-  }, [show3d, text, dialect, edit.version]);
+  }, [show3d, ct, cd, edit.version]);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
   // o render busca as posições na hora do Play (mesmo sem a aba 3D ou Render à vista) e avisa se a geometria mudar
@@ -410,6 +426,25 @@ function App() {
     a.download = name;
     a.click();
     URL.revokeObjectURL(a.href);
+  };
+  const saveBad = useSyncExternalStore(subscribeSave, saveFailedNow);
+  const [projectMsg, setProjectMsg] = useState<string | null>(null);
+  const saveProject = () => {
+    download("projeto.novelo3d.json", JSON.stringify(dispatch("project.export")));
+    setProjectMsg("Projeto salvo no arquivo projeto.novelo3d.json.");
+  };
+  const openProject = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      if (file.size > 20_000_000) throw new Error("arquivo grande demais");
+      const project = JSON.parse(await file.text()) as unknown;
+      dispatch("project.import", { project, check: true }); // arquivo errado nem oferece a troca
+      if (!window.confirm("Abrir este projeto substitui o projeto atual. Salvou o atual? Continuar?")) return;
+      const r = dispatch("project.import", { project }) as { parts: number };
+      setProjectMsg(`Projeto aberto: ${file.name} (${r.parts} peça${r.parts === 1 ? "" : "s"}).`);
+    } catch (e) {
+      setProjectMsg(`Não consegui abrir o projeto: ${(e as Error).message}`);
+    }
   };
 
   const panels: PanelRenderers = {
@@ -666,6 +701,28 @@ function App() {
         <button type="button" onClick={() => setShowSettings(true)} aria-label="Configurações">
           ⚙ Configurações
         </button>
+        <button type="button" data-testid="project-save" onClick={saveProject}>
+          Salvar projeto
+        </button>
+        <label className="btn">
+          Abrir projeto
+          <input
+            type="file"
+            accept=".json,application/json"
+            data-testid="project-open"
+            hidden
+            onChange={(e) => {
+              void openProject(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        {saveBad && (
+          <span role="alert" data-testid="save-warning" className="warn">
+            Não foi possível guardar no navegador: use "Salvar projeto".
+          </span>
+        )}
+        {projectMsg && <span data-testid="project-msg">{projectMsg}</span>}
         <span data-testid="bridge-state">
           ponte MCP: {bridge === "connected" ? "conectada" : "desconectada"}
         </span>

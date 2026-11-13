@@ -124,3 +124,12 @@ describe("gráfico com fios pintados", () => {
     expect(r.pages[0]?.svg).toContain("#f2c94c");
   });
 });
+
+describe("volta sem pontos", () => {
+  test("receita com volta vazia desenha sem lançar erro", () => {
+    const p: Pattern = { dialect: "pt-BR", rows: [row("1", [sc(6)], { start: "magicRing" }), row("2", [])] };
+    expect(() => renderChart(p)).not.toThrow();
+    const only: Pattern = { dialect: "pt-BR", rows: [row("1", [])] };
+    expect(() => renderChart(only)).not.toThrow();
+  });
+});

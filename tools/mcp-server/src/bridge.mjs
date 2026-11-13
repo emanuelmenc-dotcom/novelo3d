@@ -13,6 +13,13 @@ import http from "node:http";
 const POLL_MS = 25_000;
 const STALE_MS = 60_000;
 
+// Só o studio local pode falar com a ponte: outra página aberta no navegador (Origin diferente) é recusada.
+// Clientes sem Origin (scripts e testes em Node) passam. Outras origens: NOVELO_ALLOWED_ORIGINS="a,b".
+const ALLOWED = (process.env.NOVELO_ALLOWED_ORIGINS ?? "http://localhost:5173,http://127.0.0.1:5173")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 export function createBridge({ port = 47821, log = () => {} } = {}) {
   let session = null; // {id, client, version, lastSeen}
   const queue = []; // comandos aguardando o poll
@@ -20,9 +27,12 @@ export function createBridge({ port = 47821, log = () => {} } = {}) {
   const pending = new Map(); // id -> {resolve, reject, timer}
 
   const connected = () => session !== null && Date.now() - session.lastSeen < STALE_MS;
-  const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type" };
+  const corsFor = (req) => ({
+    ...(req?.headers.origin ? { "access-control-allow-origin": req.headers.origin, vary: "origin" } : {}),
+    "access-control-allow-headers": "content-type",
+  });
   const json = (res, code, body) => {
-    res.writeHead(code, { "content-type": "application/json", ...cors });
+    res.writeHead(code, { "content-type": "application/json", ...corsFor(res.req) });
     res.end(JSON.stringify(body));
   };
   const readBody = (req) =>
@@ -52,6 +62,13 @@ export function createBridge({ port = 47821, log = () => {} } = {}) {
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, "http://127.0.0.1");
+    const origin = req.headers.origin;
+    if (origin !== undefined && !ALLOWED.includes(origin)) {
+      log(`origem recusada: ${origin}`);
+      res.writeHead(403, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ error: "origem não permitida" }));
+    }
+    const cors = corsFor(req);
     try {
       if (req.method === "OPTIONS") return res.writeHead(204, cors).end();
       if (req.method === "GET" && url.pathname === "/health") {

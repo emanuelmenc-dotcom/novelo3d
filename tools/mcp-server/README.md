@@ -31,3 +31,7 @@ npm test     # fala MCP por stdio e simula o aplicativo
 ```
 
 Registro: `.mcp.json` na pasta `Crochet` (comando `node`, sem wrapper). Reinicie a sessão do Claude e aprove o servidor para as ferramentas aparecerem.
+
+## Origem permitida (D-58)
+
+A ponte recusa (403) pedidos de navegador cuja `Origin` não seja `http://localhost:5173` ou `http://127.0.0.1:5173`. Para outra origem, defina `NOVELO_ALLOWED_ORIGINS="https://a,https://b"`. Clientes sem `Origin` (scripts e testes em Node) continuam passando.

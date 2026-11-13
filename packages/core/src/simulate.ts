@@ -28,6 +28,9 @@ export interface SimResult {
  * Simula uma volta. `free` = volta inicial (anel/corrente): não consome topos.
  * Topos não contados são pulados em silêncio por operações comuns.
  */
+/** Teto de pontos de uma receita ("em cada ponto" repetido dobra a volta a cada vez e esgotaria a memória). */
+export const MAX_NODES = 100_000;
+
 export function simulateRow(row: Row, prev: Top[], nextId: number, free: boolean): SimResult {
   const nodes: SimNode[] = [];
   const atoms: Atom[] = [];
@@ -56,6 +59,8 @@ export function simulateRow(row: Row, prev: Top[], nextId: number, free: boolean
     groupWith?: number,
   ): number => {
     const id = nextId + nodes.length;
+    if (id >= MAX_NODES)
+      throw new RangeError(`A receita passa de ${MAX_NODES} pontos; reduza as repetições.`);
     const node: SimNode = { id, code, counted, parents: parents.filter((p): p is number => p !== undefined) };
     if (groupWith !== undefined) node.groupWith = groupWith;
     nodes.push(node);

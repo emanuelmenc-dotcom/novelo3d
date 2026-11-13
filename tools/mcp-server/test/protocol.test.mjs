@@ -31,6 +31,17 @@ assert.match(off.content[0].text, /não conectado/);
 
 // Simula o aplicativo: register, poll, result.
 const base = `http://127.0.0.1:${PORT}`;
+
+// Outra página do navegador não pode falar com a ponte; o studio local pode.
+const evil = await fetch(`${base}/register`, {
+  method: "POST",
+  headers: { origin: "http://evil.example" },
+  body: "{}",
+});
+assert.equal(evil.status, 403);
+const health = await fetch(`${base}/health`, { headers: { origin: "http://localhost:5173" } });
+assert.equal(health.status, 200);
+assert.equal(health.headers.get("access-control-allow-origin"), "http://localhost:5173");
 const reg = await (
   await fetch(`${base}/register`, { method: "POST", body: JSON.stringify({ client: "fake", version: "0" }) })
 ).json();

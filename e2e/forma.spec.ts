@@ -2,7 +2,7 @@
 // Nova peça por forma (P5b): a janela gera a receita ao vivo, cria a peça e, pela linha do tempo, muda a forma depois.
 import { mkdirSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
-import { expectTimelineOk, ribbon } from "./ribbon.ts";
+import { expectTimelineOk, ribbon, sphereStl } from "./ribbon.ts";
 
 const count = (page: Page) => page.evaluate(() => window.__view3d?.state().count ?? 0);
 const summary = (page: Page) => page.getByTestId("shape-summary");
@@ -81,5 +81,21 @@ test("peça achatada com saliência (P5c): menos pontos ao achatar, a saliência
   const made = await total(page);
   await page.getByTestId("shape-create").click();
   await expect.poll(() => count(page)).toBe(433 + made + 1);
+  await expectTimelineOk(page);
+});
+
+test("peça de um STL (P5d, rota A): a esfera vira peça com receita, e a linha do tempo confere", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect.poll(() => count(page)).toBe(433);
+  await ribbon(page, "montagem");
+  await page.getByTestId("stl-open").setInputFiles({
+    name: "bola.stl",
+    mimeType: "model/stl",
+    buffer: Buffer.from(sphereStl(30)),
+  });
+  await expect(page.getByText(/Peça criada de bola.stl: \d+ pontos/)).toBeVisible();
+  await expect.poll(() => count(page)).toBeGreaterThan(433 + 400);
   await expectTimelineOk(page);
 });

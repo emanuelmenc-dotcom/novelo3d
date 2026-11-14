@@ -140,3 +140,50 @@ describe("peça por forma (P5b)", () => {
     ).toThrow(/proporção/);
   });
 });
+
+test("forward.mesh (P5d): STL em texto ou em base64 dá a mesma receita; malha aberta dá erro claro", () => {
+  const NL = String.fromCharCode(10);
+  const tri = (a: number[], b: number[], c: number[]) =>
+    [
+      "facet normal 0 0 0",
+      "outer loop",
+      `vertex ${a.join(" ")}`,
+      `vertex ${b.join(" ")}`,
+      `vertex ${c.join(" ")}`,
+      "endloop",
+      "endfacet",
+    ].join(NL);
+  // octaedro: fechado, pequeno; a malha é refinada antes da distância geodésica
+  const v = [
+    [0, 0, -20],
+    [20, 0, 0],
+    [0, 20, 0],
+    [-20, 0, 0],
+    [0, -20, 0],
+    [0, 0, 20],
+  ];
+  const f = [
+    [0, 2, 1],
+    [0, 3, 2],
+    [0, 4, 3],
+    [0, 1, 4],
+    [5, 1, 2],
+    [5, 2, 3],
+    [5, 3, 4],
+    [5, 4, 1],
+  ];
+  const stlOf = (faces: number[][]) =>
+    [
+      "solid o",
+      ...faces.map(([a, b, c]) =>
+        tri(v[a as number] as number[], v[b as number] as number[], v[c as number] as number[]),
+      ),
+      "endsolid o",
+    ].join(NL);
+  const stl = stlOf(f);
+  const a = dispatch("forward.mesh", { stl }) as Out;
+  expect((dispatch("pattern.verify", { text: a.text }) as { ok: boolean }).ok).toBe(true);
+  const b = dispatch("forward.mesh", { stl: { base64: Buffer.from(stl).toString("base64") } }) as Out;
+  expect(b.text).toBe(a.text);
+  expect(() => dispatch("forward.mesh", { stl: stlOf(f.slice(1)) })).toThrow(/não é fechada/);
+});

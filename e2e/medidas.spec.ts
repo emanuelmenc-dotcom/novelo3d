@@ -5,7 +5,7 @@ import { mkdirSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, type Page, test } from "@playwright/test";
-import { goProps, openViewMenu, ribbon } from "./ribbon.ts";
+import { goProps, openViewMenu, ribbon, sphereStl } from "./ribbon.ts";
 
 const state = (page: Page) => page.evaluate(() => window.__view3d?.state());
 const count = async (page: Page) => (await state(page))?.count ?? 0;
@@ -234,7 +234,7 @@ test("com uma instância movida, o corte em X vale no mundo, o conjunto mede mai
   expect(b.size[0]).toBeGreaterThan((one.size[0] as number) * 1.5);
 });
 
-test("o MCP mede e gera receita por forma: measure.bounds, measure.distance e forward.revolve são consultas", async ({
+test("o MCP mede e gera receita por forma: measure.bounds, measure.distance e forward.revolve e forward.mesh são consultas", async ({
   page,
 }) => {
   const client = new Client({ name: "e2e", version: "0" });
@@ -264,6 +264,8 @@ test("o MCP mede e gera receita por forma: measure.bounds, measure.distance e fo
     // receita a partir de forma (P5a), também só consulta
     const f = await call("forward.revolve", { shape: { kind: "sphere", radius: 30 } });
     expect(f.json.total).toBe(452); // caso F2 de docs/08
+    const mesh = await call("forward.mesh", { stl: sphereStl(30) });
+    expect(Math.abs(mesh.json.total - 452)).toBeLessThan(45); // a malha da esfera dá quase o mesmo que o F2
     const t = await call("timeline.get");
     expect(t.json.features).toEqual([]);
   } finally {

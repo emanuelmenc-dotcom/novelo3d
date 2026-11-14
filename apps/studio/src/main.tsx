@@ -585,6 +585,22 @@ function App() {
     }
   };
 
+  // peça a partir de um STL (P5d): a receita vem de `forward.mesh` e a peça nasce com ela (`parts.add`)
+  const openStl = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let bin = "";
+      for (let i = 0; i < bytes.length; i += 0x8000)
+        bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      const r = dispatch("forward.mesh", { stl: { base64: btoa(bin) } }) as { text: string; total: number };
+      dispatch("parts.add", { name: file.name.replace(/[.]stl$/i, ""), text: r.text });
+      setProjectMsg(`Peça criada de ${file.name}: ${r.total} pontos.`);
+    } catch (e) {
+      setProjectMsg(`Não consegui fazer a receita do STL: ${(e as Error).message}`);
+    }
+  };
+
   // ribbon: todas as ferramentas (botões) do app; as abas e a busca de comandos leem a mesma lista
   const hist = dispatch("history.get", {}) as { canUndo: boolean; canRedo: boolean };
   const runTool = (method: string, params: Record<string, unknown> = {}, withText = false) => {
@@ -604,6 +620,7 @@ function App() {
     runText: (m, p) => runTool(m, p, true),
     save: saveProject,
     openFile: (f) => void openProject(f),
+    openStl: (f) => void openStl(f),
     settings: () => setShowSettings(true),
     materials: () => setShowMaterials((v) => !v),
     materialsOn: showMaterials,

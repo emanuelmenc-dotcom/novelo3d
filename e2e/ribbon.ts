@@ -67,3 +67,25 @@ export async function expectTimelineOk(page: Page): Promise<void> {
   const r = await page.evaluate(() => window.__timeline?.verify());
   if (!r?.ok) throw new Error(`a reexecução da linha do tempo difere em ${r?.diff ?? "?"}`);
 }
+
+/** STL ASCII de uma esfera (anéis de latitude), para testar a peça vinda de malha. */
+export function sphereStl(R: number, rings = 32, seg = 48): string {
+  const p = (i: number, j: number): number[] => {
+    const phi = (Math.PI * i) / rings;
+    const th = (2 * Math.PI * j) / seg;
+    return i === 0 || i === rings
+      ? [0, 0, -R * Math.cos(phi)]
+      : [R * Math.sin(phi) * Math.cos(th), R * Math.sin(phi) * Math.sin(th), -R * Math.cos(phi)];
+  };
+  const tri = (a: number[], b: number[], c: number[]) =>
+    `facet normal 0 0 0\nouter loop\nvertex ${a.join(" ")}\nvertex ${b.join(" ")}\nvertex ${c.join(" ")}\nendloop\nendfacet`;
+  const out = ["solid bola"];
+  for (let i = 0; i < rings; i++)
+    for (let j = 0; j < seg; j++) {
+      const k = (j + 1) % seg;
+      if (i > 0) out.push(tri(p(i, j), p(i, k), p(i + 1, k)));
+      if (i < rings - 1) out.push(tri(p(i, j), p(i + 1, k), p(i + 1, j)));
+    }
+  out.push("endsolid bola");
+  return out.join("\n");
+}

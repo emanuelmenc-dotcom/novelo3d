@@ -33,7 +33,14 @@ import {
   yarnCursor,
   yarnUsage,
 } from "@novelo/core";
-import { type ForwardOptions, revolve, type Section, type Shape } from "@novelo/engine-forward";
+import {
+  type ForwardOptions,
+  fromMesh,
+  parseStl,
+  revolve,
+  type Section,
+  type Shape,
+} from "@novelo/engine-forward";
 import { fromCp, parseCpDot, toCp } from "@novelo/interop";
 import { parsePattern, printPattern, printPatternWithYarns, splitLines } from "@novelo/notation";
 import { bandOf, MAX_LEGS, modelKey, tensionLevel } from "@novelo/stitch3d";
@@ -879,6 +886,41 @@ Object.assign(commands, {
       profile: r.value.profile
         .filter((_, i, a) => i % Math.ceil(a.length / 200) === 0 || i === a.length - 1)
         .map(([pr, pz]) => [rd(pr), rd(pz)]),
+      issues: r.issues,
+    };
+  },
+  /**
+   * Receita a partir de uma malha 3D fechada sem ramificação (P5d, rota A, protótipo): `stl` é o texto de um STL ASCII
+   * ou `{base64}` de um STL binário. A semente (anel mágico) é o ponto mais baixo. Mesma `gauge`, `beginner` e `dialect`
+   * de `forward.revolve`. Só consulta: para criar a peça, use o texto em `parts.add`.
+   */
+  "forward.mesh": (p: Params) => {
+    const s = getSettings().yarns;
+    const g = (p.gauge ?? {}) as { w?: unknown; h?: unknown };
+    const w = typeof g.w === "number" ? g.w : s.stitchWidthMm;
+    const h = typeof g.h === "number" ? g.h : (s.rowHeightMm ?? w);
+    const src = p.stl as string | { base64?: unknown } | undefined;
+    let input: string | Uint8Array;
+    if (typeof src === "string") input = src;
+    else if (src && typeof src.base64 === "string") {
+      const bin = atob(src.base64);
+      input = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    } else throw new Error("'stl' deve ser o texto do STL ou {base64}");
+    if (input.length > 60_000_000) throw new Error("STL grande demais (até 60 MB)");
+    const r = fromMesh(
+      parseStl(input),
+      { w, h },
+      p.beginner === true ? { friendlyMultiple: 6, friendlyTolerance: 1 } : {},
+    );
+    if (!r.ok) throw new Error(r.issues.map((i) => i.message).join("; "));
+    const dialect = (typeof p.dialect === "string" ? p.dialect : "pt-BR") as Dialect;
+    return {
+      text: printPattern(r.value.pattern, dialect),
+      counts: r.value.counts,
+      total: r.value.counts.reduce((a, b) => a + b, 0),
+      lengthMm: Math.round(r.value.length * 10) / 10,
+      triangles: r.value.triangles,
+      gauge: { w, h },
       issues: r.issues,
     };
   },

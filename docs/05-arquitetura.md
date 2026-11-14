@@ -208,4 +208,4 @@ Toda função do aplicativo é um **comando** nomeado (`pattern.verify`, `chart.
 
 ## Motor direto (D-71)
 
-`packages/engine-forward` (puro, só depende de `core`): forma de revolução → `Pattern` validado. `commands` o usa no comando `forward.revolve` e escreve o texto com `notation`.
+`packages/engine-forward` (puro, só depende de `core`): forma de revolução, peça composta, seção não circular e malha STL (rota A, `mesh.ts`) → `Pattern` validado. `commands` o usa no comando `forward.revolve` e escreve o texto com `notation`.

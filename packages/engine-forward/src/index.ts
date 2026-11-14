@@ -160,17 +160,29 @@ function spread(loop: XY[], n: number): XY[] {
  * aumentos se concentram ali.
  */
 export function couple(parents: XY[], children: XY[], maxIncrease: 2 | 3 = 2): Token[] {
-  const m = parents.length;
-  const n = children.length;
-  const W = n + 1;
-  const cost = new Float64Array((m + 1) * W).fill(Number.POSITIVE_INFINITY);
-  const move = new Int8Array((m + 1) * W).fill(-1);
-  cost[0] = 0;
   // ângulos a partir da costura (0 a 2π), na ordem dos pontos
   const ang = (v: XY[]) => v.map(([x, y]) => (Math.atan2(y, x) + 2 * Math.PI) % (2 * Math.PI));
   const pa = ang(parents);
   const ca = ang(children);
-  const d = (b: number, a: number) => ((ca[b] as number) - (pa[a] as number)) ** 2;
+  return coupleBy(
+    parents.length,
+    children.length,
+    (b, a) => ((ca[b] as number) - (pa[a] as number)) ** 2,
+    maxIncrease,
+  );
+}
+
+/** O mesmo acoplamento com um custo qualquer por ligação: `d(filho, pai)`. A malha livre usa a distância no espaço. */
+export function coupleBy(
+  m: number,
+  n: number,
+  d: (b: number, a: number) => number,
+  maxIncrease: 2 | 3 = 2,
+): Token[] {
+  const W = n + 1;
+  const cost = new Float64Array((m + 1) * W).fill(Number.POSITIVE_INFINITY);
+  const move = new Int8Array((m + 1) * W).fill(-1);
+  cost[0] = 0;
   // movimentos em ordem de preferência no empate: ponto baixo, aumento de 2, aumento de 3, diminuição
   const moves: { da: number; db: number; tok: Token }[] = [
     { da: 1, db: 1, tok: "SC" },
@@ -337,7 +349,8 @@ export function distribute(
   return Array.from({ length: c }, (_, i) => (s.has(i) ? "DEC" : "SC"));
 }
 
-function opsOf(tokens: Token[]): Op[] {
+/** Operações da receita a partir dos tokens de uma volta (junta os iguais seguidos). */
+export function opsOf(tokens: Token[]): Op[] {
   const ops: Op[] = [];
   for (const t of tokens) {
     const last = ops[ops.length - 1];
@@ -585,3 +598,4 @@ export function revolve(input: ForwardInput): Result<ForwardOutput> {
     issues: own,
   };
 }
+export { fromMesh, type Mesh, type MeshOutput, parseStl } from "./mesh.ts";

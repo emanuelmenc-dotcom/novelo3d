@@ -16,6 +16,8 @@ export interface RibbonCtx {
   runText: (method: string, params?: Record<string, unknown>) => void;
   save: () => void;
   openFile: (f: File | undefined) => void;
+  /** Peça nova a partir de um STL (malha fechada sem ramificação, P5d). */
+  openStl: (f: File | undefined) => void;
   settings: () => void;
   materials: () => void;
   materialsOn: boolean;
@@ -268,6 +270,30 @@ export function buildRibbonTabs(c: RibbonCtx): RibbonTab[] {
               title:
                 "Peça nova a partir de uma forma (esfera, ovo, cone, copo, composta ou perfil): a receita sai pronta",
             }),
+            {
+              kind: "custom",
+              id: "montagem.stl",
+              label: "De um STL",
+              node: (
+                <label
+                  className="rb"
+                  title="Peça nova a partir de um modelo 3D (STL) fechado e sem ramificação: a receita sai pronta (protótipo)"
+                >
+                  <Icon name="open" size={22} />
+                  <span>De um STL</span>
+                  <input
+                    type="file"
+                    accept=".stl,model/stl,application/sla"
+                    data-testid="stl-open"
+                    hidden
+                    onChange={(e) => {
+                      c.openStl(e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              ),
+            },
             btn("montagem", "instance", "Instância", "instance", () => c.run("parts.instance", part)),
             btn("montagem", "copy", "Cópia", "copy", () => c.run("parts.copy", part)),
           ],

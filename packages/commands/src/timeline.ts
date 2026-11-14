@@ -144,6 +144,7 @@ export const CLASS: Record<string, Class> = Object.fromEntries([
     "interop.parseDot",
     "materials.list",
     "math.round",
+    "forward.mesh",
     "forward.revolve",
     "measure.bounds",
     "measure.distance",

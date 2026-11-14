@@ -187,6 +187,7 @@ export {
   subscribeRender,
 } from "./render-store.ts";
 export { stitchEditorState, stitchEditorVersion, subscribeStitchEditor } from "./stitch-editor-store.ts";
+export { setTreeSelected, subscribeTree, treeSelected, treeVersion } from "./tree-store.ts";
 export {
   exportTutorial,
   loadTutorial,

@@ -30,6 +30,7 @@ import {
   withPart,
 } from "./parts-store.ts";
 import { getSettings } from "./settings.ts";
+import { setTreeSelected, treeSelected } from "./tree-store.ts";
 
 type Params = Record<string, unknown>;
 type Cmd = (p: Params) => unknown;
@@ -52,11 +53,44 @@ const view = () => {
       pos: p.pos,
       rot: p.rot,
       yarnMap: p.yarnMap ?? null,
+      hidden: p.hidden ?? false,
     })),
     seams: s.seams.length,
     draft: {
       a: s.draft.a ? { part: s.draft.a.part, count: s.draft.a.uids.length } : null,
       b: s.draft.b ? { part: s.draft.b.part, count: s.draft.b.uids.length } : null,
+    },
+  };
+};
+
+const treeView = () => {
+  const s = partsSnapshot();
+  return {
+    selected: treeSelected(),
+    active: s.active,
+    root: {
+      id: "root",
+      kind: "assembly",
+      name: "Projeto",
+      children: [
+        ...s.parts.map((q) => ({
+          id: q.id,
+          kind: q.kind === "own" ? "part" : q.kind,
+          name: q.name,
+          active: q.id === s.active,
+          visible: !q.hidden,
+          source: q.source ?? null,
+        })),
+        ...s.seams.map((m) => ({
+          id: m.id,
+          kind: "seam",
+          name: m.name,
+          active: false,
+          visible: true,
+          parts: [m.a.part, m.b.part],
+          ok: checkSeam(m.a, m.b, m.reverse, m.ratio).ok,
+        })),
+      ],
     },
   };
 };
@@ -295,6 +329,47 @@ export function partsCommands(
     "parts.setActive": (p) => {
       setActive(String(p.id));
       return view();
+    },
+    /** Mostra ou esconde uma peça no 3D. Escondida não desenha nem recebe clique, mas continua nos materiais e nas costuras. */
+    "parts.setVisible": (p) => {
+      if (typeof p.visible !== "boolean") throw new Error("'visible' deve ser verdadeiro ou falso");
+      patchPart(String(p.id), { hidden: !p.visible });
+      return view();
+    },
+    /** Só esta peça fica à vista (as outras são escondidas), num único passo do histórico. */
+    "parts.isolate": (p) => {
+      const keep = partById(String(p.id)).id;
+      transact(() => {
+        for (const q of partsSnapshot().parts) {
+          if ((q.hidden ?? false) !== (q.id !== keep)) patchPart(q.id, { hidden: q.id !== keep });
+        }
+      });
+      return view();
+    },
+    /** Todas as peças voltam a aparecer. */
+    "parts.showAll": () => {
+      transact(() => {
+        for (const q of partsSnapshot().parts) if (q.hidden) patchPart(q.id, { hidden: false });
+      });
+      return view();
+    },
+    /**
+     * Árvore do projeto: uma raiz (`kind: "assembly"`), as peças (`part`, `instance`, `mirror`) e as costuras (`seam`),
+     * cada nó com `active` (peça em edição), `visible` e, quando cabe, `source` e `ok`. G5 acrescenta montagens dentro
+     * da raiz sem mudar este formato.
+     */
+    "tree.get": () => treeView(),
+    /** Seleciona um nó da árvore (peça, costura ou "root"); selecionar uma peça também a torna a peça ativa. */
+    "tree.select": (p) => {
+      const id = String(p.id);
+      const s = partsSnapshot();
+      if (id === "root") setTreeSelected("root");
+      else if (s.parts.some((q) => q.id === id)) {
+        setActive(id);
+        setTreeSelected(id);
+      } else if (s.seams.some((q) => q.id === id)) setTreeSelected(id);
+      else throw new Error(`'${id}' não está na árvore`);
+      return treeView();
     },
 
     // --- costuras
@@ -563,6 +638,11 @@ export function partsCommands(
       const geomIdx = new Map<string, number>();
       for (const part of s.parts) {
         const base = nodes.length;
+        if (part.hidden) {
+          // escondida: fora do desenho e do clique; as outras peças seguem com os índices dela de fora
+          partsOut.push({ id: part.id, name: part.name, offset: base, count: 0, error: null });
+          continue;
+        }
         let res: LayoutRes;
         try {
           res = withPart(part.id, (root) =>

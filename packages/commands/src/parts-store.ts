@@ -41,6 +41,8 @@ export interface Part {
   rot: [number, number, number];
   /** Troca de fios só nesta instância: fio da origem -> fio daqui. */
   yarnMap?: Record<string, string>;
+  /** Escondida na vista 3D (não desenha nem é clicável); continua contando na lista de materiais e nas costuras. */
+  hidden?: boolean;
 }
 
 export interface SeamSide {
@@ -324,6 +326,10 @@ export function patchPart(id: string, patch: Record<string, unknown>): PartsStat
       throw new Error("o nome deve ter de 1 a 40 caracteres");
     }
     next.name = patch.name.trim();
+  }
+  if (patch.hidden !== undefined) {
+    if (typeof patch.hidden !== "boolean") throw new Error("'hidden' deve ser verdadeiro ou falso");
+    next.hidden = patch.hidden ? true : undefined;
   }
   if (patch.pos !== undefined) next.pos = num3(patch.pos, "pos");
   if (patch.rot !== undefined) next.rot = num3(patch.rot, "rot");

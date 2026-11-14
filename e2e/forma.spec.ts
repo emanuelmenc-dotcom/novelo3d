@@ -2,7 +2,8 @@
 // Nova peça por forma (P5b): a janela gera a receita ao vivo, cria a peça e, pela linha do tempo, muda a forma depois.
 import { mkdirSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
-import { expectTimelineOk, ribbon, sphereStl } from "./ribbon.ts";
+import { figureWithArms, toStl } from "../packages/engine-forward/test/shapes.ts";
+import { expectTimelineOk, goTree, ribbon, sphereStl } from "./ribbon.ts";
 
 const count = (page: Page) => page.evaluate(() => window.__view3d?.state().count ?? 0);
 const summary = (page: Page) => page.getByTestId("shape-summary");
@@ -95,7 +96,30 @@ test("peça de um STL (P5d, rota A): a esfera vira peça com receita, e a linha 
     mimeType: "model/stl",
     buffer: Buffer.from(sphereStl(30)),
   });
-  await expect(page.getByText(/Peça criada de bola.stl: \d+ pontos/)).toBeVisible();
+  await expect(page.getByText(/Peça criada de bola.stl\./)).toBeVisible();
   await expect.poll(() => count(page)).toBeGreaterThan(433 + 400);
+  await expectTimelineOk(page);
+});
+
+test("STL de um boneco com dois braços: corpo e dois braços como peças, com onde costurar", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.goto("/");
+  await expect.poll(() => count(page)).toBe(433);
+  await ribbon(page, "montagem");
+  await page.getByTestId("stl-open").setInputFiles({
+    name: "boneco.stl",
+    mimeType: "model/stl",
+    buffer: Buffer.from(toStl(figureWithArms())),
+  });
+  await expect(
+    page.getByText(/3 peças criadas de boneco\.stl\. Costure: .*boneco · Parte 2 na volta \d+ de boneco/),
+  ).toBeVisible({
+    timeout: 30_000,
+  });
+  await goTree(page);
+  await expect(page.locator("[data-part]", { hasText: "boneco · Parte 3" })).toBeVisible();
+  await page.screenshot({ path: "test-results/forma-boneco.png" });
   await expectTimelineOk(page);
 });

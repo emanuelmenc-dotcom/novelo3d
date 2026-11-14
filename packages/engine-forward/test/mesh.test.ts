@@ -1,117 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Malha livre -> receita, rota A (P5d): STL ASCII e binário, esfera perto do caso F2, peça orgânica curva sem ramificação,
 // toro (ramifica) e malha aberta recusados com mensagem.
-import { validate } from "@novelo/core";
+import { type Pattern, validate } from "@novelo/core";
 import { describe, expect, test } from "vitest";
-import { fromMesh, type Mesh, parseStl } from "../src/index.ts";
-
-type P = [number, number, number];
-
-/** Superfície fechada por anéis: `ring(t, θ)` com t de 0 a 1 (os polos t=0 e t=1 viram um vértice só). */
-function tubeMesh(ring: (t: number, th: number) => P, rings: number, seg: number): Mesh {
-  const vertices: number[] = [];
-  const faces: number[] = [];
-  const add = (p: P) => {
-    vertices.push(...p);
-    return vertices.length / 3 - 1;
-  };
-  const bottom = add(ring(0, 0));
-  const ids: number[][] = [];
-  for (let i = 1; i < rings; i++) {
-    const row: number[] = [];
-    for (let j = 0; j < seg; j++) row.push(add(ring(i / rings, (2 * Math.PI * j) / seg)));
-    ids.push(row);
-  }
-  const top = add(ring(1, 0));
-  const first = ids[0] as number[];
-  const last = ids[ids.length - 1] as number[];
-  for (let j = 0; j < seg; j++) {
-    faces.push(bottom, first[(j + 1) % seg] as number, first[j] as number);
-    faces.push(top, last[j] as number, last[(j + 1) % seg] as number);
-  }
-  for (let i = 0; i + 1 < ids.length; i++) {
-    const a = ids[i] as number[];
-    const b = ids[i + 1] as number[];
-    for (let j = 0; j < seg; j++) {
-      const k = (j + 1) % seg;
-      faces.push(
-        a[j] as number,
-        a[k] as number,
-        b[k] as number,
-        a[j] as number,
-        b[k] as number,
-        b[j] as number,
-      );
-    }
-  }
-  return { vertices, faces };
-}
-
-const sphere = (R: number) =>
-  tubeMesh(
-    (t, th) => {
-      const phi = Math.PI * t;
-      return [R * Math.sin(phi) * Math.cos(th), R * Math.sin(phi) * Math.sin(th), -R * Math.cos(phi)];
-    },
-    48,
-    64,
-  );
-
-/** "Banana": tubo com pontas arredondadas sobre um arco de 70 graus, começando de pé e curvando para o lado. */
-const banana = () => {
-  const Rc = 60;
-  const F = (70 * Math.PI) / 180;
-  const r0 = 12;
-  return tubeMesh(
-    (t, th) => {
-      const a = F * t;
-      const c: P = [Rc * (1 - Math.cos(a)), 0, Rc * Math.sin(a)];
-      const T: P = [Math.sin(a), 0, Math.cos(a)];
-      const N: P = [T[2], 0, -T[0]]; // perpendicular ao arco, no plano xz
-      const rho = r0 * Math.sqrt(Math.max(0, 1 - (2 * t - 1) ** 2));
-      return [
-        c[0] + rho * (Math.cos(th) * N[0]),
-        c[1] + rho * Math.sin(th),
-        c[2] + rho * (Math.cos(th) * N[2]),
-      ];
-    },
-    80,
-    48,
-  );
-};
-
-const toStl = (m: Mesh): string => {
-  const v = (i: number) => `vertex ${m.vertices[i * 3]} ${m.vertices[i * 3 + 1]} ${m.vertices[i * 3 + 2]}`;
-  const out = ["solid t"];
-  for (let f = 0; f < m.faces.length; f += 3)
-    out.push(
-      "facet normal 0 0 0",
-      "outer loop",
-      v(m.faces[f] as number),
-      v(m.faces[f + 1] as number),
-      v(m.faces[f + 2] as number),
-      "endloop",
-      "endfacet",
-    );
-  out.push("endsolid t");
-  return out.join("\n");
-};
-
-const toBinary = (m: Mesh): Uint8Array => {
-  const n = m.faces.length / 3;
-  const b = new Uint8Array(84 + n * 50);
-  const dv = new DataView(b.buffer);
-  dv.setUint32(80, n, true);
-  for (let f = 0; f < n; f++)
-    for (let k = 0; k < 3; k++)
-      for (let c = 0; c < 3; c++)
-        dv.setFloat32(
-          84 + f * 50 + 12 + k * 12 + c * 4,
-          m.vertices[(m.faces[f * 3 + k] as number) * 3 + c] as number,
-          true,
-        );
-  return b;
-};
+import { fromMesh, parseStl } from "../src/index.ts";
+import { banana, figureWithArms, sphere, toBinary, toStl } from "./shapes.ts";
 
 describe("STL", () => {
   test("ASCII e binário dão a mesma malha, com os vértices repetidos juntados", () => {
@@ -129,6 +22,28 @@ describe("STL", () => {
 });
 
 describe("receita a partir da malha (rota A)", () => {
+  test("corpo com dois braços: três peças; os braços começam na ponta, ficam abertos e dizem onde costurar", () => {
+    const mesh = figureWithArms();
+    const r = fromMesh(mesh, { w: 5, h: 5 });
+    if (!r.ok) throw new Error(r.issues[0]?.message);
+    const ps = r.value.pieces;
+    expect(ps.map((p) => p.name)).toEqual(["Corpo", "Parte 2", "Parte 3"]);
+    expect(ps[0]?.open).toBe(false);
+    for (const arm of ps.slice(1)) {
+      expect(validate(arm.pattern).ok).toBe(true);
+      expect(arm.open).toBe(true);
+      expect(arm.counts[0]).toBeLessThanOrEqual(8); // anel mágico na ponta
+      // tubo de raio 6: perto de 2π·6/5 ≈ 7,5 pontos
+      expect(Math.max(...arm.counts)).toBeGreaterThanOrEqual(6);
+      expect(Math.max(...arm.counts)).toBeLessThanOrEqual(12);
+      expect(arm.attachTo?.piece).toBe(0);
+      expect(arm.attachTo?.row).toBeGreaterThan(1);
+    }
+    expect(validate(ps[0]?.pattern as Pattern).ok).toBe(true);
+    // os dois braços são iguais (espelhados): mesmas voltas, mais ou menos
+    expect(Math.abs((ps[1]?.counts.length ?? 0) - (ps[2]?.counts.length ?? 0))).toBeLessThanOrEqual(1);
+  }, 30_000);
+
   test("esfera de raio 30: receita válida, começa em 6 e o total fica perto do caso F2 (452)", () => {
     const r = fromMesh(sphere(30), { w: 5, h: 5 });
     if (!r.ok) throw new Error(r.issues[0]?.message);
@@ -145,7 +60,7 @@ describe("receita a partir da malha (rota A)", () => {
     expect(r.value.counts.length).toBeGreaterThan(10);
   });
 
-  test("toro ramifica: recusado com explicação", () => {
+  test("toro tem furo: recusado com explicação", () => {
     const R = 30;
     const rr = 10;
     const vertices: number[] = [];
@@ -168,7 +83,7 @@ describe("receita a partir da malha (rota A)", () => {
         faces.push(id(i, j), id(i + 1, j), id(i + 1, j + 1), id(i, j), id(i + 1, j + 1), id(i, j + 1));
     const r = fromMesh({ vertices, faces }, { w: 5, h: 5 });
     expect(r.ok).toBe(false);
-    expect(r.issues[0]?.code).toBe("BRANCHES");
+    expect(r.issues[0]?.code).toBe("HOLE");
   });
 
   test("malha aberta é recusada", () => {

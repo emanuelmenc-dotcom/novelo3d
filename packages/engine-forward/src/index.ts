@@ -598,4 +598,4 @@ export function revolve(input: ForwardInput): Result<ForwardOutput> {
     issues: own,
   };
 }
-export { fromMesh, type Mesh, type MeshOutput, parseStl } from "./mesh.ts";
+export { fromMesh, type Mesh, type MeshOutput, type MeshPiece, parseStl } from "./mesh.ts";

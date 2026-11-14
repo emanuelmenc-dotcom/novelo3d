@@ -277,7 +277,7 @@ export function buildRibbonTabs(c: RibbonCtx): RibbonTab[] {
               node: (
                 <label
                   className="rb"
-                  title="Peça nova a partir de um modelo 3D (STL) fechado e sem ramificação: a receita sai pronta (protótipo)"
+                  title="Peças a partir de um modelo 3D (STL) fechado: o corpo e uma peça por braço ou perna, com a receita pronta e onde costurar (protótipo)"
                 >
                   <Icon name="open" size={22} />
                   <span>De um STL</span>

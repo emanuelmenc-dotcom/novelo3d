@@ -593,9 +593,26 @@ function App() {
       let bin = "";
       for (let i = 0; i < bytes.length; i += 0x8000)
         bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-      const r = dispatch("forward.mesh", { stl: { base64: btoa(bin) } }) as { text: string; total: number };
-      dispatch("parts.add", { name: file.name.replace(/[.]stl$/i, ""), text: r.text });
-      setProjectMsg(`Peça criada de ${file.name}: ${r.total} pontos.`);
+      const r = dispatch("forward.mesh", { stl: { base64: btoa(bin) } }) as {
+        pieces: {
+          name: string;
+          text: string;
+          total: number;
+          attachTo: { piece: number; row: number } | null;
+        }[];
+      };
+      const base = file.name.replace(/[.]stl$/i, "");
+      const names = r.pieces.map((p, i) => (i === 0 ? base : `${base} · ${p.name}`));
+      for (const [i, p] of r.pieces.entries()) dispatch("parts.add", { name: names[i], text: p.text });
+      const sew = r.pieces
+        .filter((p) => p.attachTo)
+        .map(
+          (p) =>
+            `${names[r.pieces.indexOf(p)]} na volta ${p.attachTo?.row} de ${names[p.attachTo?.piece ?? 0]}`,
+        );
+      setProjectMsg(
+        `${r.pieces.length === 1 ? "Peça criada" : `${r.pieces.length} peças criadas`} de ${file.name}.${sew.length ? ` Costure: ${sew.join("; ")}.` : ""}`,
+      );
     } catch (e) {
       setProjectMsg(`Não consegui fazer a receita do STL: ${(e as Error).message}`);
     }

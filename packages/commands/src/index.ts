@@ -890,7 +890,7 @@ Object.assign(commands, {
     };
   },
   /**
-   * Receita a partir de uma malha 3D fechada sem ramificação (P5d, rota A, protótipo): `stl` é o texto de um STL ASCII
+   * Receita a partir de uma malha 3D fechada (P5d, rota A, protótipo; braços e pernas viram peças em `pieces`): `stl` é o texto de um STL ASCII
    * ou `{base64}` de um STL binário. A semente (anel mágico) é o ponto mais baixo. Mesma `gauge`, `beginner` e `dialect`
    * de `forward.revolve`. Só consulta: para criar a peça, use o texto em `parts.add`.
    */
@@ -921,6 +921,14 @@ Object.assign(commands, {
       lengthMm: Math.round(r.value.length * 10) / 10,
       triangles: r.value.triangles,
       gauge: { w, h },
+      // o corpo e uma peça por galho (braço, perna...), cada galho aberto e com a volta do corpo em que é costurado
+      pieces: r.value.pieces.map((pc) => ({
+        name: pc.name,
+        text: printPattern(pc.pattern, dialect),
+        total: pc.counts.reduce((a, b) => a + b, 0),
+        open: pc.open,
+        attachTo: pc.attachTo,
+      })),
       issues: r.issues,
     };
   },

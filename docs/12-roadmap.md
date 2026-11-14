@@ -74,6 +74,23 @@ Geradores de grafo: perfil de revolução, cilindros e cones compostos, peças a
 
 Aceite: peça composta de três partes gera receita válida; modelo orgânico sem ramificações gera receita válida.
 
+### P5 — proposta de etapas (2026-11-14, **aguardando aprovação do usuário**)
+
+O motor direto (`docs/08`) ainda não existe no código: nenhum pacote gera receita a partir de forma. Por isso o P5 começa por ele.
+
+| Etapa | Entrega                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Aceite                                                                                                                                      |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| P5a   | Pacote puro `packages/engine-forward` (só depende de `core`): perfil de revolução (polilinha e primitivas esfera, cone, cilindro, elipsoide, copo), voltas por comprimento de arco, contagem com limites, distribuição de aumentos e diminuições com escalonamento, contagens amigáveis, avisos da seção 4 de `docs/08`; o resultado sai como receita em texto (impressor de `notation`) e passa em `core.validate()`. Comando `forward.revolve`, chamável pelo MCP | Casos F1 a F9 de `docs/13` com os valores exatos; propriedades da seção 5 de `docs/08` (fast-check); mesma entrada, mesmo texto byte a byte |
+| P5b   | Peça composta: perfil por trechos encadeados (calota, cilindro, cone, cintura) e janela "Nova peça por forma" no ribbon Montagem: editor de perfil 2D com pontos arrastáveis, contagens e prévia 3D ao vivo. A peça gerada vira peça normal (receita editável, pintura, tutorial) e entra na linha do tempo como uma feature com parâmetros editáveis                                                                                                               | Peça de três trechos gera receita válida; editar o perfil pela linha do tempo regenera a receita; e2e com captura                           |
+| P5c   | Seção não circular (peças achatadas, saliências): laço da volta por escala no ângulo e acoplamento por programação dinâmica (`docs/08` seção 2)                                                                                                                                                                                                                                                                                                                     | Seção circular reproduz a distribuição da P5a (regressão); peça achatada gera receita válida com aumentos concentrados nos lados            |
+| P5d   | Malha livre (STL → receita): protótipo das duas rotas (geodésica do artigo do AmiGo e Remesher) e escolha com o usuário                                                                                                                                                                                                                                                                                                                                             | Modelo orgânico sem ramificações gera receita válida                                                                                        |
+
+Decisões a confirmar antes de começar:
+
+- **Altura da volta (`h`).** Recomendo uma configuração ao lado da largura do ponto (`yarns.stitchWidthMm`), com padrão igual à largura (5 mm, como nos casos F2, F3 e F5).
+- **Contagens amigáveis.** Recomendo ligadas no modo iniciante (múltiplo de 6, tolerância de 1 ponto: caso F6a) e desligadas no padrão.
+- **Unidade das posições (pergunta 25).** A P5b mostra medidas em mm no editor de perfil; recomendo passar as posições da tela para mm no mesmo trabalho.
+
 ## P6 — Tricô
 
 Só inicia se o portão da F0 aprovar. Entrega: notação e gráfico de tricô e conversão por geometria compartilhada. Critérios definidos após o parecer.

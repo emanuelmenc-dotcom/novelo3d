@@ -325,8 +325,8 @@ export function AssemblyPanel(props: { sections: AssemblySection[] }) {
         <>
           <h3>Nova costura</h3>
           <p className="hint">
-            Selecione uma linha contínua de pontos (volta, caminho A→B...) na aba Pontos, use-a como lado A;
-            troque de peça (ou de linha) e use como lado B.
+            Selecione uma linha contínua de pontos (volta, caminho A→B...) na seção Pontos de Propriedades,
+            use-a como lado A; troque de peça (ou de linha) e use como lado B.
           </p>
           <div className="row">
             <button type="button" data-testid="seam-side-a" onClick={() => run("seam.draft", { side: "a" })}>

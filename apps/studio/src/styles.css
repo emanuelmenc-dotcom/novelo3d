@@ -1170,6 +1170,7 @@ input.num {
 /* Propriedades: as seções empilham e a janela rola, sem uma esmagar a outra */
 .props-col > .panel-col {
   flex: none;
+  height: auto;
   overflow: visible;
   min-height: auto;
 }

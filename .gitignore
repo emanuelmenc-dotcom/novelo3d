@@ -18,3 +18,4 @@ graphify-out/
 tsconfig.tsbuildinfo
 referencia/sessao-galinha/
 packages/commands/test/*.local.test.ts
+e2e/*.local.spec.ts

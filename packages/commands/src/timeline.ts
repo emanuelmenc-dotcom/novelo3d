@@ -551,6 +551,12 @@ export function labelOf(f: Feature): string {
       return `${p.prop === "tension" ? "tensão" : "fio"} dos pontos escolhidos`;
     case "parts.set":
       return `ajustar a peça ${String(p.id)}`;
+    case "parts.instance":
+      return `instância da peça ${String(p.id)}`;
+    case "assembly.add":
+      return "nova montagem";
+    case "assembly.set":
+      return `ajustar a montagem ${String(p.id)}`;
     default:
       return f.method;
   }

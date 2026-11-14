@@ -428,3 +428,11 @@ describe("ajustes seguidos viram uma feature só", () => {
     expect(p).toMatchObject({ pos: [7, 0, 0], name: "Z" });
   });
 });
+
+test("o nome de cada feature de peça e montagem é legível, não o nome do comando", () => {
+  dispatch("parts.instance", { id: "p1" });
+  dispatch("assembly.add", { parts: ["p2"] });
+  dispatch("assembly.set", { id: "a1", pos: [5, 0, 0] });
+  const labels = (dispatch("timeline.get") as { features: { label: string }[] }).features.map((f) => f.label);
+  expect(labels).toEqual(["instância da peça p1", "nova montagem", "ajustar a montagem a1"]);
+});

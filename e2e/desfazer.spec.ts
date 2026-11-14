@@ -136,6 +136,7 @@ test("faixa da linha do tempo: ícones, opções por clique, falha em vermelho, 
   await page.getByRole("menuitem", { name: "Suprimir" }).click();
   await expect(page.getByTestId("feature-2")).toHaveClass(/failed/);
   await expect(page.getByTestId("feature-0")).toHaveClass(/sup/);
+  await page.screenshot({ path: "test-results/g6-linha-do-tempo.png" }); // uma suprimida e uma falha em vermelho
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count ?? 0)).toBe(433);
   await page.getByRole("menuitem", { name: "Ligar" }).click();
   await expect(page.getByTestId("feature-2")).not.toHaveClass(/failed/);

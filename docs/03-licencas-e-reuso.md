@@ -100,3 +100,7 @@ Regras:
 | @types/node, @types/react, @types/react-dom | 24.19.2, 19.3.0, 19.3.0 | MIT               |
 
 Desvios do plano: sem `@react-three/fiber`/`drei`, `zustand` e `fast-check` por ora (three.js direto; entram quando houver uso). O `LICENSE` (GPL-3.0) veio de gnu.org.
+
+## Electron e electron-builder (D-70, 2026-11-14)
+
+`electron` 45.3.2 e `electron-builder` 26.18.0, ambos MIT (`npm view <pacote> license`), só como dependências de desenvolvimento de `apps/desktop`. O exe distribuído embute o Chromium e o Node do Electron, também sob licenças permissivas; o conjunto continua GPL-3.0-or-later pelo código próprio.

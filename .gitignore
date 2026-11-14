@@ -19,3 +19,7 @@ tsconfig.tsbuildinfo
 referencia/sessao-galinha/
 packages/commands/test/*.local.test.ts
 e2e/*.local.spec.ts
+
+# Novelo3D para Windows (D-70): saída do build
+apps/desktop/web/
+apps/desktop/release/

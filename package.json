@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "biome check .",
     "e2e": "playwright test",
-    "check": "npm run typecheck && npm run lint && npm test"
+    "check": "npm run typecheck && npm run lint && npm test",
+    "exe": "npm run build -w @novelo/studio && npm run dist -w @novelo/desktop"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",

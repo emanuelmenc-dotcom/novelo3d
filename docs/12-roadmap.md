@@ -253,3 +253,4 @@ Plano aprovado pelo usuário, com mockup (`docs/imagens`: ver o relatório da et
 21. **Piso do 3D no corte (G7).** O piso (grade) some junto com o corte; manter o piso inteiro ou cortá-lo também?
 22. **Linha entre os pontos medidos (G7).** A ferramenta Distância só mostra o valor; falta marcar os dois pontos e a linha entre eles.
 23. **Realce da volta ao medir (G7).** Cada clique de medida também destaca a volta do ponto na receita; desligar esse realce no modo Medir?
+24. **Atualizar o exe (D-70).** O exe é uma foto do código: refazer `npm run exe` e trocar o arquivo do desktop ao fim de cada etapa, ou o usuário prefere avisar quando quiser uma versão nova?

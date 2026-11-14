@@ -201,3 +201,7 @@ Toda função do aplicativo é um **comando** nomeado (`pattern.verify`, `chart.
 ## Pacote `stitch3d` (R1, 2026-11-12)
 
 `packages/stitch3d` — modelo 3D dos pontos: referencial e matriz por ponto, modelos por variante (tubo de seção quadrada) e tubo contínuo. Puro (sem three nem DOM); depende só de `core`. O `studio` o importa direto (a regra de dependência passou a `studio → commands, stitch3d`; `commands → …, stitch3d` só para as chaves de modelo). Testado em `layers.test.ts`.
+
+## Versão para Windows (D-70)
+
+`apps/desktop` embrulha o build do studio numa janela Electron e gera `Novelo3D.exe`. Não tem lógica própria: toda regra continua em `packages/*` e `apps/studio`.

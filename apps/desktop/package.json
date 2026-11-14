@@ -1,0 +1,37 @@
+{
+  "name": "@novelo/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "license": "GPL-3.0-or-later",
+  "main": "main.cjs",
+  "description": "Novelo3D para Windows",
+  "author": "Novelo3D",
+  "devDependencies": {
+    "electron": "45.3.2",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "br.novelo3d.app",
+    "productName": "Novelo3D",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "web/**"
+    ],
+    "win": {
+      "target": [
+        "portable",
+        "dir"
+      ],
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "Novelo3D.exe"
+    }
+  },
+  "scripts": {
+    "dist": "electron-builder --win"
+  }
+}

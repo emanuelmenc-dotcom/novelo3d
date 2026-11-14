@@ -124,6 +124,7 @@ export const CLASS: Record<string, Class> = Object.fromEntries([
     "workspace.showPanel",
   ]),
   ["project.import", "project"],
+  ...group("session", ["timeline.rollTo", "timeline.suppress", "timeline.edit", "timeline.remove"]),
   ...group("query", [
     "assembly.contents",
     "assembly.layout",
@@ -157,6 +158,7 @@ export const CLASS: Record<string, Class> = Object.fromEntries([
     "system.list",
     "system.ping",
     "tool.eyedropper",
+    "timeline.get",
     "tree.get",
     "tutorial.get",
     "tutorial.script",
@@ -339,6 +341,77 @@ function push(f: Feature): void {
   emit();
 }
 
+export type FeatureKind = "recipe" | "part" | "assembly" | "seam" | "paint" | "stitches" | "material";
+/** Grupo da feature (o ícone da faixa). */
+export function kindOf(f: Feature): FeatureKind {
+  const m = f.items?.[0]?.method ?? f.method;
+  if (m === "parts.commitText") return "recipe";
+  if (m.startsWith("parts.")) return "part";
+  if (m.startsWith("assembly.")) return "assembly";
+  if (m.startsWith("seam.")) return "seam";
+  if (m.startsWith("paint.") || m.startsWith("yarns.")) return "paint";
+  if (m === "materials.replace") return "material";
+  return "stitches";
+}
+
+/** Operações da linha do tempo: cada uma muda a lista e reexecuta a partir do projeto-base. */
+function need(id: number): number {
+  const i = features.findIndex((f) => f.id === id);
+  if (i < 0) throw new Error(`feature ${id} não existe`);
+  return i;
+}
+export function rollTo(i: number, run: (m: string, p: Params) => unknown): void {
+  if (!Number.isInteger(i) || i < 0 || i > features.length)
+    throw new Error(`o marcador deve estar entre 0 e ${features.length}`);
+  replay(run, i);
+}
+export function setSuppressed(
+  id: number,
+  on: boolean | undefined,
+  run: (m: string, p: Params) => unknown,
+): void {
+  const i = need(id);
+  const f = features[i] as Feature;
+  features = features.map((x, k) => (k === i ? { ...x, suppressed: on ?? !f.suppressed } : x));
+  replay(run);
+}
+/** Troca parâmetros (mescla chaves; `null` apaga a chave) de uma feature simples. */
+export function editFeature(id: number, patch: Params, run: (m: string, p: Params) => unknown): void {
+  const i = need(id);
+  const f = features[i] as Feature;
+  if (f.items) throw new Error("um traço de pincel não tem parâmetros para editar");
+  const params: Params = { ...f.params };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === null) delete params[k];
+    else params[k] = v;
+  }
+  features = features.map((x, k) => (k === i ? { ...x, params: clone(params) } : x));
+  replay(run);
+}
+export function removeFeature(id: number, run: (m: string, p: Params) => unknown): void {
+  const i = need(id);
+  features = features.filter((_, k) => k !== i);
+  marker = i < marker ? marker - 1 : marker;
+  replay(run);
+}
+/** Texto curto de uma feature para a faixa e para o MCP. */
+export function labelOf(f: Feature): string {
+  if (f.items) return `traço de pincel (${f.items.length} pontos)`;
+  const p = f.params;
+  switch (f.method) {
+    case "parts.commitText":
+      return `receita de ${String(p.id)}`;
+    case "paint.rows":
+      return `pintar voltas ${String(p.from)} a ${String(p.to ?? p.from)} com o fio ${String(p.yarn)}`;
+    case "points.set":
+      return `${p.prop === "tension" ? "tensão" : "fio"} dos pontos escolhidos`;
+    case "parts.set":
+      return `ajustar a peça ${String(p.id)}`;
+    default:
+      return f.method;
+  }
+}
+
 /** Peças cujo texto foi digitado e ainda não confirmado: viram feature de receita antes de qualquer operação da linha do tempo. */
 export const pendingTexts = (): string[] =>
   base === null
@@ -346,6 +419,19 @@ export const pendingTexts = (): string[] =>
     : partsSnapshot()
         .parts.filter((p) => p.kind === "own" && lastText.has(p.id) && lastText.get(p.id) !== p.text)
         .map((p) => p.id);
+
+/** Confirma os textos pendentes como features de receita (as operações da linha do tempo chamam isto antes de agir). */
+export function commitPending(run: (m: string, p: Params) => unknown): void {
+  for (const id of pendingTexts()) {
+    const norm = normalize("parts.commitText", { id });
+    const counters = getIdCounters();
+    run("parts.commitText", { id });
+    if (norm) {
+      lastText.set(String(norm.id), String(norm.text));
+      push({ id: 0, method: "parts.commitText", params: norm, counters, suppressed: false, status: "ok" });
+    }
+  }
+}
 
 /** `dispatch` de nível mais alto: executa e, se for feature e der certo, grava. */
 export function recordAndRun(method: string, params: Params, run: (p: Params) => unknown): unknown {

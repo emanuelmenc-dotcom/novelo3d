@@ -78,7 +78,18 @@ import {
 } from "./render-store.ts";
 import { getSettings, resetSettings, type SettingsPatch, setSettings } from "./settings.ts";
 import { stitchEditorCommands } from "./stitch-editor-commands.ts";
-import { pendingTexts, recordAndRun, replay as replayTimelineWith } from "./timeline.ts";
+import {
+  commitPending,
+  editFeature,
+  kindOf,
+  labelOf,
+  recordAndRun,
+  removeFeature,
+  replay as replayTimelineWith,
+  rollTo,
+  setSuppressed,
+  timelineView,
+} from "./timeline.ts";
 import { type ScriptCtx, tutorialCommands } from "./tutorial-commands.ts";
 
 export {
@@ -753,7 +764,62 @@ export function dispatch(method: string, params: Params = {}): unknown {
 /** Reexecuta a linha do tempo a partir do projeto-base (até o marcador): usado pelos comandos timeline.* e pelos testes. */
 export function replayTimeline(upTo?: number): void {
   // receita digitada e ainda não confirmada entra na linha do tempo antes de reexecutar
-  for (const id of pendingTexts()) dispatch("parts.commitText", { id });
+  commitPending(runRaw);
   replayTimelineWith((m, p) => (commands[m] as Command)(p), upTo);
 }
 export { CLASS as COMMAND_CLASS, subscribeTimeline, timelineVersion, timelineView } from "./timeline.ts";
+
+const runRaw = (m: string, p: Params): unknown => (commands[m] as Command)(p);
+const flushText = (): void => commitPending(runRaw);
+const timelineOut = (full?: number) => {
+  const t = timelineView();
+  const one = full === undefined ? undefined : t.features.find((f) => f.id === full);
+  return {
+    marker: t.marker,
+    total: t.features.length,
+    canUndo: t.marker > 0,
+    canRedo: t.marker < t.features.length,
+    features: t.features.map((f, index) => ({
+      id: f.id,
+      index,
+      method: f.method,
+      kind: kindOf(f),
+      label: labelOf(f),
+      suppressed: f.suppressed,
+      status: f.status,
+      error: f.error ?? null,
+      inEffect: index < t.marker,
+      ...(one === f ? { params: f.params } : {}),
+    })),
+  };
+};
+Object.assign(commands, {
+  /** Linha do tempo: features na ordem, marcador (quantas estão em vigor) e, com `id`, os parâmetros de uma. */
+  "timeline.get": (p: Params) => timelineOut(typeof p.id === "number" ? p.id : undefined),
+  /** Leva o marcador para `index` (0 a total): reexecuta só as features até ali. */
+  "timeline.rollTo": (p: Params) => {
+    flushText();
+    rollTo(Number(p.index), runRaw);
+    return timelineOut();
+  },
+  /** Liga ou desliga uma feature (`suppressed` omitido alterna). */
+  "timeline.suppress": (p: Params) => {
+    flushText();
+    setSuppressed(Number(p.id), typeof p.suppressed === "boolean" ? p.suppressed : undefined, runRaw);
+    return timelineOut();
+  },
+  /** Muda parâmetros de uma feature (`params`: chaves a trocar, null apaga) e reexecuta. */
+  "timeline.edit": (p: Params) => {
+    if (!p.params || typeof p.params !== "object" || Array.isArray(p.params))
+      throw new Error("'params' deve ser um objeto");
+    flushText();
+    editFeature(Number(p.id), p.params as Params, runRaw);
+    return timelineOut(Number(p.id));
+  },
+  /** Apaga uma feature e reexecuta; as seguintes que dependiam dela ficam marcadas como falhas. */
+  "timeline.remove": (p: Params) => {
+    flushText();
+    removeFeature(Number(p.id), runRaw);
+    return timelineOut();
+  },
+});

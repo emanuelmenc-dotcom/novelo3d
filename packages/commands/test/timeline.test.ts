@@ -101,3 +101,92 @@ describe("reexecução igual ao ao vivo", () => {
     ]);
   });
 });
+
+interface Out {
+  marker: number;
+  total: number;
+  canUndo: boolean;
+  canRedo: boolean;
+  features: {
+    id: number;
+    method: string;
+    status: string;
+    suppressed: boolean;
+    error: string | null;
+    inEffect: boolean;
+  }[];
+}
+const tl = () => dispatch("timeline.get") as Out;
+const ids = () => (dispatch("parts.get") as { parts: { id: string }[] }).parts.map((p) => p.id);
+const rowsPainted = () => (dispatch("paint.report", { text: TEXT }) as { changeCount: number }).changeCount;
+
+describe("operações", () => {
+  beforeEach(() => {
+    dispatch("parts.instance", { id: "p1" }); // 0: p2
+    dispatch("paint.rows", { yarn: "B", from: 2, to: 2 }); // 1
+    dispatch("parts.copy", { id: "p1" }); // 2: p3
+  });
+
+  test("rollTo volta o marcador e reexecuta só até ali; avançar traz tudo de novo", () => {
+    dispatch("timeline.rollTo", { index: 1 });
+    expect(ids()).toEqual(["p1", "p2"]);
+    expect(tl()).toMatchObject({ marker: 1, total: 3, canUndo: true, canRedo: true });
+    dispatch("timeline.rollTo", { index: 0 });
+    expect(ids()).toEqual(["p1"]);
+    dispatch("timeline.rollTo", { index: 3 });
+    expect(ids()).toEqual(["p1", "p2", "p3"]);
+    expect(() => dispatch("timeline.rollTo", { index: 9 })).toThrow("entre 0 e 3");
+  });
+
+  test("uma feature nova entra no marcador e as de depois dele continuam", () => {
+    dispatch("timeline.rollTo", { index: 1 });
+    dispatch("parts.set", { id: "p2", pos: [9, 0, 0] });
+    expect(methods()).toEqual(["parts.instance", "parts.set", "paint.rows", "parts.copy"]);
+    expect(tl().marker).toBe(2);
+    dispatch("timeline.rollTo", { index: 4 });
+    expect(ids()).toEqual(["p1", "p2", "p3"]);
+  });
+
+  test("suprimir uma feature a tira do projeto; as que dependem dela falham e o resto continua", () => {
+    dispatch("parts.set", { id: "p2", pos: [9, 0, 0] }); // 3: depende de p2
+    dispatch("timeline.suppress", { id: tl().features[0]?.id });
+    const t = tl();
+    expect(t.features[0]?.suppressed).toBe(true);
+    expect(t.features[3]).toMatchObject({ status: "failed" });
+    expect(t.features[3]?.error).toContain("não existe");
+    expect(ids()).toEqual(["p1", "p3"]); // a cópia (feature 2) continua, com o id que tinha
+    dispatch("timeline.suppress", { id: t.features[0]?.id }); // alterna: liga de novo
+    expect(tl().features.every((f) => f.status === "ok")).toBe(true);
+    expect(ids()).toEqual(["p1", "p2", "p3"]);
+  });
+
+  test("remover apaga a feature e reexecuta", () => {
+    dispatch("timeline.remove", { id: tl().features[2]?.id });
+    expect(methods()).toEqual(["parts.instance", "paint.rows"]);
+    expect(ids()).toEqual(["p1", "p2"]);
+    expect(tl().marker).toBe(2);
+    expect(() => dispatch("timeline.remove", { id: 999 })).toThrow("não existe");
+  });
+
+  test("editar parâmetros muda o resultado", () => {
+    const paint = tl().features[1];
+    const before = rowsPainted();
+    const r = dispatch("timeline.edit", { id: paint?.id, params: { from: 1, to: 3 } }) as {
+      features: { params?: Record<string, unknown> }[];
+    };
+    expect(r.features[1]?.params).toMatchObject({ from: 1, to: 3, yarn: "B" });
+    expect(rowsPainted()).not.toBe(before);
+    expect(() => dispatch("timeline.edit", { id: paint?.id, params: "x" })).toThrow("objeto");
+  });
+
+  test("texto digitado e não confirmado vira feature antes de uma operação", () => {
+    dispatch("parts.setText", {
+      id: "p1",
+      text: `${TEXT}
+V4: 18 pb (18)`,
+    });
+    dispatch("timeline.rollTo", { index: 2 });
+    expect(methods()).toContain("parts.commitText");
+    expect((dispatch("parts.get") as { parts: { id: string }[] }).parts.length).toBeGreaterThan(0);
+  });
+});

@@ -22,11 +22,18 @@ export type Shape =
   | { kind: "profile"; points: Pt[] };
 
 /** O que abre a janela: nova peça, ou a feature `featureId` da linha do tempo com a forma que ela tem. */
+/** Seção não circular (P5c): achatamento e saliências. */
+export interface Section {
+  ratio?: number;
+  bumps?: { angleDeg: number; widthDeg: number; amount: number; from: number; to: number }[];
+}
+
 export interface ShapeRequest {
   featureId?: number;
   shape?: Shape;
   name?: string;
   beginner?: boolean;
+  section?: Section;
 }
 
 let req: ShapeRequest | null = null;
@@ -197,16 +204,26 @@ function Body(props: { request: ShapeRequest }) {
   const [shape, setShape] = useState<Shape>(r.shape ?? DEFAULTS.sphere);
   const [name, setName] = useState(r.name ?? "");
   const [beginner, setBeginner] = useState(r.beginner ?? true);
+  // achatamento em % (100 = redonda) e uma saliência opcional
+  const [flat, setFlat] = useState(Math.round((r.section?.ratio ?? 1) * 100));
+  const [bump, setBump] = useState(r.section?.bumps?.[0] ?? null);
+  const section = useMemo(
+    (): Section | undefined =>
+      flat === 100 && !bump
+        ? undefined
+        : { ...(flat !== 100 ? { ratio: flat / 100 } : {}), ...(bump ? { bumps: [bump] } : {}) },
+    [flat, bump],
+  );
   const [msg, setMsg] = useState<string | null>(null);
   const editing = r.featureId !== undefined;
 
   const res = useMemo((): { out: Out | null; error: string | null } => {
     try {
-      return { out: dispatch("forward.revolve", { shape, beginner }) as Out, error: null };
+      return { out: dispatch("forward.revolve", { shape, beginner, section }) as Out, error: null };
     } catch (e) {
       return { out: null, error: (e as Error).message };
     }
-  }, [shape, beginner]);
+  }, [shape, beginner, section]);
 
   const set = (patch: Record<string, number>) => setShape({ ...shape, ...patch } as Shape);
   const segs = shape.kind === "stack" ? shape.segments : [];
@@ -218,9 +235,15 @@ function Body(props: { request: ShapeRequest }) {
       if (editing)
         dispatch("timeline.edit", {
           id: r.featureId,
-          params: { shape, beginner, name: name.trim() || null },
+          params: { shape, beginner, name: name.trim() || null, section: section ?? null },
         });
-      else dispatch("parts.fromShape", { shape, beginner, ...(name.trim() ? { name } : {}) });
+      else
+        dispatch("parts.fromShape", {
+          shape,
+          beginner,
+          ...(section ? { section } : {}),
+          ...(name.trim() ? { name } : {}),
+        });
       closeShape();
     } catch (e) {
       setMsg((e as Error).message);
@@ -361,6 +384,83 @@ function Body(props: { request: ShapeRequest }) {
             </button>
           </div>
         )}
+        <fieldset className="shape-section" data-testid="shape-section">
+          <legend>Seção (peça achatada, saliência)</legend>
+          <label className="shape-field">
+            Largura de frente para trás{" "}
+            <input
+              type="number"
+              className="num"
+              data-testid="shape-flat"
+              aria-label="Largura de frente para trás, em % da largura de lado"
+              min={10}
+              max={100}
+              step={5}
+              value={flat}
+              onChange={(e) => setFlat(Math.min(100, Math.max(10, num(e.target.value) || 100)))}
+            />{" "}
+            % (100 = redonda)
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              data-testid="shape-bump"
+              checked={bump !== null}
+              onChange={(e) =>
+                setBump(
+                  e.target.checked ? { angleDeg: 90, widthDeg: 90, amount: 0.4, from: 10, to: 30 } : null,
+                )
+              }
+            />{" "}
+            Saliência (como um olho ou uma bochecha)
+          </label>
+          {bump && (
+            <div className="shape-seg">
+              <label className="shape-field">
+                Ângulo{" "}
+                <input
+                  type="number"
+                  className="num"
+                  aria-label="Ângulo da saliência"
+                  data-testid="shape-bump-angle"
+                  value={bump.angleDeg}
+                  onChange={(e) => setBump({ ...bump, angleDeg: num(e.target.value) })}
+                />
+                °
+              </label>
+              <label className="shape-field">
+                Largura{" "}
+                <input
+                  type="number"
+                  className="num"
+                  aria-label="Largura da saliência em graus"
+                  value={bump.widthDeg}
+                  onChange={(e) => setBump({ ...bump, widthDeg: num(e.target.value) })}
+                />
+                °
+              </label>
+              <label className="shape-field">
+                Quanto{" "}
+                <input
+                  type="number"
+                  className="num"
+                  aria-label="Quanto a saliência cresce, em %"
+                  data-testid="shape-bump-amount"
+                  value={Math.round(bump.amount * 100)}
+                  onChange={(e) => setBump({ ...bump, amount: num(e.target.value) / 100 })}
+                />
+                %
+              </label>
+              <Field
+                id="bump-from"
+                label="De"
+                value={bump.from}
+                onChange={(v) => setBump({ ...bump, from: v })}
+              />
+              <Field id="bump-to" label="Até" value={bump.to} onChange={(v) => setBump({ ...bump, to: v })} />
+            </div>
+          )}
+        </fieldset>
         <label>
           Nome{" "}
           <input

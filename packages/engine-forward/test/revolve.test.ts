@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Motor direto (P5a): casos F1 a F9 de docs/08 seção 1.7 e docs/13, com os valores exatos, e as propriedades da seção 5.
-import { validate } from "@novelo/core";
+import { type Pattern, validate } from "@novelo/core";
 import { describe, expect, test } from "vitest";
 import { distribute, type ForwardInput, type ProfilePoint, revolve, type Shape } from "../src/index.ts";
 
@@ -159,6 +159,77 @@ describe("peça composta (P5b)", () => {
       gauge: { w: 5, h: 5 },
     });
     expect(r.ok).toBe(false);
+  });
+});
+
+describe("seção não circular e acoplamento (P5c, docs/08 seção 2)", () => {
+  /** Posições (índice entre os pais) dos aumentos de cada volta. */
+  const incAt = (tokens: string[]) => tokens.flatMap((t, i) => (t === "INC2" || t === "INC3" ? [i] : []));
+  const tokensOf = (pattern: Pattern, row: number) =>
+    (pattern.rows[row]?.ops ?? []).flatMap((op) =>
+      Array<string>("count" in op ? Number(op.count) : 0).fill(
+        op.kind === "inc" ? "INC2" : op.kind === "dec" ? "DEC" : "SC",
+      ),
+    );
+
+  test("regressão: seção redonda pelo acoplamento dá as mesmas contagens e aumentos espalhados por igual", () => {
+    for (const f of Object.values(F)) {
+      const plain = counts(f.shape, f.w, f.h);
+      const viaCoupling = run({ shape: f.shape, gauge: { w: f.w, h: f.h }, section: { ratio: 1 } });
+      expect(viaCoupling.value.counts).toEqual(plain);
+      // em cada volta que cresce, a distância entre aumentos seguidos (dando a volta) varia no máximo 1 ponto
+      viaCoupling.value.counts.forEach((n, i) => {
+        if (i === 0) return;
+        const prev = viaCoupling.value.counts[i - 1] as number;
+        const at = incAt(tokensOf(viaCoupling.value.pattern, i));
+        if (n <= prev || at.length < 2) return;
+        const gaps = at.map((x, k) => ((at[(k + 1) % at.length] as number) - x + prev) % prev || prev);
+        expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(1);
+      });
+    }
+  });
+
+  test("peça achatada (metade da largura) gera receita válida com menos pontos que a redonda", () => {
+    const flat = run({
+      shape: { kind: "sphere", radius: 30 },
+      gauge: { w: 5, h: 5 },
+      section: { ratio: 0.5 },
+    });
+    expect(validate(flat.value.pattern).ok).toBe(true);
+    expect(sum(flat.value.counts)).toBeLessThan(452);
+  });
+
+  test("saliência: os aumentos se concentram no lado em que a volta cresce", () => {
+    // tubo reto com uma saliência a 90 graus que começa a crescer a 20 mm do polo (como o olho de um sapo)
+    const tube: Shape = { kind: "cup", radius: 15, wall: 40 };
+    const r = run({
+      shape: tube,
+      gauge: { w: 5, h: 5 },
+      section: { bumps: [{ angleDeg: 90, widthDeg: 90, amount: 0.6, from: 25, to: 60 }] },
+    });
+    expect(validate(r.value.pattern).ok).toBe(true);
+    // a primeira volta que cresce dentro do trecho da saliência
+    const i = r.value.rows.findIndex(
+      (row, k) => k > 0 && row.s >= 25 && row.n > (r.value.counts[k - 1] as number),
+    );
+    expect(i).toBeGreaterThan(0);
+    const prev = r.value.counts[i - 1] as number;
+    const at = incAt(tokensOf(r.value.pattern, i));
+    expect(at.length).toBeGreaterThanOrEqual(2);
+    const angle = (k: number) => (360 * k) / prev;
+    const near = at.filter((k) => Math.abs(angle(k) - 90) <= 60).length;
+    expect(near / at.length).toBeGreaterThanOrEqual(0.75);
+  });
+
+  test("seção inválida é recusada", () => {
+    expect(revolve({ shape: F.F2.shape, gauge: { w: 5, h: 5 }, section: { ratio: 0 } }).ok).toBe(false);
+    expect(
+      revolve({
+        shape: F.F2.shape,
+        gauge: { w: 5, h: 5 },
+        section: { bumps: [{ angleDeg: 0, widthDeg: 0, amount: 1, from: 0, to: 10 }] },
+      }).ok,
+    ).toBe(false);
   });
 });
 

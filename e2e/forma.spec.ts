@@ -62,3 +62,24 @@ test("perfil livre: arrastar um ponto muda a forma e as contagens", async ({ pag
   await expect.poll(() => total(page)).toBeGreaterThan(before);
   await page.screenshot({ path: "test-results/forma-perfil.png" });
 });
+
+test("peça achatada com saliência (P5c): menos pontos ao achatar, a saliência acrescenta, e a peça é criada", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect.poll(() => count(page)).toBe(433);
+  await ribbon(page, "montagem");
+  await page.getByTestId("shape-open").click();
+  const round = await total(page);
+  await page.getByTestId("shape-flat").fill("50");
+  await expect.poll(() => total(page)).toBeLessThan(round);
+  const flat = await total(page);
+  await page.getByTestId("shape-bump").check();
+  await page.getByTestId("shape-bump-amount").fill("60");
+  await expect.poll(() => total(page)).toBeGreaterThan(flat);
+  await page.screenshot({ path: "test-results/forma-achatada.png" });
+  const made = await total(page);
+  await page.getByTestId("shape-create").click();
+  await expect.poll(() => count(page)).toBe(433 + made + 1);
+  await expectTimelineOk(page);
+});

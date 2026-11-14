@@ -5,7 +5,7 @@
 import { dispatch, subscribeTimeline, timelineVersion } from "@novelo/commands";
 import { useState, useSyncExternalStore } from "react";
 import { Icon } from "./icons.tsx";
-import { openShape, type Shape } from "./ShapeWindow.tsx";
+import { openShape, type Section, type Shape } from "./ShapeWindow.tsx";
 
 interface Item {
   id: number;
@@ -129,6 +129,7 @@ function Editor(props: { item: Item; onDone: () => void; run: Run }) {
               shape: p.shape as Shape,
               ...(typeof p.name === "string" ? { name: p.name } : {}),
               beginner: p.beginner === true,
+              ...(p.section && typeof p.section === "object" ? { section: p.section as Section } : {}),
             });
             onDone();
           }}

@@ -120,4 +120,23 @@ describe("peça por forma (P5b)", () => {
       (dispatch("pattern.verify", { text: t }) as { counts: number[] }).counts.length;
     expect(rounds(after.text)).toBe(rounds(before) + 4);
   });
+
+  test("peça achatada e com saliência (P5c): receita válida e a seção vai junto na feature", () => {
+    dispatch("parts.fromShape", {
+      shape: { kind: "sphere", radius: 25 },
+      section: { ratio: 0.6, bumps: [{ angleDeg: 90, widthDeg: 80, amount: 0.4, from: 20, to: 50 }] },
+    });
+    const p = last();
+    expect((dispatch("pattern.verify", { text: p.text }) as { ok: boolean }).ok).toBe(true);
+    const round = dispatch("forward.revolve", { shape: { kind: "sphere", radius: 25 } }) as { total: number };
+    const flat = dispatch("forward.revolve", {
+      shape: { kind: "sphere", radius: 25 },
+      section: { ratio: 0.6 },
+    }) as { total: number };
+    expect(flat.total).toBeLessThan(round.total);
+    expect(timelineView().features[0]?.params.section).toMatchObject({ ratio: 0.6 });
+    expect(() =>
+      dispatch("forward.revolve", { shape: { kind: "sphere", radius: 25 }, section: { ratio: 0 } }),
+    ).toThrow(/proporção/);
+  });
 });

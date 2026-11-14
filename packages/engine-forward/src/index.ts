@@ -79,10 +79,135 @@ export const DEFAULTS: ForwardOptions = {
   rowPhase: 1,
 };
 
+/** Saliência (P5c): a volta engorda `amount` (fração do raio) em volta do ângulo `angleDeg`, entre `from` e `to` mm do perfil. */
+export interface Bump {
+  angleDeg: number;
+  widthDeg: number;
+  amount: number;
+  from: number;
+  to: number;
+}
+
+/**
+ * Seção não circular (P5c, docs/08 seção 2). `ratio`: largura em y sobre largura em x (1 = redonda, 0,5 = achatada pela
+ * metade). `bumps`: saliências. Com seção, a contagem vem do comprimento do laço e os aumentos e diminuições do
+ * acoplamento entre as voltas, então se concentram onde a volta cresce.
+ */
+export interface Section {
+  ratio?: number;
+  bumps?: Bump[];
+}
+
 export interface ForwardInput {
   shape: Shape;
   gauge: Gauge;
   options?: Partial<ForwardOptions>;
+  section?: Section;
+}
+
+type XY = [number, number];
+const LOOP = 2048;
+
+/** O laço da volta de raio `r` no comprimento de arco `s`: pontos em volta do eixo, começando na costura (ângulo 0). */
+function loopOf(r: number, s: number, sec: Section): XY[] {
+  const ratio = sec.ratio ?? 1;
+  const bumps = (sec.bumps ?? []).filter((b) => s >= b.from && s <= b.to);
+  return Array.from({ length: LOOP }, (_, i) => {
+    const t = (2 * Math.PI * i) / LOOP;
+    let f = 1;
+    for (const b of bumps) {
+      const a0 = (b.angleDeg * Math.PI) / 180;
+      const half = Math.max(1e-6, (b.widthDeg * Math.PI) / 360);
+      const d = Math.atan2(Math.sin(t - a0), Math.cos(t - a0));
+      if (Math.abs(d) < half) f += b.amount * Math.cos((Math.PI / 2) * (d / half)) ** 2;
+    }
+    return [r * f * Math.cos(t), r * f * ratio * Math.sin(t)];
+  });
+}
+
+const perimeter = (loop: XY[]): number =>
+  loop.reduce((a, p, i) => {
+    const q = loop[(i + 1) % loop.length] as XY;
+    return a + Math.hypot(q[0] - p[0], q[1] - p[1]);
+  }, 0);
+
+/** `n` pontos espaçados igualmente em comprimento ao longo do laço, a partir da costura. */
+function spread(loop: XY[], n: number): XY[] {
+  const L = perimeter(loop);
+  const out: XY[] = [];
+  let acc = 0;
+  let k = 0;
+  for (let i = 0; i < loop.length && k < n; i++) {
+    const p = loop[i] as XY;
+    const q = loop[(i + 1) % loop.length] as XY;
+    const seg = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    while (k < n && (k * L) / n <= acc + seg + 1e-12) {
+      const t = seg > 0 ? ((k * L) / n - acc) / seg : 0;
+      out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]);
+      k++;
+    }
+    acc += seg;
+  }
+  while (out.length < n) out.push(loop[0] as XY);
+  return out;
+}
+
+/**
+ * Acoplamento da volta nova à anterior (docs/08 seção 2.4): caminho monótono de custo mínimo, por programação dinâmica,
+ * com o primeiro par fixo na costura. Ponto baixo liga 1 pai a 1 filho; aumento, 1 pai a 2 (ou 3) filhos; diminuição,
+ * 2 pais a 1 filho. O custo de cada ligação é o quadrado da diferença de ângulo em volta do eixo: numa volta redonda
+ * isso espalha os aumentos por igual; onde a volta cresce (saliência), os pontos ficam mais juntos em ângulo e os
+ * aumentos se concentram ali.
+ */
+export function couple(parents: XY[], children: XY[], maxIncrease: 2 | 3 = 2): Token[] {
+  const m = parents.length;
+  const n = children.length;
+  const W = n + 1;
+  const cost = new Float64Array((m + 1) * W).fill(Number.POSITIVE_INFINITY);
+  const move = new Int8Array((m + 1) * W).fill(-1);
+  cost[0] = 0;
+  // ângulos a partir da costura (0 a 2π), na ordem dos pontos
+  const ang = (v: XY[]) => v.map(([x, y]) => (Math.atan2(y, x) + 2 * Math.PI) % (2 * Math.PI));
+  const pa = ang(parents);
+  const ca = ang(children);
+  const d = (b: number, a: number) => ((ca[b] as number) - (pa[a] as number)) ** 2;
+  // movimentos em ordem de preferência no empate: ponto baixo, aumento de 2, aumento de 3, diminuição
+  const moves: { da: number; db: number; tok: Token }[] = [
+    { da: 1, db: 1, tok: "SC" },
+    { da: 1, db: 2, tok: "INC2" },
+    ...(maxIncrease === 3 ? [{ da: 1, db: 3, tok: "INC3" as Token }] : []),
+    { da: 2, db: 1, tok: "DEC" },
+  ];
+  for (let a = 0; a <= m; a++) {
+    for (let b = 0; b <= n; b++) {
+      const here = cost[a * W + b] as number;
+      if (!Number.isFinite(here)) continue;
+      moves.forEach((mv, k) => {
+        const a2 = a + mv.da;
+        const b2 = b + mv.db;
+        if (a2 > m || b2 > n) return;
+        let c = 0;
+        for (let x = 0; x < mv.da; x++) for (let y = 0; y < mv.db; y++) c += d(b + y, a + x);
+        const v = here + c;
+        if (v < (cost[a2 * W + b2] as number) - 1e-9) {
+          cost[a2 * W + b2] = v;
+          move[a2 * W + b2] = k;
+        }
+      });
+    }
+  }
+  const toks: Token[] = [];
+  let a = m;
+  let b = n;
+  while (a > 0 || b > 0) {
+    const k = move[a * W + b] as number;
+    const mv = moves[k];
+    if (!mv) throw new Error("acoplamento sem caminho"); // não acontece com n entre m/2 e o máximo por ponto
+    toks.push(mv.tok);
+    a -= mv.da;
+    b -= mv.db;
+  }
+  return toks.reverse();
 }
 
 export interface ForwardRow {
@@ -326,9 +451,32 @@ function checkInput(input: ForwardInput): string | null {
   }
 }
 
+function checkSection(sec: Section | undefined): string | null {
+  if (sec === undefined) return null;
+  if (typeof sec !== "object" || sec === null) return "a seção deve ser {ratio, bumps}";
+  if (sec.ratio !== undefined && !(Number.isFinite(sec.ratio) && sec.ratio >= 0.1 && sec.ratio <= 10))
+    return "a proporção da seção deve ficar entre 0,1 e 10";
+  if (sec.bumps !== undefined) {
+    if (!Array.isArray(sec.bumps)) return "as saliências devem ser uma lista";
+    for (const b of sec.bumps) {
+      const ok =
+        b &&
+        [b.angleDeg, b.widthDeg, b.amount, b.from, b.to].every(Number.isFinite) &&
+        b.widthDeg > 0 &&
+        b.widthDeg <= 360 &&
+        b.amount > -0.9 &&
+        b.amount <= 3 &&
+        b.to >= b.from;
+      if (!ok)
+        return "cada saliência tem ângulo, largura (0 a 360 graus), quanto (-0,9 a 3) e trecho de/até em mm";
+    }
+  }
+  return null;
+}
+
 /** Gera a receita de uma peça de revolução. */
 export function revolve(input: ForwardInput): Result<ForwardOutput> {
-  const bad = checkInput(input);
+  const bad = checkInput(input) ?? checkSection(input.section);
   if (bad) return fail("BAD_INPUT", bad);
   const o: ForwardOptions = { ...DEFAULTS, ...input.options };
   const { w, h } = input.gauge;
@@ -338,12 +486,20 @@ export function revolve(input: ForwardInput): Result<ForwardOutput> {
   const issues: Issue[] = [];
   const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
 
+  const sec = input.section;
+  const loops: XY[][] = [];
   const rows: ForwardRow[] = [];
   for (let i = 1; ; i++) {
     const s = (i - 1 + o.rowPhase) * h;
     if (s > S + 1e-9) break;
     const [r, z] = pointAt(points, acc, s);
-    const ideal = (2 * Math.PI * r) / w;
+    let ideal = (2 * Math.PI * r) / w;
+    if (sec) {
+      // seção não circular: a contagem vem do comprimento do laço
+      const loop = loopOf(r, s, sec);
+      loops.push(loop);
+      ideal = perimeter(loop) / w;
+    }
     const prev = rows[rows.length - 1]?.n;
     let n: number;
     if (prev === undefined) {
@@ -415,12 +571,10 @@ export function revolve(input: ForwardInput): Result<ForwardOutput> {
         declaredCount: row.n,
       };
     const prev = (rows[i - 1] as ForwardRow).n;
-    return {
-      label,
-      kind: "round",
-      ops: opsOf(distribute(prev, row.n, i + 1, o.stagger)),
-      declaredCount: row.n,
-    };
+    const tokens = sec
+      ? couple(spread(loops[i - 1] as XY[], prev), spread(loops[i] as XY[], row.n), o.maxIncreasePerStitch)
+      : distribute(prev, row.n, i + 1, o.stagger);
+    return { label, kind: "round", ops: opsOf(tokens), declaredCount: row.n };
   });
   const pattern: Pattern = { dialect: "pt-BR", rows: out };
   const v = validate(pattern);

@@ -33,7 +33,7 @@ import {
   yarnCursor,
   yarnUsage,
 } from "@novelo/core";
-import { type ForwardOptions, revolve, type Shape } from "@novelo/engine-forward";
+import { type ForwardOptions, revolve, type Section, type Shape } from "@novelo/engine-forward";
 import { fromCp, parseCpDot, toCp } from "@novelo/interop";
 import { parsePattern, printPattern, printPatternWithYarns, splitLines } from "@novelo/notation";
 import { bandOf, MAX_LEGS, modelKey, tensionLevel } from "@novelo/stitch3d";
@@ -848,7 +848,8 @@ Object.assign(commands, {
    * {kind: "ellipsoid", radius, halfHeight} | {kind: "cone", halfAngleDeg, slant} | {kind: "cup", radius, wall} |
    * {kind: "profile", points: [[raio, altura], ...]} em mm, começando no eixo. `gauge` {w, h} em mm (padrão: largura do
    * ponto e altura da volta das configurações), `options` do motor, `beginner` liga as contagens amigáveis (múltiplo de 6)
-   * e `dialect` escolhe a língua do texto. Só consulta: não muda o projeto.
+   * `section` {ratio, bumps} faz a seção não circular (peça achatada, saliências; P5c) e `dialect` escolhe a língua do
+   * texto. Só consulta: não muda o projeto.
    */
   "forward.revolve": (p: Params) => {
     const s = getSettings().yarns;
@@ -859,7 +860,12 @@ Object.assign(commands, {
       ...(p.beginner === true ? { friendlyMultiple: 6, friendlyTolerance: 1 } : {}),
       ...((p.options ?? {}) as Partial<ForwardOptions>),
     };
-    const r = revolve({ shape: p.shape as Shape, gauge: { w, h }, options });
+    const r = revolve({
+      shape: p.shape as Shape,
+      gauge: { w, h },
+      options,
+      ...(p.section === undefined || p.section === null ? {} : { section: p.section as Section }),
+    });
     if (!r.ok) throw new Error(r.issues.map((i) => i.message).join("; "));
     const dialect = (typeof p.dialect === "string" ? p.dialect : "pt-BR") as Dialect;
     return {
@@ -883,6 +889,7 @@ Object.assign(commands, {
   "parts.fromShape": (p: Params) => {
     const r = (commands["forward.revolve"] as Command)({
       shape: p.shape,
+      ...(p.section === undefined ? {} : { section: p.section }),
       ...(p.gauge === undefined ? {} : { gauge: p.gauge }),
       ...(p.options === undefined ? {} : { options: p.options }),
       beginner: p.beginner === true,

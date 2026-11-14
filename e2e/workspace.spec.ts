@@ -56,7 +56,6 @@ test("layout padrão: coluna da esquerda em abas e o 3D ocupando o resto da tela
     "Propriedades",
     "Pontos",
     "Fios",
-    "Materiais",
   ]);
   // o 3D está sempre à vista e é a janela mais larga
   await expect(page.getByTestId("scene").locator("canvas")).toBeVisible();
@@ -148,7 +147,7 @@ test("presets: Foco no 3D, Tudo em abas e volta ao clássico", async ({ page }) 
   await page.getByTestId("windows-menu").click();
   await page.getByRole("menuitemradio", { name: /Tudo em abas/ }).click();
   await expect(page.locator("section.ws-leaf")).toHaveCount(1);
-  await expect(windowTabs(page).getByRole("tab")).toHaveCount(10);
+  await expect(windowTabs(page).getByRole("tab")).toHaveCount(9);
   await page.getByRole("tab", { name: "Receita", exact: true }).click();
   await showTab(page, "Receita");
   await expect(page.getByLabel("Receita", { exact: true })).toBeVisible();

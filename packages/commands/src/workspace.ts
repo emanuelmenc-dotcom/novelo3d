@@ -15,7 +15,6 @@ export const PANEL_IDS = [
   "points",
   "tree",
   "props",
-  "materials",
   "render",
   "stitchEditor",
 ] as const;
@@ -43,7 +42,6 @@ export const PANEL_TITLES: Record<PanelId, string> = {
   points: "Pontos",
   tree: "Árvore",
   props: "Propriedades",
-  materials: "Materiais",
   render: "Render",
   stitchEditor: "Criador de pontos",
 };
@@ -456,7 +454,6 @@ export const DEFAULT_PANEL_MINS: PanelMins = {
   points: { w: 260, h: 200 },
   tree: { w: 240, h: 200 },
   props: { w: 260, h: 200 },
-  materials: { w: 280, h: 200 },
   render: { w: 320, h: 260 },
   stitchEditor: { w: 320, h: 240 },
 };

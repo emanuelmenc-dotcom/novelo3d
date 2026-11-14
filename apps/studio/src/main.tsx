@@ -762,8 +762,6 @@ function App() {
 
     props: () => <PropsPanel />,
 
-    materials: () => <MaterialsPanel version={pver} />,
-
     render: () => <RenderPanel />,
 
     stitchEditor: () => <StitchEditorPanel />,

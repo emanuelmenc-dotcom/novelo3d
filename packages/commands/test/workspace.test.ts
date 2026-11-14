@@ -358,4 +358,13 @@ describe("migração da janela Montagem (G4)", () => {
     expect(s.off).toEqual(["tree", "props"]);
     expect(leaves(s.customs[0]?.layout as Layout).flatMap((l) => l.tabs)).toEqual(["tree", "props"]);
   });
+
+  test("layout salvo com a antiga janela Materiais abre sem ela e sem perder o resto", () => {
+    const s = loadWorkspace({
+      layout: { root: leaf(["recipe", "materials", "view3d"]) },
+      presetId: null,
+      customs: [],
+    });
+    expect(leaves(s.layout).flatMap((l) => l.tabs)).toEqual(["recipe", "view3d"]);
+  });
 });

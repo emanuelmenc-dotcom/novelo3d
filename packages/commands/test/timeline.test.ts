@@ -10,6 +10,7 @@ import {
   setTreeSelected,
   timelineView,
 } from "../src/index.ts";
+import { labelOf } from "../src/timeline.ts";
 import { expectReplayMatchesLive } from "./replay-check.ts";
 
 const TEXT = "V1: 6 pb no anel mágico (6)\nV2: 6 aum (12)\nV3: (1 pb, 1 aum) x6 (18)";
@@ -435,4 +436,13 @@ test("o nome de cada feature de peça e montagem é legível, não o nome do com
   dispatch("assembly.set", { id: "a1", pos: [5, 0, 0] });
   const labels = (dispatch("timeline.get") as { features: { label: string }[] }).features.map((f) => f.label);
   expect(labels).toEqual(["instância da peça p1", "nova montagem", "ajustar a montagem a1"]);
+});
+
+test("toda feature tem nome legível na faixa, diferente do nome do comando", () => {
+  const feats = Object.entries(COMMAND_CLASS).filter(([, c]) => c === "feature");
+  expect(feats.length).toBeGreaterThan(20);
+  for (const [m] of feats) {
+    const f = { method: m, params: {} } as unknown as Parameters<typeof labelOf>[0];
+    expect(labelOf(f), m).not.toBe(m);
+  }
 });

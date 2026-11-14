@@ -230,7 +230,16 @@ Plano aprovado pelo usuário, com mockup (`docs/imagens`: ver o relatório da et
 
 ### Fechamento do marco G (2026-11-14)
 
-G1 a G7 entregues e testadas; **G3 a G7 aguardam a aprovação visual do usuário** (regra 7 para o gráfico). Teste que cruza as etapas: `e2e/marco-g.spec.ts` (instância, montagem, pintura, desfazer e refazer, esconder, corte, leitura, exportar, importar, recarregar). Lacunas declaradas, por etapa: G3 (`docs/17` seção 11); G4 (ícones próprios na árvore, propriedades de costura simples); G6 (editores só para receita, pintura por voltas, posição e rotação da peça e valor de ponto); G7 (sem altura e diâmetro rotulados, sem linha entre os pontos, piso some no corte). Desempenho medido na receita de 6210 pontos com instância: mover peça cerca de 150 ms; traço de pincel e desfazer cerca de 4,4 s, iguais com a Árvore ou as Propriedades à mostra (medida de tamanho visível).
+G1 a G7 entregues e testadas; **G3 a G7 aguardam a aprovação visual do usuário** (regra 7 para o gráfico) e o marco só fecha com o sim dele. Teste que cruza as etapas: `e2e/marco-g.spec.ts` (instância, montagem, pintura, desfazer e refazer, esconder, corte, leitura, exportar, importar, recarregar). Lacunas declaradas, por etapa:
+
+- G1 e G4: perguntas 12 e 13; ícones próprios na árvore e propriedades de costura simples.
+- G2: perguntas 2 a 4 (marco escrito na receita, várias peças na leitura, troca de fio como aviso).
+- G3: `docs/17` seção 11. No gráfico de 30 voltas, a página 7 é só a tabela das voltas 28 a 30 numa página quase vazia (regra D-63), e na página 6 os símbolos e etiquetas ficam muito pequenos; na bola, as etiquetas de volta 7 a 9 encostam nas etiquetas "Nx". Nada foi ajustado (regra 7).
+- G5: pergunta 14 (`assembly.close` ignora as transformações da montagem); posição e rotação sem unidade na tela (pergunta 25).
+- G6: editores só para receita, pintura por voltas, posição e rotação da peça e valor de ponto; os nomes das features vêm de uma tabela (`PLAIN` em `timeline.ts`) e a faixa não mostra ainda os parâmetros delas.
+- G7: sem altura e diâmetro rotulados, sem linha entre os pontos, piso some no corte (perguntas 21 a 23).
+
+Desempenho medido na receita de 6210 pontos com instância: mover peça cerca de 150 ms; traço de pincel e desfazer cerca de 4,4 s, iguais com a Árvore ou as Propriedades à mostra (medida de tamanho visível).
 
 ### Perguntas guardadas (usuário autorizou seguir sem perguntar; responder quando puder)
 
@@ -258,3 +267,4 @@ G1 a G7 entregues e testadas; **G3 a G7 aguardam a aprovação visual do usuári
 22. **Linha entre os pontos medidos (G7).** A ferramenta Distância só mostra o valor; falta marcar os dois pontos e a linha entre eles.
 23. **Realce da volta ao medir (G7).** Cada clique de medida também destaca a volta do ponto na receita; desligar esse realce no modo Medir?
 24. **Atualizar o exe (D-70).** O exe é uma foto do código: refazer `npm run exe` e trocar o arquivo do desktop ao fim de cada etapa, ou o usuário prefere avisar quando quiser uma versão nova?
+25. **Unidade da posição (G5).** Os campos de posição da peça e da montagem não dizem a unidade: o valor é em larguras de ponto (40 alarga o conjunto em 40 larguras, 200 mm a 5 mm), não em milímetros como o resto do projeto. Mostrar a unidade, ou converter para mm?

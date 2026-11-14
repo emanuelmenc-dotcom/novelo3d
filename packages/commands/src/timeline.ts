@@ -534,6 +534,34 @@ export function removeFeature(id: number, run: (m: string, p: Params) => unknown
   marker = i < marker ? marker - 1 : marker;
   replay(run);
 }
+/** Nome legível dos comandos que não têm parâmetros que mudem o texto. Um teste confere que toda feature tem nome. */
+const PLAIN: Record<string, string> = {
+  "parts.add": "nova peça",
+  "parts.mirror": "peça espelhada",
+  "parts.copy": "cópia da peça",
+  "parts.detach": "soltar a peça da original",
+  "parts.remove": "remover a peça",
+  "assembly.remove": "remover a montagem",
+  "assembly.close": "fechar a montagem",
+  "assembly.undoClose": "desfazer o fechamento da montagem",
+  "seam.add": "nova costura",
+  "seam.set": "ajustar a costura",
+  "seam.remove": "remover a costura",
+  "paint.clear": "limpar a pintura",
+  "paint.remove": "tirar a pintura",
+  "paint.reset": "zerar a pintura",
+  "paint.stitches": "pintar pontos",
+  "yarns.add": "novo fio",
+  "yarns.set": "paleta de fios",
+  "tool.brush": "pincel",
+  "tool.bucket": "balde",
+  "tool.stripes": "listras",
+  "tool.gradient": "gradiente",
+  "tool.smooth": "suavizar tensão",
+  "edit.clear": "limpar as edições",
+  "edit.setDefaultTension": "tensão padrão",
+  "materials.replace": "trocar o fio em todo o projeto",
+};
 /** Texto curto de uma feature para a faixa e para o MCP. */
 export function labelOf(f: Feature): string {
   if (f.items) {
@@ -558,7 +586,7 @@ export function labelOf(f: Feature): string {
     case "assembly.set":
       return `ajustar a montagem ${String(p.id)}`;
     default:
-      return f.method;
+      return PLAIN[f.method] ?? f.method;
   }
 }
 

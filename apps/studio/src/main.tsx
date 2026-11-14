@@ -27,6 +27,7 @@ import {
   subscribeParts,
   subscribeRender,
   subscribeSettings,
+  subscribeTimeline,
   subscribeTutorial,
   subscribeWorkspace,
   tutorialVersion,
@@ -48,6 +49,7 @@ import { installRenderJob, renderGeomChanged, setRenderSource } from "./render/r
 import { buildRibbonTabs } from "./ribbonTabs.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
 import { StitchEditorPanel } from "./StitchEditorPanel.tsx";
+import { TimelineStrip } from "./TimelineStrip.tsx";
 import { TitleBar } from "./TitleBar.tsx";
 import { ToolOptionsBar } from "./ToolOptionsBar.tsx";
 import { VIEWS } from "./views.ts";
@@ -129,6 +131,8 @@ const EDIT_KEY = "novelo3d.edit"; // fio e tensão por ponto, de cada peça
 const PARTS_KEY = "novelo3d.parts"; // peças, receitas e costuras
 const UI_KEY = "novelo3d.ui"; // versão da interface (migração única do layout e do cubo) e preferências do ribbon
 const TUTORIAL_KEY = "novelo3d.tutorial"; // onde o usuário parou no tutorial, por peça
+const TIMELINE_KEY = "novelo3d.timeline"; // linha do tempo: features e marcador (a base vai em outra chave, grava menos vezes)
+const TIMELINE_BASE_KEY = "novelo3d.timeline.base";
 function readJson(key: string): unknown {
   try {
     const v = localStorage.getItem(key);
@@ -149,6 +153,16 @@ function readJson(key: string): unknown {
   loadPaintAll(readJson(PROJECT_KEY), root);
   loadEditAll(readJson(EDIT_KEY), root);
   loadTutorial(readJson(TUTORIAL_KEY));
+  // linha do tempo (desfazer) do navegador: só vale se reexecutá-la dá o projeto que acabou de ser carregado
+  const tl = readJson(TIMELINE_KEY) as { base?: unknown } | undefined;
+  if (tl) {
+    try {
+      dispatch("timeline.load", { timeline: { ...tl, base: readJson(TIMELINE_BASE_KEY) } });
+      dispatch("timeline.verify", { keep: true });
+    } catch {
+      // linha do tempo ilegível: o projeto abre sem histórico
+    }
+  }
 }
 // gravação no navegador: se falhar (espaço cheio, armazenamento bloqueado), a tela avisa em vez de calar
 // (uma chave grande pode falhar enquanto outra pequena grava: o aviso vale enquanto qualquer uma falhar)
@@ -197,6 +211,24 @@ subscribeParts(() => {
 });
 subscribeTutorial(() => {
   put(TUTORIAL_KEY, JSON.stringify(exportTutorial()));
+});
+let tlTimer: ReturnType<typeof setTimeout> | undefined;
+let tlBase: unknown;
+subscribeTimeline(() => {
+  // grava com atraso e só regrava a base quando ela muda (ela é a parte grande)
+  clearTimeout(tlTimer);
+  tlTimer = setTimeout(() => {
+    const t = dispatch("timeline.save") as { base: unknown } | null;
+    if (!t) {
+      put(TIMELINE_KEY, "null");
+      return;
+    }
+    if (t.base !== tlBase) {
+      put(TIMELINE_BASE_KEY, JSON.stringify(t.base));
+      tlBase = t.base;
+    }
+    put(TIMELINE_KEY, JSON.stringify({ ...t, base: undefined }));
+  }, 500);
 });
 subscribeSettings((s) => {
   applyScale(s);
@@ -752,6 +784,7 @@ function App() {
           }
         />
         {viewer3d}
+        <TimelineStrip />
         <p data-testid="node-info" className="hint node-info">
           {selNode
             ? `#${selNode.uid} · Volta ${selNode.row >= 0 && layout ? layout.rows[selNode.row]?.label : "anel"}, ponto ${selNode.index + 1} · ${selNode.code}${selNode.parents.length > 0 ? ` · sai de ${selNode.parents.length} ponto(s) da volta anterior` : ""}`
@@ -855,6 +888,20 @@ function App() {
     </div>
   );
 }
+
+declare global {
+  interface Window {
+    /** Exposto para os testes de navegador: reexecuta a linha do tempo e confere que o projeto fica igual. */
+    __timeline?: {
+      verify: () => { ok: boolean; diff: string | null; features: number };
+      run: (method: string, params?: Record<string, unknown>) => unknown;
+    };
+  }
+}
+window.__timeline = {
+  verify: () => dispatch("timeline.verify") as { ok: boolean; diff: string | null; features: number },
+  run: (method, params) => dispatch(method, params),
+};
 
 const root = document.getElementById("root");
 if (root) {

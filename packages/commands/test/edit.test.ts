@@ -79,6 +79,8 @@ describe("pontos e seleção", () => {
 
 describe("ferramentas e histórico", () => {
   test("pintar a seleção com o fio B aparece em chart e relatório; desfazer reverte", () => {
+    dispatch("parts.setText", { id: "p1", text });
+    dispatch("parts.commitText", { id: "p1" });
     dispatch("yarns.set", {
       yarns: [
         { id: "A", name: "a", colorHex: "#5d6b3a" },

@@ -4,7 +4,7 @@
 // Costuras ligam duas linhas contínuas de pontos, na mesma peça ou entre peças. Estado na camada de comandos (D-21).
 import type { Dialect } from "@novelo/core";
 import { cloneSlot, currentSlot, resetSlots, switchSlot } from "./edit-store.ts";
-import { clearRedoExcept, fireProjectReset, nextTick, registerRedoClear } from "./history-tick.ts";
+import { fireProjectReset } from "./history-tick.ts";
 import {
   clonePaintSlot,
   paintToken,
@@ -117,31 +117,8 @@ export function subscribeParts(fn: (s: PartsState) => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
-// ---- desfazer de peças e costuras (um passo por ação; o fechamento da montagem é um passo só, via transact)
-interface PartsStep {
-  t: number;
-  state: PartsState;
-}
-const ustack: PartsStep[] = [];
-let rstack: PartsStep[] = [];
-registerRedoClear("parts", () => {
-  rstack = [];
-});
-let tx = 0;
-let txRecorded = false;
-export const partsUndoTick = (): number => ustack[ustack.length - 1]?.t ?? 0;
-export const partsRedoTick = (): number => rstack[rstack.length - 1]?.t ?? 0;
-
-/** Agrupa várias alterações de peças/costuras num único passo do histórico. */
-export function transact<T>(fn: () => T): T {
-  if (tx === 0) txRecorded = false;
-  tx++;
-  try {
-    return fn();
-  } finally {
-    tx--;
-  }
-}
+/** Agrupar várias alterações num passo era do histórico antigo; a linha do tempo grava o comando inteiro (G6). */
+export const transact = <T>(fn: () => T): T => fn();
 
 function publish(next: PartsState): PartsState {
   state = next;
@@ -149,59 +126,8 @@ function publish(next: PartsState): PartsState {
   return state;
 }
 
-/** `record: false` para o que não é uma edição do projeto (peça ativa, rascunho, texto da receita). */
-function commit(next: Omit<PartsState, "version">, record = true): PartsState {
-  if (record && !(tx > 0 && txRecorded)) {
-    ustack.push({ t: nextTick(), state });
-    if (ustack.length > 100) ustack.shift();
-    rstack = [];
-    clearRedoExcept("parts");
-    if (tx > 0) txRecorded = true;
-  }
+function commit(next: Omit<PartsState, "version">, _record = true): PartsState {
   return publish({ ...next, version: state.version + 1 });
-}
-
-function restoreStep(step: PartsStep): void {
-  // a receita e o dialeto não são passos do histórico: valem sempre os atuais (senão desfazer um movimento reverteria texto)
-  const now = new Map(state.parts.map((p) => [p.id, p]));
-  const s: PartsState = {
-    ...step.state,
-    parts: step.state.parts.map((p) => {
-      const cur = now.get(p.id);
-      if (!cur) return p;
-      // esconder não é passo do histórico: vale sempre o estado atual
-      const { hidden: _h, ...base } = p;
-      const keep = cur.hidden ? { ...base, hidden: true } : base;
-      if (p.kind !== "own" || cur.kind !== "own") return keep;
-      const { dialect: _d, ...rest } = keep;
-      return { ...rest, text: cur.text, ...(cur.dialect ? { dialect: cur.dialect } : {}) };
-    }),
-  };
-  const active = s.parts.some((p) => p.id === state.active) ? state.active : (s.parts[0] as Part).id;
-  // esconder montagem também não é passo do histórico
-  const nowAsm = new Map(state.assemblies.map((a) => [a.id, a]));
-  s.assemblies = s.assemblies.map((a) => {
-    const { hidden: _h, ...rest } = a;
-    return nowAsm.get(a.id)?.hidden ? { ...rest, hidden: true } : rest;
-  });
-  publish({ ...s, active, draft: {}, version: state.version + 1 });
-  useRoot(active);
-}
-
-export function undoParts(): PartsState {
-  const step = ustack.pop();
-  if (!step) throw new Error("nada para desfazer");
-  rstack.push({ t: nextTick(), state });
-  restoreStep(step);
-  return state;
-}
-
-export function redoParts(): PartsState {
-  const step = rstack.pop();
-  if (!step) throw new Error("nada para refazer");
-  ustack.push({ t: nextTick(), state });
-  restoreStep(step);
-  return state;
 }
 
 export const partById = (id: string, s: PartsState = state): Part => {
@@ -678,8 +604,6 @@ export function loadParts(raw: unknown, fallback: { text: string; dialect?: Dial
 
 /** Depois de carregar um projeto o histórico recomeça. */
 function reload(): PartsState {
-  ustack.length = 0;
-  rstack = [];
   const out = publish({ ...state, version: state.version + 1 });
   fireProjectReset();
   return out;

@@ -19,7 +19,7 @@ import {
 } from "@novelo/core";
 import { type LayoutResult, layoutGraph } from "@novelo/layout";
 import { parsePattern } from "@novelo/notation";
-import { clearRedoExcept, fireProjectReset, nextTick, registerRedoClear } from "./history-tick.ts";
+import { fireProjectReset } from "./history-tick.ts";
 import { paintSnapshot } from "./paint-store.ts";
 
 export const TENSION_MIN = -1;
@@ -30,8 +30,6 @@ export const sizeOfTension = (t: number): number => 1.4 ** -t;
 // ------------------------------------------------------------------ estado editável e histórico
 
 interface Snap {
-  /** Instante do passo no relógio comum (maior = mais recente). */
-  t?: number;
   yarn: Map<number, number>;
   tension: Map<number, number>;
   defaultTension: number;
@@ -39,8 +37,6 @@ interface Snap {
 
 interface EditState extends Snap {
   selection: Set<number>;
-  undo: Snap[];
-  redo: Snap[];
   /** Muda a cada edição de tensão (invalida o layout em cache). */
   tver: number;
   /** Muda a cada edição de fio/tensão (não na seleção): invalida cálculos que dependem das propriedades. */
@@ -48,15 +44,11 @@ interface EditState extends Snap {
   version: number;
 }
 
-const HISTORY_MAX = 100;
-
 const fresh = (): EditState => ({
   yarn: new Map(),
   tension: new Map(),
   defaultTension: 0,
   selection: new Set(),
-  undo: [],
-  redo: [],
   tver: 0,
   pver: 0,
   version: 0,
@@ -75,8 +67,6 @@ export interface EditView {
   pver: number;
   selected: number;
   defaultTension: number;
-  canUndo: boolean;
-  canRedo: boolean;
   yarnOverrides: number;
   tensionOverrides: number;
 }
@@ -86,8 +76,6 @@ const view = (): EditView => ({
   pver: st.pver,
   selected: st.selection.size,
   defaultTension: st.defaultTension,
-  canUndo: st.undo.length > 0,
-  canRedo: st.redo.length > 0,
   yarnOverrides: st.yarn.size,
   tensionOverrides: st.tension.size,
 });
@@ -106,68 +94,10 @@ function emit(): EditView {
   return current;
 }
 
-const snap = (): Snap => ({
-  t: nextTick(),
-  yarn: new Map(st.yarn),
-  tension: new Map(st.tension),
-  defaultTension: st.defaultTension,
-});
-function restore(s: Snap): void {
-  st.yarn = new Map(s.yarn);
-  st.tension = new Map(s.tension);
-  st.defaultTension = s.defaultTension;
-  st.tver++;
-  st.pver = ++pverTick;
-}
-
-registerRedoClear("edit", () => {
-  st.redo = [];
-});
-
-/** Dentro de um traço (begin...end) só a primeira edição cria passo no histórico. */
-let grouping = false;
-let groupPushed = false;
-export function beginGroup(): void {
-  grouping = true;
-  groupPushed = false;
-}
-export function endGroup(): void {
-  grouping = false;
-  groupPushed = false;
-}
-
-/** Instante do passo mais recente que dá para desfazer / refazer (0 = nenhum). */
-export const undoTick = (): number => st.undo[st.undo.length - 1]?.t ?? 0;
-export const redoTick = (): number => st.redo[st.redo.length - 1]?.t ?? 0;
-
-/** Executa uma edição como um único passo do histórico. */
+/** Executa uma edição de pontos (o histórico é a linha do tempo, G6). */
 function edit(fn: () => void): EditView {
-  if (!(grouping && groupPushed)) {
-    st.undo.push(snap());
-    if (st.undo.length > HISTORY_MAX) st.undo.shift();
-    st.redo = [];
-    clearRedoExcept("edit");
-    groupPushed = grouping;
-  }
   fn();
   st.pver = ++pverTick;
-  return emit();
-}
-
-export function undo(): EditView {
-  endGroup();
-  const s = st.undo.pop();
-  if (!s) throw new Error("nada para desfazer");
-  st.redo.push(snap());
-  restore(s);
-  return emit();
-}
-export function redo(): EditView {
-  endGroup();
-  const s = st.redo.pop();
-  if (!s) throw new Error("nada para refazer");
-  st.undo.push(snap());
-  restore(s);
   return emit();
 }
 
@@ -397,6 +327,16 @@ export function clearSelection(): EditView {
   return emit();
 }
 
+/** Põe a seleção de pontos de uma peça (a linha do tempo devolve a seleção da sessão depois de reexecutar). */
+export function setSlotSelection(id: string, uids: number[]): void {
+  const sel = new Set(uids.filter((u) => Number.isInteger(u)));
+  if (id === slotId) st.selection = sel;
+  else {
+    const x = slots.get(id);
+    if (x) x.st.selection = sel;
+  }
+}
+
 export const selectedUids = (): number[] => [...st.selection].sort((a, b) => a - b);
 
 // ------------------------------------------------------------------ escrita de propriedades
@@ -496,7 +436,6 @@ const blank = (): Slot => ({
 /** Passa a editar o conjunto de edições (uids, fio, tensão, seleção, histórico) da peça `id`. */
 export function switchSlot(id: string, quiet = false): void {
   if (id === slotId) return;
-  if (!quiet) endGroup();
   slots.set(slotId, capture());
   restoreSlot(slots.get(id) ?? blank());
   slotId = id;

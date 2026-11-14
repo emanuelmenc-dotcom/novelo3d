@@ -132,17 +132,22 @@ Verificações comuns a todos: SVG bem formado; `viewBox` A4; nenhum símbolo co
 
 ## 8. Tutorial (T) e pintura (C)
 
-| Caso | Verificação                                                                                                                                                               |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T1   | P-BOLA gera 402 passos no roteiro antigo (um por ponto baixo, aumento ou diminuição); o modo de leitura (D-66) gera 129: 105 cadeias e 2 slides em cada um dos 12 marcos  |
-| T2   | Cada passo de aumento tem 2 nós e 1 pai; cada passo de diminuição tem 1 nó e 2 pais                                                                                       |
-| T3   | Alerta `rowStart` no primeiro passo de cada volta                                                                                                                         |
-| R1   | Modo de leitura de P-BOLA: 12 marcos, 129 entradas (105 cadeias e 24 slides); volta 3 tem 12 cadeias com `(1 pb, 1 aum) x6` e "repetição i de 6"                          |
-| R2   | `#marco texto` depois de uma volta vira marco, sai uma vez só ao imprimir (também com fios) e vai e volta no arquivo do projeto                                           |
-| R3   | Teclas do modo de leitura: Espaço, →, ←, Backspace, ↑, ↓, Pg Up, Pg Dn, Home, End, F, R, 1 a 6, 0, Esc; Espaço não aciona o botão com foco; nada edita no modo de leitura |
-| R4   | Layout salvo com a antiga janela Tutorial (ativa, sozinha numa folha, desligada, nomeado) abre sem erro                                                                   |
-| C1   | Faixa do fio B entre as voltas 7 e 9 de P-BOLA: 108 pontos no fio B e duas trocas de fio                                                                                  |
-| C2   | A mesma faixa, definida em milímetros de perfil, continua cobrindo a mesma região depois de mudar a amostra                                                               |
+| Caso | Verificação                                                                                                                                                                                                                       |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1   | P-BOLA gera 402 passos no roteiro antigo (um por ponto baixo, aumento ou diminuição); o modo de leitura (D-66) gera 129: 105 cadeias e 2 slides em cada um dos 12 marcos                                                          |
+| T2   | Cada passo de aumento tem 2 nós e 1 pai; cada passo de diminuição tem 1 nó e 2 pais                                                                                                                                               |
+| T3   | Alerta `rowStart` no primeiro passo de cada volta                                                                                                                                                                                 |
+| R1   | Modo de leitura de P-BOLA: 12 marcos, 129 entradas (105 cadeias e 24 slides); volta 3 tem 12 cadeias com `(1 pb, 1 aum) x6` e "repetição i de 6"                                                                                  |
+| R2   | `#marco texto` depois de uma volta vira marco, sai uma vez só ao imprimir (também com fios) e vai e volta no arquivo do projeto                                                                                                   |
+| R3   | Teclas do modo de leitura: Espaço, →, ←, Backspace, ↑, ↓, Pg Up, Pg Dn, Home, End, F, R, 1 a 6, 0, Esc; Espaço não aciona o botão com foco; nada edita no modo de leitura                                                         |
+| R4   | Layout salvo com a antiga janela Tutorial (ativa, sozinha numa folha, desligada, nomeado) abre sem erro                                                                                                                           |
+| L1   | Todo comando tem classe (feature, sessão ou consulta) e toda classe é de um comando que existe                                                                                                                                    |
+| L2   | Reexecutar a linha do tempo a partir do projeto-base dá o mesmo projeto, com uids e seleção (helper nos testes de peças, pontos, pintura, árvore e montagens; `timeline.verify` nos e2e de pontos, pintura, montagem e materiais) |
+| L3   | Desfazer e refazer movem o marcador; pintar, desfazer e a pintura some; feature nova entra no marcador e as de depois continuam; ids novos não repetem                                                                            |
+| L4   | Suprimir uma feature faz as que dependem dela falharem (vermelho) e as outras seguem; editar parâmetros e excluir reexecutam                                                                                                      |
+| L5   | Arquivo do projeto e navegador guardam a linha do tempo; arquivo antigo ou linha do tempo fora de sincronia abre sem histórico e sem perder o projeto                                                                             |
+| C1   | Faixa do fio B entre as voltas 7 e 9 de P-BOLA: 108 pontos no fio B e duas trocas de fio                                                                                                                                          |
+| C2   | A mesma faixa, definida em milímetros de perfil, continua cobrindo a mesma região depois de mudar a amostra                                                                                                                       |
 
 ## 9. Propriedades gerais
 

@@ -61,3 +61,9 @@ export async function closePalette(page: Page): Promise<void> {
   if (await page.getByTestId("yarns-window").count())
     await page.getByRole("button", { name: "Fechar Paleta de fios" }).click();
 }
+
+/** A linha do tempo reexecutada dá o mesmo projeto que a tela mostra (G6): chamar no fim dos testes de uso real. */
+export async function expectTimelineOk(page: Page): Promise<void> {
+  const r = await page.evaluate(() => window.__timeline?.verify());
+  if (!r?.ok) throw new Error(`a reexecução da linha do tempo difere em ${r?.diff ?? "?"}`);
+}

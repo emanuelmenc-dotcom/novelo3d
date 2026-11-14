@@ -1193,3 +1193,73 @@ input.num {
   text-align: left;
   min-height: 2rem;
 }
+
+/* linha do tempo de features (G6): faixa fina sob o 3D, só ícones */
+.timeline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.125rem;
+  min-height: 1.75rem;
+  padding: 0.125rem 0.25rem;
+  border-top: 1px solid var(--line);
+  background: var(--card);
+}
+.tl-nav,
+.tl-item {
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0.125rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tl-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.125rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tl-item.off {
+  opacity: 0.4;
+}
+.tl-item.sup {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.tl-item.failed {
+  color: var(--err);
+  border-color: var(--err);
+}
+.tl-item.on {
+  outline: 2px solid var(--fg);
+}
+.tl-marker::after {
+  content: "";
+  display: inline-block;
+  width: 0.1875rem;
+  height: 1.5rem;
+  margin-left: 0.125rem;
+  background: var(--ok);
+  vertical-align: middle;
+}
+.tl-panel {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+.tl-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.tl-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}

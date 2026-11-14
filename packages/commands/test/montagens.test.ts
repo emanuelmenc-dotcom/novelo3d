@@ -2,7 +2,7 @@
 // Montagens (G5): agrupam peças e outras montagens, com posição e rotação próprias; apagar leva tudo o que há dentro.
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { dispatch, resetParts, setTreeSelected } from "../src/index.ts";
-import { expectReplayMatchesLive, skipReplayCheck } from "./replay-check.ts";
+import { expectReplayMatchesLive } from "./replay-check.ts";
 
 const TEXT = "V1: 6 pb no anel mágico (6)\nV2: 6 aum (12)";
 interface Node {
@@ -119,7 +119,6 @@ describe("posição e rotação", () => {
     const n = layout().nodes.length;
     dispatch("assembly.setVisible", { id: "a1", visible: false });
     expect(layout().nodes.length).toBe(n / 2);
-    skipReplayCheck();
     dispatch("history.undo"); // desfaz a criação, não o esconder
     expect(tree().some((x) => x.kind === "assembly")).toBe(false);
   });
@@ -151,7 +150,6 @@ describe("apagar", () => {
     dispatch("assembly.remove", { id: "a1", confirm: true });
     expect(tree().map((n) => n.id)).toEqual(["p1"]);
     expect((dispatch("seam.list") as { seams: unknown[] }).seams).toEqual([]);
-    skipReplayCheck();
     dispatch("history.undo");
     expect(tree().some((n) => n.id === "a1")).toBe(true);
   });

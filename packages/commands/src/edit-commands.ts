@@ -34,16 +34,12 @@ import {
   type Yarn,
 } from "@novelo/core";
 import {
-  beginGroup,
   clearEdits,
   clearSelection,
   type Engine,
   editSnapshot,
-  endGroup,
   engineFor,
   ensurePositions,
-  redo,
-  redoTick,
   refreshColumns,
   selectedUids,
   selectionMask,
@@ -52,13 +48,10 @@ import {
   sizeOfTension,
   TENSION_MAX,
   TENSION_MIN,
-  undo,
-  undoTick,
   writeEach,
   writeProp,
 } from "./edit-store.ts";
 import { paintSnapshot } from "./paint-store.ts";
-import { partsRedoTick, partsUndoTick, redoParts, undoParts } from "./parts-store.ts";
 
 type Params = Record<string, unknown>;
 type Cmd = (p: Params) => unknown;
@@ -399,37 +392,9 @@ export const editCommands: Record<string, Cmd> = {
   "edit.setDefaultTension": (p) => ({ edit: setDefaultTension(num(p, "value")) }),
   /** Apaga todas as edições de fio e tensão por ponto (a pintura por regras continua). */
   "edit.clear": () => ({ edit: clearEdits() }),
-  /** Começa um traço: as edições até history.end viram um único passo de desfazer (pincel arrastado). */
-  "history.begin": () => {
-    beginGroup();
-    return { ok: true };
-  },
-  "history.end": () => {
-    endGroup();
-    return { ok: true };
-  },
-  /** Se há o que desfazer/refazer (edições por ponto, peças e costuras, na ordem em que aconteceram). */
-  "history.get": () => ({
-    canUndo: undoTick() > 0 || partsUndoTick() > 0,
-    canRedo: redoTick() > 0 || partsRedoTick() > 0,
-  }),
-  /** Desfaz a ação mais recente, seja de pontos (fio, tensão) ou de peças e costuras. */
-  "history.undo": () => {
-    const e = undoTick();
-    const q = partsUndoTick();
-    if (e === 0 && q === 0) throw new Error("nada para desfazer");
-    if (e >= q) undo();
-    else undoParts();
-    return { edit: editSnapshot() };
-  },
-  "history.redo": () => {
-    const e = redoTick();
-    const q = partsRedoTick();
-    if (e === 0 && q === 0) throw new Error("nada para refazer");
-    if (e >= q) redo();
-    else redoParts();
-    return { edit: editSnapshot() };
-  },
+  /** Começa um traço de pincel: as ferramentas de pontos até history.end viram uma feature só da linha do tempo. */
+  "history.begin": () => ({ ok: true }),
+  "history.end": () => ({ ok: true }),
 };
 
 export { newMask, TENSION_MAX, TENSION_MIN };

@@ -3,7 +3,15 @@
 // em todo o projeto, e fechar a montagem.
 import { mkdirSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
-import { closePalette, goProps, goTree, openPalette, openViewMenu, ribbon } from "./ribbon.ts";
+import {
+  closePalette,
+  expectTimelineOk,
+  goProps,
+  goTree,
+  openPalette,
+  openViewMenu,
+  ribbon,
+} from "./ribbon.ts";
 
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
 const N = 433;
@@ -155,4 +163,5 @@ test("fechar a montagem leva as bordas costuradas a se encontrarem", async ({ pa
   await page.getByTestId("assembly-undo-close").click();
   await goProps(page, "part");
   await expect(page.getByLabel("Posição X da peça")).toHaveValue("40");
+  await expectTimelineOk(page);
 });

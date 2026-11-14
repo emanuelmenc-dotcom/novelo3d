@@ -4,7 +4,7 @@ import { mkdirSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, type Page, test } from "@playwright/test";
-import { openViewMenu, ribbon, showTab } from "./ribbon.ts";
+import { expectTimelineOk, openViewMenu, ribbon, showTab } from "./ribbon.ts";
 
 const PORT = 47899;
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
@@ -116,6 +116,7 @@ test("selecionar por volta e por retângulo, pintar fio, tensão, desfazer e per
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(433);
   await expect(page.getByTestId("points-info")).toContainText("72 pontos editados");
   await expect.poll(() => page.evaluate((i) => window.__view3d?.nodeColor(i), p.id)).toBe("#f4f1e8");
+  await expectTimelineOk(page);
 });
 
 test("pincel arrastado pinta pontos vizinhos; Alt + arrasto gira a câmera", async ({ page }) => {
@@ -149,6 +150,7 @@ test("pincel arrastado pinta pontos vizinhos; Alt + arrasto gira a câmera", asy
   await page.keyboard.up("Alt");
   const after = await page.evaluate(() => window.__view3d?.state().viewDir);
   expect(after).not.toEqual(before);
+  await expectTimelineOk(page);
 });
 
 test("o MCP seleciona, valida cadeia, edita tensão e a interface acompanha", async ({ page }) => {

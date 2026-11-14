@@ -350,17 +350,18 @@ describe("achados da revisão do R0", () => {
   );
   type Sel = { count: number; uids: number[] };
 
-  test("desfazer um movimento de peça não devolve receita antiga", () => {
+  test("desfazer logo depois de digitar a receita desfaz a digitação e não o movimento da peça", () => {
     resetParts(text);
     dispatch("parts.instance", { id: "p1" });
     dispatch("parts.set", { id: "p2", pos: [5, 0, 0] });
     const novo = `${text}\nV5: 12 pb (12)`;
     dispatch("parts.setText", { id: "p1", text: novo });
-    dispatch("history.undo", {}); // desfaz o movimento
-    const parts = dispatch("parts.get", {}) as { parts: { id: string }[] };
+    dispatch("history.undo", {}); // a receita digitada virou uma feature: é ela que sai
+    const parts = dispatch("parts.get", {}) as { parts: { id: string; pos: number[] }[] };
     expect(parts.parts).toHaveLength(2);
+    expect(parts.parts[1]?.pos).toEqual([5, 0, 0]); // o movimento continua
     const lay = dispatch("assembly.layout", {}) as { nodes: { part: string }[] };
-    expect(lay.nodes.filter((n) => n.part === "p1")).toHaveLength(1 + 6 + 12 + 12 + 12 + 12); // com a V5
+    expect(lay.nodes.filter((n) => n.part === "p1")).toHaveLength(1 + 6 + 12 + 12 + 12); // sem a V5
   });
 
   test("depois de recarregar, o casamento em dois níveis continua valendo", () => {
@@ -415,13 +416,13 @@ describe("achados da revisão do R0", () => {
     expect(JSON.stringify(exportEditAll().p1?.uids)).toBe(before);
   });
 
-  test("ação nova em uma pilha limpa o refazer da outra", () => {
+  test("ação nova com o marcador voltado entra no marcador e o que vinha depois continua (D-68)", () => {
     resetParts(text);
     dispatch("tool.brush", { text, uid: 8, hops: 0, prop: "yarn", value: "B" });
     dispatch("history.undo", {});
     expect((dispatch("history.get", {}) as { canRedo: boolean }).canRedo).toBe(true);
     dispatch("parts.add", { name: "X", text });
-    expect((dispatch("history.get", {}) as { canRedo: boolean }).canRedo).toBe(false);
+    expect((dispatch("history.get", {}) as { canRedo: boolean }).canRedo).toBe(true);
   });
 });
 

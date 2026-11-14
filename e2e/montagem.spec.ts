@@ -2,7 +2,7 @@
 // Aceite do P3.5 (montagem): peça espelhada, seleção em duas peças, costura entre elas, validação, 3D e persistência.
 import { mkdirSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
-import { goProps, goTree, openViewMenu, ribbon, showTab } from "./ribbon.ts";
+import { expectTimelineOk, goProps, goTree, openViewMenu, ribbon, showTab } from "./ribbon.ts";
 
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
 const N = 433;
@@ -114,6 +114,7 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().seamSegments)).toBe(36);
   await goTree(page);
   await expect(page.locator("[data-seam]")).toHaveCount(1);
+  await expectTimelineOk(page);
 });
 
 test("instância acompanha a edição da original; cópia não", async ({ page }) => {
@@ -141,6 +142,7 @@ test("instância acompanha a edição da original; cópia não", async ({ page }
   await page.getByLabel("Editar Peça 1 (cópia)").check();
   await showTab(page, "Receita");
   await expect(page.getByLabel("Receita", { exact: true })).toHaveValue(/V17: 6 dim \(6\)/);
+  await expectTimelineOk(page);
 });
 
 test("copiar uma peça grava as edições dela no disco", async ({ page }) => {

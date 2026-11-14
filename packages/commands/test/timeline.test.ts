@@ -46,14 +46,15 @@ describe("gravação", () => {
     expect(timelineView().features).toEqual([]);
   });
 
-  test("receita: texto igual não grava e edições seguidas da mesma peça viram uma feature só", () => {
+  test("receita: texto igual não grava e edições seguidas da mesma peça ficam cada uma a sua feature (juntar mudaria os uids)", () => {
+    dispatch("points.info", { text: TEXT }); // motor construído e confirmado
     dispatch("parts.commitText", { id: "p1" }); // foco saiu sem mudar nada
     expect(timelineView().features).toEqual([]);
     dispatch("parts.setText", { id: "p1", text: `${TEXT}\nV4: 18 pb (18)` });
     dispatch("parts.commitText", { id: "p1" });
     dispatch("parts.setText", { id: "p1", text: `${TEXT}\nV4: 18 pb (18)\nV5: 18 pb (18)` });
     dispatch("parts.commitText", { id: "p1" });
-    expect(methods()).toEqual(["parts.commitText"]);
+    expect(methods()).toEqual(["parts.commitText", "parts.commitText"]);
   });
 
   test("um traço de pincel (history.begin...end) é uma feature só", () => {
@@ -188,5 +189,168 @@ V4: 18 pb (18)`,
     dispatch("timeline.rollTo", { index: 2 });
     expect(methods()).toContain("parts.commitText");
     expect((dispatch("parts.get") as { parts: { id: string }[] }).parts.length).toBeGreaterThan(0);
+  });
+});
+
+describe("buracos de reexecução (revisão do advisor)", () => {
+  test("gravar com o marcador voltado não repete ids de features que vêm depois", () => {
+    dispatch("parts.instance", { id: "p1" }); // p2
+    dispatch("paint.rows", { yarn: "B", from: 2, to: 2 });
+    dispatch("parts.copy", { id: "p1" }); // p3
+    dispatch("timeline.rollTo", { index: 1 });
+    dispatch("parts.instance", { id: "p1" }); // novo: não pode ser p3
+    dispatch("timeline.rollTo", { index: 4 });
+    const found = ids();
+    expect(new Set(found).size).toBe(found.length);
+    expect(found).toHaveLength(4);
+  });
+
+  test("a seleção de pontos e o tutorial continuam depois de reexecutar", () => {
+    dispatch("parts.instance", { id: "p1" });
+    dispatch("selection.select", { text: TEXT, by: { kind: "group", from: 2, to: 2 } });
+    dispatch("tutorial.goto", { text: TEXT, round: 2 });
+    const sel = dispatch("selection.get", { text: TEXT, all: true }) as { uids: number[] };
+    const tut = (dispatch("tutorial.get", { text: TEXT }) as { index: number }).index;
+    replayTimeline();
+    expect((dispatch("selection.get", { text: TEXT, all: true }) as { uids: number[] }).uids).toEqual(
+      sel.uids,
+    );
+    expect((dispatch("tutorial.get", { text: TEXT }) as { index: number }).index).toBe(tut);
+  });
+
+  test("editar pontos de uma volta nova, com a receita digitada e sem confirmar, fica na ordem certa", () => {
+    const novo = `${TEXT}
+V4: (2 pb, 1 aum) x6 (24)`;
+    dispatch("parts.setText", { id: "p1", text: novo });
+    dispatch("selection.select", { text: novo, by: { kind: "group", from: 4, to: 4 } });
+    dispatch("points.set", { text: novo, prop: "tension", value: 0.5 });
+    // selection.select já confirmou a receita nova no motor: ela faz parte da base, só a edição de pontos é feature
+    expect(methods()).toEqual(["points.set"]);
+  });
+
+  test("só o dialeto mudou: vira feature de receita", () => {
+    dispatch("parts.instance", { id: "p1" });
+    dispatch("points.info", { text: TEXT }); // motor construído e confirmado
+    dispatch("parts.setText", { id: "p1", text: TEXT, dialect: "pt-BR" });
+    dispatch("parts.commitText", { id: "p1" });
+    expect(methods()).toEqual(["parts.instance", "parts.commitText"]);
+  });
+
+  test("duas inserções no meio da receita seguidas de edição de ponto reexecutam iguais (uids)", () => {
+    const base = ["V1: 6 pb no anel mágico (6)", "V2: 6 aum (12)"];
+    const a = [...base, "V3: 12 pb (12)", "V4: (1 pb, 1 aum) x6 (18)"].join("\n");
+    const b = [...base, "V3: 12 pb (12)", "V4: 12 pb (12)", "V5: (1 pb, 1 aum) x6 (18)"].join("\n");
+    dispatch("parts.instance", { id: "p1" });
+    dispatch("points.info", { text: TEXT }); // motor com a receita de partida
+    dispatch("parts.setText", { id: "p1", text: a });
+    dispatch("parts.commitText", { id: "p1" });
+    dispatch("parts.setText", { id: "p1", text: b });
+    dispatch("parts.commitText", { id: "p1" });
+    dispatch("selection.select", { text: b, by: { kind: "group", from: 4, to: 4 } });
+    dispatch("points.set", { text: b, prop: "tension", value: -0.3 });
+  });
+});
+
+describe("desfazer e refazer pela linha do tempo", () => {
+  test("pintar, desfazer: a pintura some; refazer: volta (a pintura passa a ser desfazível)", () => {
+    dispatch("paint.rows", { yarn: "B", from: 2, to: 2 });
+    expect(rowsPainted()).toBeGreaterThan(0);
+    dispatch("history.undo");
+    expect(rowsPainted()).toBe(0);
+    expect(dispatch("history.get")).toEqual({ canUndo: false, canRedo: true });
+    dispatch("history.redo");
+    expect(rowsPainted()).toBeGreaterThan(0);
+    expect(() => dispatch("history.redo")).toThrow("nada para refazer");
+  });
+
+  test("desfazer sem nada é erro claro", () => {
+    expect(() => dispatch("history.undo")).toThrow("nada para desfazer");
+  });
+
+  test("o tipo de costura e o fio novo ficam como eram quando a feature foi gravada", () => {
+    dispatch("parts.instance", { id: "p1" });
+    dispatch("selection.select", { text: TEXT, by: { kind: "group", from: 3, to: 3 } });
+    dispatch("seam.draft", { side: "a" });
+    dispatch("parts.setActive", { id: "p2" });
+    dispatch("seam.draft", { side: "b" });
+    dispatch("seam.add", {});
+    dispatch("yarns.add", {});
+    const type = (dispatch("seam.list") as { seams: { type: string }[] }).seams[0]?.type;
+    const palette = JSON.stringify((dispatch("yarns.get") as { yarns: unknown[] }).yarns);
+    dispatch("settings.set", { yarns: { seam: { type: "whip" } } });
+    replayTimeline();
+    expect((dispatch("seam.list") as { seams: { type: string }[] }).seams[0]?.type).toBe(type);
+    expect(JSON.stringify((dispatch("yarns.get") as { yarns: unknown[] }).yarns)).toBe(palette);
+    dispatch("settings.reset", {});
+  });
+
+  test("um traço de pincel que ficou aberto não engole as features seguintes", () => {
+    dispatch("history.begin");
+    dispatch("tool.brush", { text: TEXT, uid: 3, hops: 0, prop: "tension", value: 0.5 });
+    dispatch("parts.instance", { id: "p1" }); // fecha o traço
+    expect(methods()).toEqual(["group", "parts.instance"]);
+  });
+});
+
+describe("arquivo do projeto", () => {
+  test("a linha do tempo vai no arquivo e, ao abrir, o desfazer continua de onde estava", () => {
+    dispatch("parts.instance", { id: "p1" });
+    dispatch("paint.rows", { yarn: "B", from: 2, to: 2 });
+    dispatch("history.undo");
+    const file = JSON.parse(JSON.stringify(dispatch("project.export")));
+    expect(file.timeline).toMatchObject({ version: 1, marker: 1 });
+    resetParts(TEXT);
+    expect(timelineView().features).toEqual([]);
+    dispatch("project.import", { project: file });
+    expect(methods()).toEqual(["parts.instance", "paint.rows"]);
+    expect(timelineView().marker).toBe(1);
+    expect(ids()).toEqual(["p1", "p2"]);
+    dispatch("history.redo");
+    expect(rowsPainted()).toBeGreaterThan(0);
+    dispatch("history.undo");
+    dispatch("history.undo");
+    expect(ids()).toEqual(["p1"]);
+  });
+
+  test("arquivo antigo (sem linha do tempo) ou com ela estragada abre com a linha do tempo vazia", () => {
+    dispatch("parts.instance", { id: "p1" });
+    const file = JSON.parse(JSON.stringify(dispatch("project.export")));
+    for (const bad of [
+      undefined,
+      null,
+      5,
+      { version: 9 },
+      { version: 1, base: {}, features: [] },
+      { ...file.timeline, features: [{ x: 1 }] },
+    ]) {
+      resetParts(TEXT);
+      dispatch("project.import", { project: { ...file, timeline: bad } });
+      expect(timelineView().features).toEqual([]);
+      expect(ids()).toEqual(["p1", "p2"]); // o projeto abre do mesmo jeito
+    }
+  });
+
+  test("tamanho do arquivo depois de 50 traços numa receita grande", () => {
+    const rows = ["V1: 6 pb no anel mágico (6)", "V2: 6 aum (12)"];
+    for (let i = 3; i <= 45; i++) rows.push(`V${i}: (${i - 2} pb, 1 aum) x6 (${6 * i})`);
+    const big = rows.join("\n");
+    resetParts(big);
+    dispatch("points.info", { text: big });
+    const last = (dispatch("points.info", { text: big }) as { lastUid: number }).lastUid;
+    for (let k = 0; k < 50; k++) {
+      dispatch("history.begin");
+      for (let j = 0; j < 12; j++)
+        dispatch("tool.brush", {
+          text: big,
+          uid: last - 10 - k * 20 - j,
+          hops: 1,
+          prop: "tension",
+          value: 0.5,
+        });
+      dispatch("history.end");
+    }
+    const bytes = JSON.stringify(dispatch("project.export")).length;
+    console.log(`arquivo com 50 traços: ${(bytes / 1024).toFixed(0)} KB`);
+    expect(bytes).toBeLessThan(5_000_000);
   });
 });

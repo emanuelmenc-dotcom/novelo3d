@@ -4,6 +4,7 @@
 import { exportEditAll, loadEditAll } from "./edit-store.ts";
 import { exportPaintAll, loadPaintAll } from "./paint-store.ts";
 import { exportParts, loadParts, partsSnapshot, rootOf, validPartCount } from "./parts-store.ts";
+import { exportTimeline, importTimeline } from "./timeline.ts";
 import { exportTutorial, loadTutorial } from "./tutorial-store.ts";
 
 type Params = Record<string, unknown>;
@@ -38,12 +39,13 @@ export function importProject(raw: unknown, checkOnly = false): { parts: number 
   loadPaintAll(o.paint, root);
   loadEditAll(o.edit, root);
   loadTutorial(o.tutorial); // projetos antigos não têm: a posição recomeça
+  importTimeline(o.timeline); // projetos antigos não têm: a linha do tempo recomeça vazia
   return { parts: partsSnapshot().parts.length };
 }
 
 export const projectCommands: Record<string, (p: Params) => unknown> = {
   /** Todo o projeto como JSON (versão 1): parts, edit, paint. */
-  "project.export": () => exportProject(),
+  "project.export": () => ({ ...exportProject(), timeline: exportTimeline() }),
   /** Substitui o projeto atual por `project` (o JSON de `project.export`). Com `check: true` só confere o arquivo, sem carregar. Erro claro e nada muda se o arquivo for inválido. */
   "project.import": (p) => importProject(p.project, p.check === true),
 };

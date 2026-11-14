@@ -81,12 +81,15 @@ import { stitchEditorCommands } from "./stitch-editor-commands.ts";
 import {
   commitPending,
   editFeature,
+  exportTimeline,
+  importTimeline,
   kindOf,
   labelOf,
   recordAndRun,
   removeFeature,
   replay as replayTimelineWith,
   rollTo,
+  setRawRunner,
   setSuppressed,
   timelineView,
 } from "./timeline.ts";
@@ -770,7 +773,9 @@ export function replayTimeline(upTo?: number): void {
 export { CLASS as COMMAND_CLASS, subscribeTimeline, timelineVersion, timelineView } from "./timeline.ts";
 
 const runRaw = (m: string, p: Params): unknown => (commands[m] as Command)(p);
-const flushText = (): void => commitPending(runRaw);
+setRawRunner(runRaw);
+/** Confirma a receita digitada e pendente (vira feature) antes de operar sobre a linha do tempo. */
+export const flushText = (): void => commitPending(runRaw);
 const timelineOut = (full?: number) => {
   const t = timelineView();
   const one = full === undefined ? undefined : t.features.find((f) => f.id === full);
@@ -793,7 +798,81 @@ const timelineOut = (full?: number) => {
     })),
   };
 };
+/** O projeto com o motor de pontos de cada peça original já construído, para comparar dois estados. */
+function comparable(): unknown {
+  const st = dispatch("project.export") as {
+    parts: { parts: { id: string; kind: string; text: string; dialect?: string }[] };
+    edit: Record<string, Record<string, unknown>>;
+  };
+  for (const p of st.parts.parts) {
+    if (p.kind !== "own" || p.text.trim() === "") continue;
+    try {
+      dispatch("points.info", { text: p.text, ...(p.dialect ? { dialect: p.dialect } : {}) });
+    } catch {
+      // receita inválida: sem motor
+    }
+  }
+  const out = dispatch("project.export") as typeof st & { timeline?: unknown };
+  out.timeline = undefined;
+  for (const p of out.parts.parts) if (p.kind !== "own") delete out.edit[p.id];
+  return JSON.parse(JSON.stringify(out));
+}
+
+/** Primeiro caminho em que dois valores JSON diferem (null se iguais). */
+function firstDiff(a: unknown, b: unknown, path = "$"): string | null {
+  if (a === b) return null;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return path;
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const k of keys) {
+    const d = firstDiff((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], `${path}.${k}`);
+    if (d) return d;
+  }
+  return null;
+}
+
 Object.assign(commands, {
+  /** A linha do tempo para gravar (base, features, marcador); null se está vazia. */
+  "timeline.save": () => exportTimeline(),
+  /** Carrega uma linha do tempo gravada (inválida vira vazia). */
+  "timeline.load": (p: Params) => {
+    importTimeline(p.timeline);
+    return timelineOut();
+  },
+  /** Se há o que desfazer ou refazer: o marcador da linha do tempo. */
+  "history.get": () => ({
+    canUndo: timelineView().marker > 0,
+    canRedo: timelineView().marker < timelineView().features.length,
+  }),
+  /** Desfaz: o marcador volta uma feature e o projeto é reexecutado até ali. */
+  "history.undo": () => {
+    flushText();
+    const m = timelineView().marker;
+    if (m === 0) throw new Error("nada para desfazer");
+    rollTo(m - 1, runRaw);
+    return timelineOut();
+  },
+  "history.redo": () => {
+    flushText();
+    const t = timelineView();
+    if (t.marker >= t.features.length) throw new Error("nada para refazer");
+    rollTo(t.marker + 1, runRaw);
+    return timelineOut();
+  },
+  /** Reexecuta a linha do tempo e confere que o projeto fica igual ao de antes; devolve o primeiro caminho que difere. */
+  "timeline.verify": (p: Params) => {
+    flushText();
+    const before = comparable();
+    const keep = p.keep === true ? JSON.parse(JSON.stringify(dispatch("project.export"))) : null;
+    replayTimeline();
+    const diff = firstDiff(before, comparable());
+    // `keep`: se a reexecução não bate (linha do tempo velha, gravada fora de sincronia), o projeto de antes volta
+    // inteiro e a linha do tempo recomeça vazia: nunca se perde o que estava na tela
+    if (diff && keep) {
+      keep.timeline = undefined;
+      dispatch("project.import", { project: keep });
+    }
+    return { ok: diff === null, diff, features: timelineView().features.length };
+  },
   /** Linha do tempo: features na ordem, marcador (quantas estão em vigor) e, com `id`, os parâmetros de uma. */
   "timeline.get": (p: Params) => timelineOut(typeof p.id === "number" ? p.id : undefined),
   /** Leva o marcador para `index` (0 a total): reexecuta só as features até ali. */

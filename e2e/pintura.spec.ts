@@ -5,7 +5,7 @@ import { mkdirSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, type Page, test } from "@playwright/test";
-import { closePalette, openPalette, showTab } from "./ribbon.ts";
+import { closePalette, expectTimelineOk, openPalette, showTab } from "./ribbon.ts";
 
 const PORT = 47893;
 
@@ -67,6 +67,7 @@ test("pintar 3 voltas: trocas nas linhas certas, consumo, gráfico, 3D e persist
   await openPalette(page);
   await expect(page.locator('[data-paint="0"]')).toContainText("Voltas 7–9");
   await expect(page.getByTestId("recipe-yarns")).toHaveValue(/V7–9: trocar para o fio B/);
+  await expectTimelineOk(page);
 });
 
 test("pintar a partir da seleção (volta da tabela e ponto do 3D) e trocar a cor de um fio", async ({
@@ -99,6 +100,7 @@ test("pintar a partir da seleção (volta da tabela e ponto do 3D) e trocar a co
   await page.getByRole("button", { name: "Limpar pintura" }).click();
   await expect(page.locator("[data-paint]")).toHaveCount(0);
   await expect(page.getByTestId("recipe-yarns")).not.toHaveValue(/trocar para/);
+  await expectTimelineOk(page);
 });
 
 test("paleta: adicionar e remover fios", async ({ page }) => {

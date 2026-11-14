@@ -83,10 +83,10 @@ describe("project.export / project.import", () => {
     expect(JSON.stringify(dispatch("project.export"))).toBe(before);
   });
 
-  test("desfazer logo depois de abrir um projeto não mexe no projeto aberto", () => {
+  test("arquivo sem linha do tempo: desfazer logo depois de abrir não mexe no projeto aberto", () => {
     resetParts(TEXT);
     dispatch("paint.rows", { yarn: "B", from: 2, to: 2 });
-    const file = JSON.parse(JSON.stringify(dispatch("project.export")));
+    const file = { ...JSON.parse(JSON.stringify(dispatch("project.export"))), timeline: undefined };
     resetParts("V1: 6 pb no anel mágico (6)");
     dispatch("project.import", { project: file });
     const opened = JSON.stringify(dispatch("project.export"));

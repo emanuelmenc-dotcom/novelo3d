@@ -3,8 +3,9 @@
 // reexecutar a partir de um projeto-base. Cada feature guarda os parâmetros com as entradas "ambientes" já resolvidas
 // (seleção em uids, peça ativa, texto da receita), para que reexecutar nunca dependa do que está selecionado agora.
 // Só `dispatch` de nível mais alto grava: chamadas de um comando para outro e a própria reexecução não gravam.
-import { selectedUids } from "./edit-store.ts";
+import { exportEditAll, selectedUids, setSlotSelection } from "./edit-store.ts";
 import { onProjectReset } from "./history-tick.ts";
+import { paintSnapshot } from "./paint-store.ts";
 import {
   getIdCounters,
   partsSnapshot,
@@ -14,9 +15,12 @@ import {
   setIdCounters,
   setPartsHidden,
   useRoot,
+  withPart,
 } from "./parts-store.ts";
 import { exportProject, importProject } from "./project-commands.ts";
+import { getSettings } from "./settings.ts";
 import { setTreeSelected, treeSelected } from "./tree-store.ts";
+import { exportTutorial, loadTutorial } from "./tutorial-store.ts";
 
 type Params = Record<string, unknown>;
 
@@ -124,6 +128,9 @@ export const CLASS: Record<string, Class> = Object.fromEntries([
     "workspace.showPanel",
   ]),
   ["project.import", "project"],
+  ["timeline.verify", "session"],
+  ["timeline.load", "session"],
+  ["timeline.save", "query"],
   ...group("session", ["timeline.rollTo", "timeline.suppress", "timeline.edit", "timeline.remove"]),
   ...group("query", [
     "assembly.contents",
@@ -220,6 +227,27 @@ let depth = 0;
 let openGroup: Feature[] | null = null;
 /** Último texto gravado por peça: `parts.commitText` com o mesmo texto não vira feature. */
 const lastText = new Map<string, string>();
+const lastRaw = new Map<string, { text: string; dialect?: string }>();
+const setCommitted = (id: string, t: { text: string; dialect?: string }): void => {
+  lastRaw.set(id, { text: t.text, ...(t.dialect ? { dialect: t.dialect } : {}) });
+  lastText.set(id, textKey(t));
+};
+const clearCommitted = (): void => {
+  lastText.clear();
+  lastRaw.clear();
+};
+/** Maiores contadores de ids já usados: ids novos nunca repetem um que uma feature de depois do marcador vai gerar. */
+let highWater = { part: 0, seam: 0, asm: 0 };
+let rawRun: ((m: string, p: Params) => unknown) | null = null;
+/** Quem monta o mapa de comandos entrega aqui o executor sem gravação. */
+export const setRawRunner = (fn: (m: string, p: Params) => unknown): void => {
+  rawRun = fn;
+};
+const maxC = (a: typeof highWater, b: typeof highWater): typeof highWater => ({
+  part: Math.max(a.part, b.part),
+  seam: Math.max(a.seam, b.seam),
+  asm: Math.max(a.asm, b.asm),
+});
 let version = 0;
 const listeners = new Set<() => void>();
 
@@ -236,9 +264,58 @@ export const timelineView = (): TimelineView => ({ features, marker, hasBase: ba
 export const isReplaying = (): boolean => replaying;
 
 /** O texto de cada receita no momento: só um texto diferente dele vira feature de receita. */
+const textKey = (p: { text: string; dialect?: string }): string => `${p.dialect ?? ""}|${p.text}`;
 function seedTexts(): void {
-  for (const p of partsSnapshot().parts)
-    if (p.kind === "own" && !lastText.has(p.id)) lastText.set(p.id, p.text);
+  const all = exportEditAll(partsSnapshot().parts.map((q) => q.id)) as Record<
+    string,
+    { uids?: { text?: string } }
+  >;
+  for (const p of partsSnapshot().parts) {
+    const committed = all[p.id]?.uids?.text;
+    // sem motor de pontos ainda não houve confirmação: a primeira vira feature
+    if (p.kind === "own" && !lastText.has(p.id) && typeof committed === "string")
+      setCommitted(p.id, { text: committed, ...(p.dialect ? { dialect: p.dialect } : {}) });
+  }
+}
+
+const FILE_VERSION = 1;
+
+/** A linha do tempo para o arquivo do projeto e o navegador: base, features em ordem e o marcador. */
+export function exportTimeline(): unknown {
+  if (base === null || features.length === 0) return null;
+  return { version: FILE_VERSION, base, features: clone(features), marker, nextId };
+}
+
+/** Carrega a do arquivo; inválida ou ausente (arquivo antigo) vira linha do tempo vazia, sem erro. */
+export function importTimeline(raw: unknown): void {
+  if (replaying) return;
+  resetTimeline(true);
+  const o = raw as {
+    version?: unknown;
+    base?: unknown;
+    features?: unknown;
+    marker?: unknown;
+    nextId?: unknown;
+  } | null;
+  if (!o || typeof o !== "object" || o.version !== FILE_VERSION) return;
+  const b = o.base as { app?: unknown; parts?: unknown } | null;
+  if (!b || typeof b !== "object" || b.app !== "novelo3d" || !Array.isArray(o.features)) return;
+  const fs = (o.features as Feature[]).filter(
+    (f) =>
+      f &&
+      typeof f.id === "number" &&
+      typeof f.method === "string" &&
+      f.params &&
+      typeof f.params === "object",
+  );
+  if (fs.length !== o.features.length) return;
+  base = clone(b) as ReturnType<typeof exportProject>;
+  features = fs.map((f) => ({ ...f, status: "ok" as const, error: undefined }));
+  marker = Number.isInteger(o.marker) ? Math.max(0, Math.min(fs.length, o.marker as number)) : fs.length;
+  nextId = Math.max(typeof o.nextId === "number" ? o.nextId : 1, ...fs.map((f) => f.id + 1));
+  for (const f of fs) highWater = maxC(highWater, f.counters);
+  seedTexts();
+  emit();
 }
 
 /** Novo projeto ou projeto importado: a linha do tempo recomeça vazia. */
@@ -249,8 +326,9 @@ export function resetTimeline(force = false): void {
   marker = 0;
   base = null;
   openGroup = null;
-  lastText.clear();
+  clearCommitted();
   seedTexts();
+  highWater = getIdCounters();
   emit();
 }
 onProjectReset(() => resetTimeline());
@@ -276,8 +354,14 @@ function normalize(method: string, params: Params): Params | null {
     const id = typeof params.id === "string" ? params.id : active;
     const root = rootOf(id);
     if (root.id !== id) return null;
-    if (lastText.get(id) === root.text) return null; // o foco saiu sem o texto mudar
-    return { id, text: root.text, ...(root.dialect ? { dialect: root.dialect } : {}) };
+    if (lastText.get(id) === textKey(root)) return null; // o foco saiu sem o texto nem o dialeto mudar
+    const was = lastRaw.get(id) ?? base?.parts.parts.find((q) => q.id === id);
+    return {
+      id,
+      text: root.text,
+      ...(root.dialect ? { dialect: root.dialect } : {}),
+      ...(was ? { prev: { text: was.text, ...(was.dialect ? { dialect: was.dialect } : {}) } } : {}),
+    };
   } else if (method === "assembly.add" && params.fromSelection === true) {
     const sel = treeSelected();
     const s = partsSnapshot();
@@ -288,9 +372,22 @@ function normalize(method: string, params: Params): Params | null {
     const d = partsSnapshot().draft;
     if (out.a === undefined && d.a) out.a = d.a;
     if (out.b === undefined && d.b) out.b = d.b;
+    // o tipo de costura padrão vem das configurações: fixa o de agora, para mudar a configuração depois não mudar a costura
+    if (out.type === undefined) out.type = getSettings().yarns.seam.type;
   }
   for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k];
   return clone(out);
+}
+
+/** Garante o motor de pontos da peça com o texto anterior: o app sempre o tem (o 3D calcula), e os uids dependem dele. */
+function ensureEngine(id: string, prev: unknown, run: (m: string, p: Params) => unknown): void {
+  const t = prev as { text?: string; dialect?: string } | undefined;
+  if (!t || typeof t.text !== "string" || t.text.trim() === "") return;
+  try {
+    withPart(id, () => run("points.info", { text: t.text, ...(t.dialect ? { dialect: t.dialect } : {}) }));
+  } catch {
+    // receita anterior inválida: sem motor
+  }
 }
 
 /** Roda uma feature com as entradas resolvidas (sem gravar). */
@@ -302,6 +399,7 @@ function runFeature(f: Feature, run: (m: string, p: Params) => unknown): void {
   setIdCounters(f.counters);
   const { part, ...rest } = f.params as Params & { part?: string };
   if (f.method === "parts.commitText") {
+    ensureEngine(String(rest.id), rest.prev, run);
     run("parts.setText", {
       id: rest.id,
       text: rest.text,
@@ -321,19 +419,7 @@ function runFeature(f: Feature, run: (m: string, p: Params) => unknown): void {
 }
 
 function push(f: Feature): void {
-  const prev = features[marker - 1];
-  // receitas seguidas da mesma peça viram uma feature só
-  if (
-    f.method === "parts.commitText" &&
-    prev?.method === "parts.commitText" &&
-    prev.params.id === f.params.id &&
-    !prev.suppressed &&
-    marker === features.length
-  ) {
-    features[marker - 1] = { ...prev, params: f.params };
-    emit();
-    return;
-  }
+  // cada confirmação de receita é uma feature: juntar A→B→C em A→C muda os uids permanentes dos pontos
   f.id = nextId++;
   // uma feature nova entra no marcador: as de depois dele continuam (D-68)
   features = [...features.slice(0, marker), f, ...features.slice(marker)];
@@ -413,23 +499,64 @@ export function labelOf(f: Feature): string {
 }
 
 /** Peças cujo texto foi digitado e ainda não confirmado: viram feature de receita antes de qualquer operação da linha do tempo. */
-export const pendingTexts = (): string[] =>
-  base === null
-    ? []
-    : partsSnapshot()
-        .parts.filter((p) => p.kind === "own" && lastText.has(p.id) && lastText.get(p.id) !== p.text)
-        .map((p) => p.id);
+export const pendingTexts = (): string[] => {
+  if (base === null) return [];
+  const b = base.parts.parts;
+  return partsSnapshot()
+    .parts.filter((p) => {
+      if (p.kind !== "own") return false;
+      const was =
+        lastText.get(p.id) ??
+        (b.find((q) => q.id === p.id) ? textKey(b.find((q) => q.id === p.id) as typeof p) : undefined);
+      return was !== undefined && was !== textKey(p);
+    })
+    .map((p) => p.id);
+};
 
 /** Confirma os textos pendentes como features de receita (as operações da linha do tempo chamam isto antes de agir). */
 export function commitPending(run: (m: string, p: Params) => unknown): void {
   for (const id of pendingTexts()) {
     const norm = normalize("parts.commitText", { id });
     const counters = getIdCounters();
+    if (norm) ensureEngine(id, norm.prev, run);
     run("parts.commitText", { id });
     if (norm) {
-      lastText.set(String(norm.id), String(norm.text));
+      setCommitted(String(norm.id), rootOf(String(norm.id)));
       push({ id: 0, method: "parts.commitText", params: norm, counters, suppressed: false, status: "ok" });
     }
+  }
+}
+
+/**
+ * Projeto-base: o projeto agora, mas com a receita de cada peça no texto que o motor de pontos já confirmou (digitado e
+ * não confirmado é pendente, vira feature de receita e não faz parte da base).
+ */
+function captureBase(): void {
+  const b = clone(exportProject()) as ReturnType<typeof exportProject> & {
+    edit: Record<string, { uids?: { text?: string } } | undefined>;
+  };
+  for (const p of b.parts.parts) {
+    const committed = b.edit[p.id]?.uids?.text;
+    if (p.kind === "own" && typeof committed === "string" && committed !== p.text) p.text = committed;
+  }
+  base = b;
+  clearCommitted();
+  seedTexts();
+}
+
+function closeGroup(): void {
+  const items = openGroup;
+  openGroup = null;
+  if (items && items.length > 0) {
+    push({
+      id: 0,
+      method: "group",
+      params: {},
+      counters: (items[0] as Feature).counters,
+      suppressed: false,
+      status: "ok",
+      items,
+    });
   }
 }
 
@@ -437,22 +564,13 @@ export function commitPending(run: (m: string, p: Params) => unknown): void {
 export function recordAndRun(method: string, params: Params, run: (p: Params) => unknown): unknown {
   const cls = CLASS[method];
   if (!replaying && depth === 0) {
-    if (method === "history.begin") openGroup = [];
-    if (method === "history.end" && openGroup) {
-      const items = openGroup;
-      openGroup = null;
-      if (items.length > 0) {
-        push({
-          id: 0,
-          method: "group",
-          params: {},
-          counters: (items[0] as Feature).counters,
-          suppressed: false,
-          status: "ok",
-          items,
-        });
-      }
+    if (method === "history.begin") {
+      closeGroup(); // um traço que ficou aberto não engole os seguintes
+      openGroup = [];
     }
+    if (method === "history.end") closeGroup();
+    // só o pincel e as ferramentas de pontos entram num traço; qualquer outra feature fecha o grupo
+    if (cls === "feature" && !method.startsWith("tool.")) closeGroup();
   }
   if (replaying || depth > 0 || cls !== "feature") {
     depth++;
@@ -461,15 +579,17 @@ export function recordAndRun(method: string, params: Params, run: (p: Params) =>
     } finally {
       depth--;
       // abrir outro projeto recomeça a linha do tempo
-      if (cls === "project" && !replaying && depth === 0) resetTimeline(true);
+      // (importProject recomeça a linha do tempo com a do arquivo, se houver)
     }
   }
+  // receita digitada e ainda não confirmada entra antes: o que se grava a seguir pode depender dela
+  if (base === null) captureBase();
+  if (rawRun && method !== "parts.commitText") commitPending(rawRun);
   const norm = normalize(method, params);
-  if (base === null) {
-    base = clone(exportProject());
-    seedTexts();
-  }
+  // ids novos saem de um contador que está acima de tudo que já foi usado, mesmo com o marcador voltado
+  setIdCounters(maxC(getIdCounters(), highWater));
   const counters = getIdCounters();
+  if (method === "parts.commitText" && norm && rawRun) ensureEngine(String(norm.id), norm.prev, rawRun);
   depth++;
   let result: unknown;
   try {
@@ -478,9 +598,21 @@ export function recordAndRun(method: string, params: Params, run: (p: Params) =>
     depth--;
   }
   if (norm !== null) {
-    if (method === "parts.commitText") lastText.set(String(norm.id), String(norm.text));
+    if (method === "parts.commitText") setCommitted(String(norm.id), rootOf(String(norm.id)));
     seedTexts(); // peça nova: o texto dela já é o ponto de partida
-    const f: Feature = { id: 0, method, params: norm, counters, suppressed: false, status: "ok" };
+    highWater = maxC(highWater, getIdCounters());
+    // fio novo: grava a paleta que ele deixou (o padrão e a cor livre vieram das configurações de agora)
+    const f: Feature =
+      method === "yarns.add"
+        ? {
+            id: 0,
+            method: "yarns.set",
+            params: { part: norm.part, yarns: clone(paintSnapshot().yarns) },
+            counters,
+            suppressed: false,
+            status: "ok",
+          }
+        : { id: 0, method, params: norm, counters, suppressed: false, status: "ok" };
     if (openGroup) openGroup.push(f);
     else push(f);
   }
@@ -498,16 +630,18 @@ export function replay(run: (m: string, p: Params) => unknown, upTo = marker): v
   const hiddenAsm = Object.fromEntries(s.assemblies.map((a) => [a.id, !!a.hidden]));
   const active = s.active;
   const sel = treeSelected();
+  const keepEdit = exportEditAll(s.parts.map((p) => p.id));
+  const keepTutorial = exportTutorial();
   replaying = true;
   try {
     importProject(clone(base), false);
-    lastText.clear();
+    clearCommitted();
     seedTexts();
     features = features.map((f, i) => {
       if (i >= upTo || f.suppressed) return { ...f, status: "ok" as const, error: undefined };
       try {
         runFeature(f, run);
-        if (f.method === "parts.commitText") lastText.set(String(f.params.id), String(f.params.text));
+        if (f.method === "parts.commitText") setCommitted(String(f.params.id), rootOf(String(f.params.id)));
         return { ...f, status: "ok" as const, error: undefined };
       } catch (e) {
         return { ...f, status: "failed" as const, error: (e as Error).message };
@@ -522,6 +656,10 @@ export function replay(run: (m: string, p: Params) => unknown, upTo = marker): v
       if (a.id in hiddenAsm) setAssemblyHidden(a.id, hiddenAsm[a.id] as boolean);
     if (now.parts.some((p) => p.id === active)) setActive(active);
     setTreeSelected(sel);
+    // a seleção de pontos e o ponto do tutorial são da sessão: voltam como estavam
+    for (const [id, old] of Object.entries(keepEdit as Record<string, { selection?: number[] }>))
+      setSlotSelection(id, old.selection ?? []);
+    loadTutorial(keepTutorial);
   } finally {
     replaying = false;
   }

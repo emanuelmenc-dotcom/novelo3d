@@ -4,9 +4,18 @@
 const { app, BrowserWindow, Menu } = require("electron");
 const path = require("node:path");
 
+// Uma janela só: duas disputariam o mesmo armazenamento e a última a gravar apagaria o projeto da outra.
+let win = null;
+if (!app.requestSingleInstanceLock()) app.quit();
+app.on("second-instance", () => {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.focus();
+});
+
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
-  const win = new BrowserWindow({ width: 1400, height: 900, title: "Novelo3D", backgroundColor: "#f4f1e8" });
+  win = new BrowserWindow({ width: 1400, height: 900, title: "Novelo3D", backgroundColor: "#f4f1e8" });
   win.loadFile(path.join(__dirname, "web", "index.html"));
   win.on("page-title-updated", (e) => e.preventDefault());
 });

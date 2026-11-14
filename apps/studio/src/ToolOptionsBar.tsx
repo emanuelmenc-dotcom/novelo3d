@@ -8,6 +8,7 @@ const MODE_NAME: Record<ToolState["mode"], string> = {
   select: "Selecionar",
   yarn: "Pintar fio",
   tension: "Tensão",
+  measure: "Medir",
 };
 const SEL_NAME: Record<ToolState["selTool"], string> = {
   point: "ponto",
@@ -41,7 +42,9 @@ export function ToolOptionsBar(props: { tools: ToolState; selected: number; stat
         ? `${BRUSH_NAME[tools.brushTool]} · fio ${tools.yarn} · raio ${tools.hops}`
         : tools.mode === "tension"
           ? `${BRUSH_NAME[tools.brushTool]} · tensão ${tools.tension} · raio ${tools.hops}`
-          : "botão esquerdo gira · meio ou direito desloca · roda aproxima";
+          : tools.mode === "measure"
+            ? (tools.measureText ?? "Clique em dois pontos para medir a distância (estimativa).")
+            : "botão esquerdo gira · meio ou direito desloca · roda aproxima";
   return (
     <div className="optbar" data-testid="options-bar">
       <strong>{MODE_NAME[tools.mode]}</strong>

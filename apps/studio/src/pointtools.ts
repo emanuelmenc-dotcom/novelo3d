@@ -4,7 +4,7 @@
 import { dispatch, partsSnapshot } from "@novelo/commands";
 import type { Handlers, Tool } from "./view3d.ts";
 
-export type Mode = "orbit" | "select" | "yarn" | "tension";
+export type Mode = "orbit" | "select" | "yarn" | "tension" | "measure";
 export type SelTool = "point" | "group" | "column" | "hood" | "path" | "rect" | "ellipse" | "lasso";
 export type BrushTool = "brush" | "bucket" | "dropper" | "erase";
 export type SelOp = "replace" | "add" | "remove" | "intersect";
@@ -24,6 +24,9 @@ export interface ToolState {
   visibleOnly: boolean;
   /** Primeiro ponto do caminho, esperando o segundo clique. */
   pathA: number | null;
+  /** Medir distância: primeiro ponto, esperando o segundo clique, e o último resultado (estimativa). */
+  measureA: { part: string; uid: number } | null;
+  measureText: string | null;
   stroking: boolean;
   error: string | null;
 }
@@ -39,6 +42,8 @@ let st: ToolState = {
   pathByYarn: false,
   visibleOnly: false,
   pathA: null,
+  measureA: null,
+  measureText: null,
   stroking: false,
   error: null,
 };
@@ -105,6 +110,28 @@ export function makeHandlers(ctx: () => Ctx): Handlers {
 
   return {
     onClick(id, mods) {
+      if (st.mode === "measure") {
+        const hit = id === null ? undefined : ctx().node(id);
+        if (!hit) return;
+        const here = { part: hit.part ?? partsSnapshot().active, uid: hit.uid };
+        if (st.measureA === null) {
+          setTools({ measureA: here, measureText: "Clique no segundo ponto." });
+          return;
+        }
+        try {
+          const r = dispatch("measure.distance", { a: st.measureA, b: here }) as {
+            distance: number;
+            distanceMm: number;
+          };
+          setTools({
+            measureA: null,
+            measureText: `Distância ≈ ${r.distanceMm} mm (${r.distance} larguras de ponto) · estimativa`,
+          });
+        } catch (e) {
+          setTools({ measureA: null, measureText: (e as Error).message });
+        }
+        return;
+      }
       if (st.mode === "orbit") return;
       const nd = id === null ? undefined : ctx().node(id);
       focus(nd);

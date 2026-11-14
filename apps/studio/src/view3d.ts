@@ -134,6 +134,8 @@ export interface View3D {
   visibleNodes(): number[];
   /** Leva a câmera à direção dada (de dentro para fora), com animação curta. Ex.: [0,-1,0] = frente. */
   snapView(dir: [number, number, number]): void;
+  /** Corte (seção) só da vista: some o que está de um lado do plano; clique, pincel e seleção por forma ignoram o cortado. */
+  setSection(s: SectionSpec | null): void;
   dispose(): void;
   /** Para testes: quantos pontos há, o que está selecionado e a direção atual da câmera. */
   state(): {
@@ -161,7 +163,16 @@ export interface View3D {
     cubeRect: { x: number; y: number; size: number; visible: boolean };
     /** Tutorial: pontos esmaecidos (por fazer) e pontos em destaque agora; vazio sem tutorial. */
     tutorial: { faded: number; current: number[]; parents: number[] };
+    /** Corte ativo e quantos pontos ele esconde. */
+    section: { spec: SectionSpec | null; clipped: number };
   };
+}
+
+/** Plano de corte: eixo, posição em % entre o menor e o maior valor dos pontos nesse eixo, e qual lado some. */
+export interface SectionSpec {
+  axis: "x" | "y" | "z";
+  pos: number;
+  flip: boolean;
 }
 
 /** Diâmetro do alvo de clique do estilo CrochetPARADE, em ligações (aresta média = 1): grande o bastante para fechar a malha. */
@@ -824,7 +835,9 @@ export function mountView3D(
     const buf = new Uint8Array(w * h * 4);
     try {
       renderer.setRenderTarget(rt);
+      applySection();
       renderer.render(pickScene, camera);
+      renderer.clippingPlanes = [];
       renderer.readRenderTargetPixels(rt, 0, 0, w, h, buf);
     } finally {
       renderer.setRenderTarget(null);
@@ -844,6 +857,37 @@ export function mountView3D(
     onSelect(id === null ? null : (nodes[id] as NodeMeta));
   };
 
+  // corte (seção): só da vista, fora do projeto e da linha do tempo
+  let section: SectionSpec | null = null;
+  let sectionT = 0;
+  const axisIdx = (a: "x" | "y" | "z"): number => (a === "x" ? 0 : a === "y" ? 1 : 2);
+  const applySection = () => {
+    if (!section || centers.length === 0) {
+      renderer.clippingPlanes = [];
+      return;
+    }
+    const k = axisIdx(section.axis);
+    let lo = Number.POSITIVE_INFINITY;
+    let hi = Number.NEGATIVE_INFINITY;
+    for (let i = 0; i < centers.length / 3; i++) {
+      const v = centers[i * 3 + k] as number;
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+    sectionT = lo + (section.pos / 100) * (hi - lo);
+    const n = new THREE.Vector3(k === 0 ? 1 : 0, k === 1 ? 1 : 0, k === 2 ? 1 : 0);
+    // o lado mantido é o de n·p + d >= 0; o outro some
+    renderer.clippingPlanes = [
+      new THREE.Plane(section.flip ? n.negate() : n, section.flip ? sectionT : -sectionT),
+    ];
+  };
+  /** O ponto `i` está do lado cortado do plano (o raio de clique ignora o corte, então confere aqui). */
+  const isClipped = (i: number): boolean => {
+    if (!section) return false;
+    const v = centers[i * 3 + axisIdx(section.axis)] as number;
+    return section.flip ? v > sectionT : v < sectionT;
+  };
+
   const ray = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
   const pickAt = (clientX: number, clientY: number): number | null => {
@@ -851,7 +895,10 @@ export function mountView3D(
     const r = renderer.domElement.getBoundingClientRect();
     ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
-    return ray.intersectObject(mesh, false)[0]?.instanceId ?? null;
+    const hit = ray
+      .intersectObject(mesh, false)
+      .find((h) => h.instanceId !== undefined && !isClipped(h.instanceId));
+    return hit?.instanceId ?? null;
   };
   const projectAll = (): number[] => {
     const r = renderer.domElement.getBoundingClientRect();
@@ -862,8 +909,9 @@ export function mountView3D(
       v.set(centers[i * 3] as number, centers[i * 3 + 1] as number, centers[i * 3 + 2] as number).project(
         camera,
       );
-      out[i * 2] = ((v.x + 1) / 2) * r.width;
-      out[i * 2 + 1] = ((1 - v.y) / 2) * r.height;
+      // ponto cortado fica longe de qualquer forma de seleção
+      out[i * 2] = isClipped(i) ? -1e9 : ((v.x + 1) / 2) * r.width;
+      out[i * 2 + 1] = isClipped(i) ? -1e9 : ((1 - v.y) / 2) * r.height;
     }
     return out;
   };
@@ -1039,7 +1087,9 @@ export function mountView3D(
     // só desenha quando algo mudou (câmera, dados, cores, cubo): parado, a GPU descansa
     if (dirty || moved) {
       dirty = false;
+      applySection();
       renderer.render(scene, camera);
+      renderer.clippingPlanes = []; // o cubo de vistas não é cortado
       cube.render(renderer, camera, controls.target);
       frames++;
     }
@@ -1077,6 +1127,12 @@ export function mountView3D(
       camera.position.copy(p).addScaledVector(dir, Math.max(fitRadius * 0.9, 4));
       controls.update();
       invalidate();
+    },
+    setSection(s) {
+      section = s;
+      applySection(); // fixa a posição do plano já, para o clique logo depois valer
+      renderer.clippingPlanes = [];
+      dirty = true;
     },
     setTutorial(t) {
       tut = t;
@@ -1183,6 +1239,10 @@ export function mountView3D(
         viewCube: { ...cubeOpts },
         cubeRect: cubeRect(cubeOpts, renderer.domElement.clientWidth, renderer.domElement.clientHeight),
         tutorial: { faded: tutFaded, current: tutCurrent, parents: tutParents },
+        section: {
+          spec: section ? { ...section } : null,
+          clipped: section ? Array.from({ length: nodes.length }, (_, i) => i).filter(isClipped).length : 0,
+        },
       };
     },
   };

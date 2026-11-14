@@ -8,6 +8,7 @@ import {
   type LayoutData,
   mountView3D,
   type NodeMeta,
+  type SectionSpec,
   type Tool,
   type TutorialView,
   type View3D,
@@ -28,6 +29,8 @@ export function Viewer3D(props: {
   wire?: boolean;
   /** Passo do tutorial a destacar no 3D, ou null. */
   tutorial?: TutorialView | null;
+  /** Corte (seção) da vista, ou null. */
+  section?: SectionSpec | null;
   /** Opções de exibição do menu de vista, ao lado do cubo. */
   onWire: (v: boolean) => void;
   onGraph: (v: boolean) => void;
@@ -84,6 +87,9 @@ export function Viewer3D(props: {
   useEffect(() => {
     view.current?.setTutorial(props.tutorial ?? null);
   }, [props.tutorial]);
+  useEffect(() => {
+    view.current?.setSection(props.section ?? null);
+  }, [props.section]);
   useEffect(() => {
     view.current?.highlightRows(props.rows, props.activePart);
   }, [props.rows, props.activePart]);

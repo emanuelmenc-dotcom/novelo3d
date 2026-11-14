@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Camada de comandos (D-21): toda função do app é um comando JSON -> JSON,
 // chamável pela interface e pela ponte MCP. Sem DOM.
+
 import { renderChart } from "@novelo/charts";
 import {
   applyPaint,
@@ -57,6 +58,7 @@ import {
   setYarns,
 } from "./paint-store.ts";
 import { partsCommands } from "./parts-commands.ts";
+import { assemblyContents, partById } from "./parts-store.ts";
 import { projectCommands } from "./project-commands.ts";
 import {
   completeRender,
@@ -830,7 +832,78 @@ function firstDiff(a: unknown, b: unknown, path = "$"): string | null {
   return null;
 }
 
+type Lay = { positions: number[]; nodes: { part: string; uid: number }[] };
+const sw = (): number => getSettings().yarns.stitchWidthMm;
+const mmOf = (v: number[]): number[] => v.map((x) => Math.round(x * sw() * 10) / 10);
+const r3 = (v: number[]): number[] => v.map((x) => Math.round(x * 1000) / 1000);
+
 Object.assign(commands, {
+  /**
+   * Tamanho estimado do que está à vista: `target` = "all" (padrão), "part" ou "assembly" com `id`. Posições do mundo
+   * (peça e montagens por fora dela), só peças visíveis. Em larguras de ponto e em mm (largura do ponto das configurações):
+   * é uma estimativa, o fio real e o enchimento mudam o tamanho.
+   */
+  "measure.bounds": (p: Params) => {
+    const target = typeof p.target === "string" ? p.target : "all";
+    const id = typeof p.id === "string" ? p.id : "";
+    let parts: Set<string> | null = null;
+    if (target === "part") {
+      partById(id);
+      parts = new Set([id]);
+    } else if (target === "assembly") {
+      parts = new Set(assemblyContents(id).parts);
+    } else if (target !== "all") throw new Error("'target' deve ser all, part ou assembly");
+    const lay = (commands["assembly.layout"] as Command)({}) as unknown as Lay;
+    const lo = [Infinity, Infinity, Infinity];
+    const hi = [-Infinity, -Infinity, -Infinity];
+    let n = 0;
+    lay.nodes.forEach((nd, i) => {
+      if (parts && !parts.has(nd.part)) return;
+      n++;
+      for (let k = 0; k < 3; k++) {
+        const v = lay.positions[i * 3 + k] as number;
+        if (v < (lo[k] as number)) lo[k] = v;
+        if (v > (hi[k] as number)) hi[k] = v;
+      }
+    });
+    if (n === 0) throw new Error("não há pontos à vista para medir (peça escondida ou vazia)");
+    const size = hi.map((h, k) => h - (lo[k] as number));
+    return {
+      target,
+      id: id || null,
+      nodes: n,
+      unit: "larguras de ponto",
+      min: r3(lo),
+      max: r3(hi),
+      size: r3(size),
+      stitchWidthMm: sw(),
+      sizeMm: mmOf(size),
+      estimate: true,
+    };
+  },
+  /** Distância entre dois pontos `{part, uid}` (a e b) no mundo, em larguras de ponto e em mm estimados. */
+  "measure.distance": (p: Params) => {
+    const lay = (commands["assembly.layout"] as Command)({}) as unknown as Lay;
+    const find = (v: unknown, name: string): number[] => {
+      const o = v as { part?: unknown; uid?: unknown } | null;
+      if (!o || typeof o.part !== "string" || typeof o.uid !== "number")
+        throw new Error(`'${name}' deve ser {part, uid}`);
+      const i = lay.nodes.findIndex((nd) => nd.part === o.part && nd.uid === o.uid);
+      if (i < 0) throw new Error(`o ponto ${name} (#${String(o.uid)} em ${String(o.part)}) não está à vista`);
+      return [0, 1, 2].map((k) => lay.positions[i * 3 + k] as number);
+    };
+    const [ax, ay, az] = find(p.a, "a") as [number, number, number];
+    const [bx, by, bz] = find(p.b, "b") as [number, number, number];
+    const d = Math.hypot(ax - bx, ay - by, az - bz);
+    return {
+      unit: "larguras de ponto",
+      distance: Math.round(d * 1000) / 1000,
+      distanceMm: Math.round(d * sw() * 10) / 10,
+      delta: r3([bx - ax, by - ay, bz - az]),
+      stitchWidthMm: sw(),
+      estimate: true,
+    };
+  },
   /** A linha do tempo para gravar (base, features, marcador); null se está vazia. */
   "timeline.save": () => exportTimeline(),
   /** Carrega uma linha do tempo gravada (inválida vira vazia). */

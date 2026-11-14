@@ -5,6 +5,7 @@
 import { Icon } from "./icons.tsx";
 import { setTools, type ToolState } from "./pointtools.ts";
 import type { RibbonItem, RibbonTab } from "./Ribbon.tsx";
+import { sectionSnapshot, setSection } from "./section.ts";
 import { VIEWS } from "./views.ts";
 
 export interface RibbonCtx {
@@ -336,6 +337,82 @@ export function buildRibbonTabs(c: RibbonCtx): RibbonTab[] {
               { title: `${v.name} (${key})` },
             ),
           ),
+        },
+        {
+          id: "medir",
+          label: "Medir",
+          items: [
+            btn(
+              "vista",
+              "measure",
+              "Distância",
+              "ruler",
+              () =>
+                setTools(
+                  t.mode === "measure"
+                    ? { mode: "orbit", measureA: null }
+                    : { mode: "measure", measureA: null, measureText: null },
+                ),
+              {
+                pressed: t.mode === "measure",
+                testid: "mode-measure",
+                title: "Clique em dois pontos do 3D: mostra a distância estimada (mm e larguras de ponto)",
+              },
+            ),
+          ],
+        },
+        {
+          id: "corte",
+          label: "Corte",
+          items: [
+            ...(["x", "y", "z"] as const).map((axis) =>
+              btn(
+                "vista",
+                `section-${axis}`,
+                `Cortar em ${axis.toUpperCase()}`,
+                "cube",
+                () => setSection({ axis: sectionSnapshot().axis === axis ? null : axis }),
+                {
+                  pressed: sectionSnapshot().axis === axis,
+                  testid: `section-${axis}`,
+                  title: `Corta a vista por um plano perpendicular ao eixo ${axis.toUpperCase()} (só da vista; não entra no projeto)`,
+                },
+              ),
+            ),
+            {
+              kind: "custom",
+              id: "section.pos",
+              label: "Posição do corte",
+              node: (
+                <label className="rc-field">
+                  Posição do corte
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    data-testid="section-pos"
+                    aria-label="Posição do corte"
+                    disabled={sectionSnapshot().axis === null}
+                    value={sectionSnapshot().pos}
+                    onChange={(e) => setSection({ pos: Number(e.target.value) })}
+                  />
+                </label>
+              ),
+            },
+            btn(
+              "vista",
+              "section-flip",
+              "Inverter lado",
+              "invert",
+              () => setSection({ flip: !sectionSnapshot().flip }),
+              {
+                pressed: sectionSnapshot().flip,
+                disabled: sectionSnapshot().axis === null,
+                testid: "section-flip",
+                title: "Troca qual lado do corte some",
+              },
+            ),
+          ],
         },
         {
           id: "exibir",

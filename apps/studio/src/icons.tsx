@@ -47,6 +47,7 @@ const P: Record<string, ReactNode> = {
   dropper: <path d="M15 4l5 5-3 3-5-5zM12 9l-7 7v4h4l7-7" />,
   erase: <path d="M4 15l8-9 8 8-5 5H8zM9 20h11" />,
   tension: <path d="M3 12c3-6 6-6 9 0s6 6 9 0" />,
+  ruler: <path d="M3 17 17 3l4 4L7 21zM8 12l2 2M11 9l2 2M14 6l2 2" />,
   eye: (
     <>
       <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" />

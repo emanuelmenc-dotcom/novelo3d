@@ -49,6 +49,7 @@ import { installRenderJob, renderGeomChanged, setRenderSource } from "./render/r
 import { buildRibbonTabs } from "./ribbonTabs.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
 import { StitchEditorPanel } from "./StitchEditorPanel.tsx";
+import { sectionSnapshot, sectionSpec, setSection, subscribeSection } from "./section.ts";
 import { TimelineStrip } from "./TimelineStrip.tsx";
 import { TitleBar } from "./TitleBar.tsx";
 import { ToolOptionsBar } from "./ToolOptionsBar.tsx";
@@ -320,6 +321,7 @@ function App() {
   const settings = useSyncExternalStore(subscribeSettings, settingsSnapshot);
   const visible = useSyncExternalStore(subscribeVisible, visibleSnapshot);
   const reading = useSyncExternalStore(subscribeTutorial, readingOn);
+  const sec = useSyncExternalStore(subscribeSection, sectionSnapshot);
   const show3d = visible.has("view3d") || reading;
   const rstate = useSyncExternalStore(subscribeRender, renderSnapshot).state;
   const [ribbonTab, setRibbonTab] = useState(() => {
@@ -332,7 +334,10 @@ function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   // a busca de comandos é do modo de edição: entrar na leitura a fecha, para não reaparecer ao sair
   useEffect(() => {
-    if (reading) setPaletteOpen(false);
+    if (reading) {
+      setPaletteOpen(false);
+      setSection({ axis: null }); // o modo de leitura mostra a peça inteira
+    }
   }, [reading]);
   const saveUi = (patch: { tab?: string; collapsed?: boolean }) => {
     try {
@@ -626,6 +631,7 @@ function App() {
       showGraph={showGraph}
       wire={wire}
       tutorial={tutorialView}
+      section={reading ? null : sectionSpec(sec)}
       rows={reading ? null : highlighted}
       {...(multi ? { activePart: partsState.active } : {})}
       cube={settings.interface.viewCube}

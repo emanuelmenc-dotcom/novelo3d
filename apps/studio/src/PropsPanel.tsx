@@ -7,6 +7,35 @@ import { AssemblyPanel } from "./AssemblyPanel.tsx";
 import { PointsPanel } from "./PointsPanel.tsx";
 import type { NodeMeta } from "./view3d.ts";
 
+/** Tamanho estimado do item escolhido na árvore (projeto, peça ou montagem), em mm e em larguras de ponto. */
+function Measures(props: { selected: string | null }) {
+  const sel = props.selected;
+  if (sel === null || sel.startsWith("s")) return null;
+  const target =
+    sel === "root"
+      ? { target: "all" }
+      : sel.startsWith("a")
+        ? { target: "assembly", id: sel }
+        : { target: "part", id: sel };
+  let text: string;
+  try {
+    const r = dispatch("measure.bounds", target) as {
+      size: number[];
+      sizeMm: number[];
+      stitchWidthMm: number;
+    };
+    const f = (v: number[]) => v.map((x) => Math.round(x * 10) / 10).join(" × ");
+    text = `${f(r.sizeMm)} mm (${f(r.size)} larguras de ponto de ${r.stitchWidthMm} mm)`;
+  } catch (e) {
+    text = (e as Error).message;
+  }
+  return (
+    <p className="hint" data-testid="measure-bounds">
+      Tamanho (estimativa): {text}
+    </p>
+  );
+}
+
 export function PropsPanel(props: { text: string; dialect: string; selNode: NodeMeta | null }) {
   useSyncExternalStore(subscribeParts, partsSnapshot);
   useSyncExternalStore(subscribeTree, treeVersion);
@@ -15,6 +44,7 @@ export function PropsPanel(props: { text: string; dialect: string; selNode: Node
   return (
     <div className="panel-col scroll props-col">
       <PointsPanel text={props.text} dialect={props.dialect} selNode={props.selNode} />
+      <Measures selected={selected} />
       {selected === "root" ? (
         <AssemblyPanel sections={["seam", "close"]} />
       ) : selected?.startsWith("a") ? (

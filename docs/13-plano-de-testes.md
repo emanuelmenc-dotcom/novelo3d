@@ -149,6 +149,9 @@ Verificações comuns a todos: SVG bem formado; `viewBox` A4; nenhum símbolo co
 | C1   | Faixa do fio B entre as voltas 7 e 9 de P-BOLA: 108 pontos no fio B e duas trocas de fio                                                                                                                                          |
 | C2   | A mesma faixa, definida em milímetros de perfil, continua cobrindo a mesma região depois de mudar a amostra                                                                                                                       |
 
+| M1 | Bola de 433 pontos: `measure.bounds` dá 11,6 × 11,6 × 9,8 larguras (57,9 × 57,9 × 48,9 mm a 5 mm); distância entre dois pontos > 0; peça escondida fica fora; medir não vira feature | `medidas.test.ts`, `e2e/medidas.spec.ts` |
+| M2 | Corte da metade: clique e retângulo ignoram o cortado; o corte não entra na linha do tempo; modo de leitura mostra a peça inteira | `e2e/medidas.spec.ts` |
+
 ## 9. Propriedades gerais
 
 1. `validate(print(parse(texto)))` aceita toda receita que `validate(parse(texto))` aceita.

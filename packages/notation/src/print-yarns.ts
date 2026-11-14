@@ -102,7 +102,7 @@ export function printPatternWithYarns(
 
     const leadless = lead ? pieces.slice(1) : pieces;
     const body = pieces.join(", ");
-    const sig = `${leadless.join(",")}|${segs.map((s) => s.yarn).join("")}|${r.prevCounted}|${r.produced}|${r.row.start ?? ""}|${r.row.kind}${r.row.milestone === undefined ? "" : `|M${entries.length}`}`;
+    const sig = `${leadless.join(",")}|${segs.map((s) => s.yarn).join("")}|${r.prevCounted}|${r.produced}|${r.row.start ?? ""}|${r.row.kind}${r.row.milestone === undefined ? "" : `|M${pattern.rows.indexOf(r.row)}`}`;
     const last = entries[entries.length - 1];
     // junta voltas iguais; uma volta que repete a troca do começo só entra se a primeira também a tinha
     if (last && last.sig === sig && r.row.start === undefined && (lead === null || lead === last.lead)) {

@@ -7,17 +7,21 @@ import { WindowsMenu } from "./WindowsMenu.tsx";
 export function TitleBar(props: {
   bridge: "off" | "connected";
   saveBad: boolean;
+  /** Modo de leitura: sem busca de comandos nem menu Janelas, só os avisos. */
+  reading?: boolean;
   projectMsg: string | null;
   onSearch: () => void;
 }) {
-  const { bridge, saveBad, projectMsg, onSearch } = props;
+  const { bridge, saveBad, reading, projectMsg, onSearch } = props;
   const bridgeText = `ponte MCP: ${bridge === "connected" ? "conectada" : "desconectada"}`;
   return (
     <header className="titlebar">
       <strong className="title-name">Novelo3D</strong>
-      <button type="button" className="title-search" data-testid="command-search" onClick={onSearch}>
-        <Icon name="search" size={14} /> Buscar comando… <kbd>Ctrl+K</kbd>
-      </button>
+      {!reading && (
+        <button type="button" className="title-search" data-testid="command-search" onClick={onSearch}>
+          <Icon name="search" size={14} /> Buscar comando… <kbd>Ctrl+K</kbd>
+        </button>
+      )}
       <span className="title-spacer" />
       {projectMsg && (
         <span className="title-msg" data-testid="project-msg" title={projectMsg}>
@@ -39,7 +43,7 @@ export function TitleBar(props: {
         <Icon name="bridge" size={16} />
         <span className="sr">{bridgeText}</span>
       </span>
-      <WindowsMenu />
+      {!reading && <WindowsMenu />}
     </header>
   );
 }

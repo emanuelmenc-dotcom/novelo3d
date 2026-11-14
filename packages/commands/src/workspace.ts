@@ -15,7 +15,6 @@ export const PANEL_IDS = [
   "points",
   "assembly",
   "materials",
-  "tutorial",
   "render",
   "stitchEditor",
 ] as const;
@@ -43,7 +42,6 @@ export const PANEL_TITLES: Record<PanelId, string> = {
   points: "Pontos",
   assembly: "Montagem",
   materials: "Materiais",
-  tutorial: "Tutorial",
   render: "Render",
   stitchEditor: "Criador de pontos",
 };
@@ -456,7 +454,6 @@ export const DEFAULT_PANEL_MINS: PanelMins = {
   points: { w: 260, h: 200 },
   assembly: { w: 260, h: 200 },
   materials: { w: 280, h: 200 },
-  tutorial: { w: 280, h: 200 },
   render: { w: 320, h: 260 },
   stitchEditor: { w: 320, h: 240 },
 };

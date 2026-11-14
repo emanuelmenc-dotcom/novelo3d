@@ -190,6 +190,7 @@ export { stitchEditorState, stitchEditorVersion, subscribeStitchEditor } from ".
 export {
   exportTutorial,
   loadTutorial,
+  readingOn,
   subscribeTutorial,
   type TutorialPos,
   tutorialVersion,

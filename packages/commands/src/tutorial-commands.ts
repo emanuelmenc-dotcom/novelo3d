@@ -33,7 +33,8 @@ function currentIndex(part: string, c: ScriptCtx): number {
   if (!pos) return 0;
   if (pos.uid !== null) {
     const i = c.steps.findIndex(
-      (s) => s.kind === "step" && s.nodeIds[0] !== undefined && c.uidOf(s.nodeIds[0]) === pos.uid,
+      // o passo que contém o ponto guardado (posições antigas guardam o primeiro ponto do passo por ponto)
+      (s) => s.kind === "step" && s.nodeIds.some((id) => c.uidOf(id) === pos.uid),
     );
     if (i >= 0) return i;
   }

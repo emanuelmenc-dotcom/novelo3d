@@ -18,6 +18,7 @@ import {
   type PanelId,
   paintSnapshot,
   partsSnapshot,
+  readingOn,
   renderSnapshot,
   rootOf,
   settingsSnapshot,
@@ -40,6 +41,7 @@ import { FloatingWindow } from "./FloatingWindow.tsx";
 import { MaterialsPanel } from "./MaterialsPanel.tsx";
 import { PointsPanel } from "./PointsPanel.tsx";
 import { makeHandlers, subscribeTools, toolSnapshot, viewerTool } from "./pointtools.ts";
+import { type ReadingData, ReadingMode } from "./ReadingMode.tsx";
 import { Ribbon } from "./Ribbon.tsx";
 import { RenderPanel } from "./render/RenderPanel.tsx";
 import { installRenderJob, renderGeomChanged, setRenderSource } from "./render/renderJob.ts";
@@ -48,7 +50,6 @@ import { SettingsDialog } from "./SettingsDialog.tsx";
 import { StitchEditorPanel } from "./StitchEditorPanel.tsx";
 import { TitleBar } from "./TitleBar.tsx";
 import { ToolOptionsBar } from "./ToolOptionsBar.tsx";
-import { type TutorialData, TutorialPanel } from "./TutorialPanel.tsx";
 import { VIEWS } from "./views.ts";
 import "./styles.css";
 import { Viewer3D } from "./Viewer3D.tsx";
@@ -276,7 +277,8 @@ function App() {
   const [showMaterials, setShowMaterials] = useState(false);
   const settings = useSyncExternalStore(subscribeSettings, settingsSnapshot);
   const visible = useSyncExternalStore(subscribeVisible, visibleSnapshot);
-  const show3d = visible.has("view3d");
+  const reading = useSyncExternalStore(subscribeTutorial, readingOn);
+  const show3d = visible.has("view3d") || reading;
   const rstate = useSyncExternalStore(subscribeRender, renderSnapshot).state;
   const [ribbonTab, setRibbonTab] = useState(() => {
     const ui = readJson(UI_KEY) as { tab?: string } | undefined;
@@ -286,6 +288,10 @@ function App() {
     () => (readJson(UI_KEY) as { collapsed?: boolean } | undefined)?.collapsed === true,
   );
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // a busca de comandos é do modo de edição: entrar na leitura a fecha, para não reaparecer ao sair
+  useEffect(() => {
+    if (reading) setPaletteOpen(false);
+  }, [reading]);
   const saveUi = (patch: { tab?: string; collapsed?: boolean }) => {
     try {
       localStorage.setItem(
@@ -296,7 +302,7 @@ function App() {
       // preferência de tela: sem armazenamento, vale só nesta sessão
     }
   };
-  const showTutorial = visible.has("tutorial") || ribbonTab === "tutorial";
+  const showTutorial = reading;
   const tutVersion = useSyncExternalStore(subscribeTutorial, tutorialVersion);
   const showRender = visible.has("render") || rstate === "running" || rstate === "paused";
   const edit = useSyncExternalStore(subscribeEdit, editSnapshot);
@@ -355,7 +361,7 @@ function App() {
     if (!showTutorial) return null;
     try {
       const data = call<
-        TutorialData & { doneThrough: number; step: { nodeIds: number[]; parentIds: number[] } | null }
+        ReadingData & { doneThrough: number; step: { nodeIds: number[]; parentIds: number[] } | null }
       >("tutorial.get", { text: ct, dialect: cd, part: partsState.active });
       return { data, error: null as string | null };
     } catch (e) {
@@ -370,7 +376,8 @@ function App() {
     const start = part?.offset ?? 0;
     const end = start + (part?.count ?? layout.nodes.length);
     return {
-      current: step.nodeIds.map((id) => id + start),
+      // no slide de estado nada fica em destaque: só o que já foi feito e o que falta
+      current: step.kind === "state" ? [] : step.nodeIds.map((id) => id + start),
       parents: step.parentIds.map((id) => id + start),
       doneThrough: tut.data.doneThrough + start,
       start,
@@ -450,7 +457,7 @@ function App() {
 
   // atalhos de vista iguais aos do FreeCAD (só com o 3D à vista e fora de campos de texto)
   useEffect(() => {
-    if (!show3d) return;
+    if (!show3d || reading) return; // no modo de leitura F e os números são do próprio modo
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el && /^(TEXTAREA|INPUT|SELECT)$/.test(el.tagName)) return;
@@ -461,35 +468,7 @@ function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [show3d]);
-
-  // setas esquerda e direita andam o tutorial (só com a janela à vista e fora de campos de texto)
-  useEffect(() => {
-    if (!showTutorial) return;
-    const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null;
-      if (el && /^(TEXTAREA|INPUT|SELECT)$/.test(el.tagName)) return;
-      // elementos que já usam as setas (divisores, controles deslizantes, menus) ficam com elas; botões e abas não
-      if (
-        el &&
-        /^(separator|slider|spinbutton|listbox|menuitem|menuitemradio)$/.test(el.getAttribute("role") ?? "")
-      )
-        return;
-      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
-      try {
-        dispatch(e.key === "ArrowRight" ? "tutorial.next" : "tutorial.prev", {
-          text: ct,
-          dialect: cd,
-          part: partsState.active,
-        });
-        e.preventDefault();
-      } catch {
-        // receita inválida: nada a andar
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [showTutorial, ct, cd, partsState.active]);
+  }, [show3d, reading]);
 
   // Ctrl+Z / Ctrl+Y (ou Ctrl+Shift+Z) desfazem e refazem as edições por ponto, fora dos campos de texto
   useEffect(() => {
@@ -576,17 +555,7 @@ function App() {
     showWireOption: !features().realistic3d,
     setWire,
     setShowGraph,
-    tutorial: tut?.data
-      ? {
-          index: tut.data.index,
-          total: tut.data.total,
-          round: tut.data.step?.round ?? 1,
-          rounds: tut.data.rounds,
-          ...(tutorialView && show3d
-            ? { onShow: () => window.__view3d?.focusOn(tutorialView.current[0] ?? tutorialView.start) }
-            : {}),
-        }
-      : null,
+    readingStart: () => runTool("tutorial.reading", { on: true }),
   });
 
   // Ctrl+K abre a busca de comandos, em qualquer lugar da tela
@@ -594,12 +563,35 @@ function App() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setPaletteOpen(true);
+        if (!readingOn()) setPaletteOpen(true);
+      } else if (e.key === "F9") {
+        e.preventDefault();
+        dispatch("tutorial.reading", {});
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  const viewer3d = (
+    <Viewer3D
+      layout={layout}
+      showGraph={showGraph}
+      wire={wire}
+      tutorial={tutorialView}
+      rows={reading ? null : highlighted}
+      {...(multi ? { activePart: partsState.active } : {})}
+      cube={settings.interface.viewCube}
+      // no modo de leitura o botão esquerdo só gira: nada de pintar nem selecionar
+      tool={reading ? "orbit" : viewerTool(tools)}
+      handlers={reading ? {} : handlers}
+      selection={reading ? null : selection}
+      onSelect={onSelect3D}
+      onWire={setWire}
+      onGraph={setShowGraph}
+      showWireOption={!features().realistic3d}
+    />
+  );
 
   const panels: PanelRenderers = {
     recipe: () => (
@@ -752,22 +744,7 @@ function App() {
               : null
           }
         />
-        <Viewer3D
-          layout={layout}
-          showGraph={showGraph}
-          wire={wire}
-          tutorial={tutorialView}
-          rows={highlighted}
-          {...(multi ? { activePart: partsState.active } : {})}
-          cube={settings.interface.viewCube}
-          tool={viewerTool(tools)}
-          handlers={handlers}
-          selection={selection}
-          onSelect={onSelect3D}
-          onWire={setWire}
-          onGraph={setShowGraph}
-          showWireOption={!features().realistic3d}
-        />
+        {viewer3d}
         <p data-testid="node-info" className="hint node-info">
           {selNode
             ? `#${selNode.uid} · Volta ${selNode.row >= 0 && layout ? layout.rows[selNode.row]?.label : "anel"}, ponto ${selNode.index + 1} · ${selNode.code}${selNode.parents.length > 0 ? ` · sai de ${selNode.parents.length} ponto(s) da volta anterior` : ""}`
@@ -783,14 +760,6 @@ function App() {
     render: () => <RenderPanel />,
 
     stitchEditor: () => <StitchEditorPanel />,
-
-    tutorial: () => (
-      <TutorialPanel
-        data={tut?.data ?? null}
-        error={tut?.error ?? null}
-        countWarning={view.verify ? !view.verify.ok : false}
-      />
-    ),
 
     points: () => <PointsPanel text={text} dialect={dialect} selNode={selNode} />,
 
@@ -813,25 +782,46 @@ function App() {
       <TitleBar
         bridge={bridge}
         saveBad={saveBad}
+        reading={reading}
         projectMsg={projectMsg}
         onSearch={() => setPaletteOpen(true)}
       />
-      <Ribbon
-        tabs={ribbonTabs}
-        active={ribbonTab}
-        onTab={(id) => {
-          setRibbonTab(id);
-          saveUi({ tab: id });
-        }}
-        collapsed={ribbonCollapsed}
-        onCollapse={(v) => {
-          setRibbonCollapsed(v);
-          saveUi({ collapsed: v });
-        }}
-      />
-      {paletteOpen && <CommandPalette tabs={ribbonTabs} onClose={() => setPaletteOpen(false)} />}
+      {reading ? (
+        <ReadingMode
+          data={tut?.data ?? null}
+          error={tut?.error ?? null}
+          countWarning={view.verify ? !view.verify.ok : false}
+          params={() => ({ text: ct, dialect: cd, part: partsState.active })}
+          onExit={() => dispatch("tutorial.reading", { on: false })}
+          onShow={() => {
+            const first = tutorialView?.current[0];
+            if (first === undefined)
+              window.__view3d?.fit(); // slide de estado: nenhum ponto em destaque
+            else window.__view3d?.focusOn(first);
+          }}
+        >
+          {viewer3d}
+        </ReadingMode>
+      ) : (
+        <>
+          <Ribbon
+            tabs={ribbonTabs}
+            active={ribbonTab}
+            onTab={(id) => {
+              setRibbonTab(id);
+              saveUi({ tab: id });
+            }}
+            collapsed={ribbonCollapsed}
+            onCollapse={(v) => {
+              setRibbonCollapsed(v);
+              saveUi({ collapsed: v });
+            }}
+          />
+          {paletteOpen && <CommandPalette tabs={ribbonTabs} onClose={() => setPaletteOpen(false)} />}
 
-      <Workspace render={panels} />
+          <Workspace render={panels} />
+        </>
+      )}
 
       {/* páginas do gráfico para impressão/PDF: ficam fora das janelas, só aparecem ao imprimir */}
       <div className="print-only" data-testid="print-pages">

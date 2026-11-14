@@ -29,14 +29,8 @@ export interface RibbonCtx {
   showWireOption: boolean;
   setWire: (v: boolean) => void;
   setShowGraph: (v: boolean) => void;
-  /** Passo do tutorial: null sem receita válida. */
-  tutorial: {
-    index: number;
-    total: number;
-    round: number;
-    rounds: number;
-    onShow?: () => void;
-  } | null;
+  /** Entra no modo de leitura (o tutorial passo a passo, em tela cheia). */
+  readingStart: () => void;
 }
 
 const btn = (
@@ -73,19 +67,6 @@ export function buildRibbonTabs(c: RibbonCtx): RibbonTab[] {
       title: inPaint ? label : `${label} (escolha primeiro Pintar fio ou Tensão)`,
     });
   const part = { id: c.activePart };
-
-  const tutorialItems: RibbonItem[] = [
-    btn("tutorial", "prev", "Anterior", "prev", () => c.runText("tutorial.prev", tutorialParams(c)), {
-      disabled: !c.tutorial || c.tutorial.index <= 0,
-      testid: "tutorial-prev",
-      title: "Passo anterior (←)",
-    }),
-    btn("tutorial", "next", "Próximo", "next", () => c.runText("tutorial.next", tutorialParams(c)), {
-      disabled: !c.tutorial || c.tutorial.index >= c.tutorial.total - 1,
-      testid: "tutorial-next",
-      title: "Próximo passo (→)",
-    }),
-  ];
 
   return [
     {
@@ -293,38 +274,12 @@ export function buildRibbonTabs(c: RibbonCtx): RibbonTab[] {
       label: "Tutorial",
       groups: [
         {
-          id: "passos",
-          label: "Passos",
+          id: "leitura",
+          label: "Leitura",
           items: [
-            ...tutorialItems,
-            {
-              kind: "custom",
-              id: "tutorial.round",
-              label: "Ir para a volta",
-              node: (
-                <label className="rc-field">
-                  Ir para a volta
-                  <select
-                    data-testid="tutorial-round"
-                    disabled={!c.tutorial}
-                    value={c.tutorial?.round ?? 1}
-                    onChange={(e) =>
-                      c.runText("tutorial.goto", { ...tutorialParams(c), round: Number(e.target.value) })
-                    }
-                  >
-                    {Array.from({ length: c.tutorial?.rounds ?? 1 }, (_, i) => i + 1).map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ),
-            },
-            btn("tutorial", "show", "Mostrar ponto", "eye", () => c.tutorial?.onShow?.(), {
-              disabled: !c.tutorial?.onShow,
-              testid: "tutorial-show",
-              title: "Leva a câmera ao ponto atual (F)",
+            btn("tutorial", "reading", "Modo de leitura", "tutorial", () => c.readingStart(), {
+              testid: "reading-start",
+              title: "Esconde as ferramentas e mostra o 3D com o passo atual e as teclas de navegação (F9)",
             }),
           ],
         },
@@ -401,5 +356,3 @@ export function buildRibbonTabs(c: RibbonCtx): RibbonTab[] {
     },
   ];
 }
-
-const tutorialParams = (c: RibbonCtx): Record<string, unknown> => ({ part: c.activePart });

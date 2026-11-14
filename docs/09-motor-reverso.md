@@ -128,6 +128,8 @@ Meta do marco M8, não obrigatória antes: quando o usuário edita só um trecho
 
 ## 5. Tutorial: do grafo aos passos
 
+> Desde D-66 a interface usa `readingScript` (`packages/tutorial/src/reading.ts`): um passo por cadeia de pontos iguais, marcos e slides de revisão. O roteiro por ponto descrito abaixo continua em `tutorialScript` e nos testes T1 a T3.
+
 Pacote `tutorial`, consumido pela interface.
 
 ```ts

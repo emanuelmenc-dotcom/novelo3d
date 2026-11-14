@@ -25,7 +25,7 @@ export const PRESET_SPECS: Preset[] = [
           sizes: [0.55, 0.45],
           children: [
             { leaf: ["recipe", "verify", "chart", "cp"] },
-            { leaf: ["points", "yarns", "assembly", "materials", "tutorial"] },
+            { leaf: ["points", "yarns", "assembly", "materials"] },
           ],
         },
         { leaf: ["view3d"] },
@@ -47,7 +47,7 @@ export const PRESET_SPECS: Preset[] = [
           sizes: [0.7, 0.3],
           children: [
             { leaf: ["chart", "view3d", "stitchEditor"] },
-            { leaf: ["cp", "yarns", "points", "tutorial", "assembly", "materials", "render"] },
+            { leaf: ["cp", "yarns", "points", "assembly", "materials", "render"] },
           ],
         },
       ],
@@ -67,7 +67,7 @@ export const PRESET_SPECS: Preset[] = [
           sizes: [0.74, 0.26],
           children: [
             { leaf: ["view3d", "stitchEditor"] },
-            { leaf: ["chart", "cp", "yarns", "points", "tutorial", "assembly", "materials", "render"] },
+            { leaf: ["chart", "cp", "yarns", "points", "assembly", "materials", "render"] },
           ],
         },
       ],
@@ -87,7 +87,7 @@ export const PRESET_SPECS: Preset[] = [
           sizes: [0.28, 0.3, 0.42],
           children: [
             { leaf: ["recipe"] },
-            { leaf: ["verify", "tutorial"] },
+            { leaf: ["verify"] },
             { leaf: ["view3d", "cp", "yarns", "points", "assembly", "materials", "render"] },
           ],
         },
@@ -105,7 +105,7 @@ export const PRESET_SPECS: Preset[] = [
         { leaf: ["recipe"] },
         { leaf: ["verify"] },
         { dir: "row", sizes: [0.5, 0.5], children: [{ leaf: ["chart"] }, { leaf: ["view3d"] }] },
-        { leaf: ["cp", "yarns", "points", "tutorial", "assembly", "materials", "render", "stitchEditor"] },
+        { leaf: ["cp", "yarns", "points", "assembly", "materials", "render", "stitchEditor"] },
       ],
     },
   },
@@ -124,7 +124,6 @@ export const PRESET_SPECS: Preset[] = [
         "points",
         "assembly",
         "materials",
-        "tutorial",
         "render",
         "stitchEditor",
       ],

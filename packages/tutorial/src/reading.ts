@@ -33,7 +33,7 @@ export interface ReadingStep {
   kind: ReadingKind;
   /** Marco a que o passo pertence (passos e slides do mesmo marco compartilham o número). */
   milestone: number;
-  /** Pontos feitos neste passo; no slide de revisão, os da etapa; no de estado, todos até aqui. */
+  /** Pontos feitos neste passo; no slide de revisão, os do marco; no de estado, vazio (nada em destaque). */
   nodeIds: number[];
   parentIds: number[];
   round: number;
@@ -88,7 +88,6 @@ export function readingScript(pattern: Pattern, graph: StitchGraph): ReadingScri
   const rounds = expandRounds(pattern);
   let lastYarn: string | undefined;
   let sinceNodes: number[] = [];
-  let allNodes: number[] = [];
   let sinceFromRound = 1;
   const seen = new Map<Pattern["rows"][number], number>();
 
@@ -151,8 +150,7 @@ export function readingScript(pattern: Pattern, graph: StitchGraph): ReadingScri
           : undefined,
         line,
       });
-      sinceNodes = sinceNodes.concat(nodeIds);
-      allNodes = allNodes.concat(nodeIds);
+      for (const id of nodeIds) sinceNodes.push(id);
     });
 
     // fim de marco: última repetição da linha da receita (a marcação `#marco` cai na mesma linha)
@@ -160,7 +158,11 @@ export function readingScript(pattern: Pattern, graph: StitchGraph): ReadingScri
     if (!next || next.row !== r.row) {
       milestones.push({
         index: milestone,
-        title: r.row.milestone ?? `Volta ${rowLabel} concluída`,
+        title:
+          r.row.milestone ??
+          ((r.row.repeatRows ?? 1) > 1
+            ? `Voltas ${r.row.label} concluídas`
+            : `Volta ${r.row.label} concluída`),
         manual: r.row.milestone !== undefined,
         fromRound: sinceFromRound,
         toRound: r.round,
@@ -171,7 +173,8 @@ export function readingScript(pattern: Pattern, graph: StitchGraph): ReadingScri
           index: out.length,
           kind,
           milestone,
-          nodeIds: kind === "review" ? [...sinceNodes] : [...allNodes],
+          // o slide de estado não destaca nada: a tela já sabe até onde a peça está pelos passos anteriores
+          nodeIds: kind === "review" ? sinceNodes.slice() : [],
           parentIds: [],
           round: r.round,
           rowLabel,

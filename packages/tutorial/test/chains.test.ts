@@ -29,13 +29,16 @@ describe("chainsOf com atomos reais", () => {
     );
     expect(show(chainsOf(k))).toBe("1CH0 | (2SC 1SKIP 1CH) x9 | 2SL0");
   });
-  test("G14: corrente inicial e fechamento", () => {
+  test("G14: corrente inicial, pbx no meio e fechamento na corrente inicial", () => {
     const k = keysOf(
-      "V1: 27 pb no anel mágico (27)\nV2: 1 corr (não conta), 4 pb, 3 pbx, 4 pb, 3 pbx, pbx na corr",
+      "V1: 27 pb no anel mágico (27)\nV2: 1 corr (não conta), 4 pb, 3 pbx, 4 pb, 3 pbx, pbx na corrente inicial",
       2,
     );
-    // o anexo espera "4x pb; 3x pbx; 4x pb; 3x pbx; 1x pbx"; o texto "pbx na corr" sai do parser como 6 pbx e uma corr:
-    // diferença guardada em docs/12 (pergunta 6); o valor do anexo não foi alterado
-    expect(show(chainsOf(k))).toBe("1CH0 | 4SC 3SL0 4SC 4SL0 1CH | ");
+    // a regra do v3.py dobra (4 pb; 3 pbx) x2; o anexo espera o miolo por extenso (pergunta 6 em docs/12)
+    expect(show(chainsOf(k))).toBe("1CH0 | (4SC 3SL0) x2 | 1JOIN");
+  });
+  test("pbx na corr sozinho não é reconhecido como fechamento (pergunta 6 em docs/12)", () => {
+    const k = keysOf("V1: 27 pb no anel mágico (27)\nV2: 1 corr (não conta), 4 pb, pbx na corr", 2);
+    expect(k.at(-1)).not.toBe("JOIN");
   });
 });

@@ -204,6 +204,16 @@ describe("tutorial.*: modo de leitura (G2)", () => {
     expect((dispatch("tutorial.first", { text: BOLA }) as View).index).toBe(0);
   });
 
+  test("faixa de fio nas voltas 7 a 9 dá duas trocas de fio e quebra as cadeias por fio", () => {
+    dispatch("paint.rows", { yarn: "B", from: 7, to: 9 });
+    const r = dispatch("tutorial.script", { text: BOLA, count: 200 }) as {
+      steps: { kind: string; yarnId: string; alerts: string[] }[];
+    };
+    const steps = r.steps.filter((s) => s.kind === "step");
+    expect(steps.filter((s) => s.alerts.includes("yarnChange"))).toHaveLength(2);
+    expect(steps.filter((s) => s.yarnId === "B")).toHaveLength(3); // uma cadeia de 36 pb por volta
+  });
+
   test("tutorial.reading liga, desliga e alterna sem mexer na posição", () => {
     dispatch("tutorial.goto", { text: BOLA, round: 4 });
     expect(dispatch("tutorial.reading", { on: true })).toEqual({ reading: true });

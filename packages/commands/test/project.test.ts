@@ -47,6 +47,21 @@ describe("project.export / project.import", () => {
     expect(JSON.stringify(exportEditAll())).toBe(edit);
   });
 
+  test("o texto com #marco vai e volta no arquivo e o marco continua no modo de leitura", () => {
+    const marked = `${TEXT}
+#marco Fechar o corpo`;
+    resetParts(marked);
+    const file = JSON.parse(JSON.stringify(dispatch("project.export")));
+    resetParts("V1: 6 pb no anel mágico (6)");
+    dispatch("project.import", { project: file });
+    expect(partsSnapshot().parts[0]?.text).toBe(marked);
+    dispatch("tutorial.goto", { text: marked, round: 3 });
+    const v = dispatch("tutorial.slide", { text: marked, kind: "review" }) as {
+      milestone: { title: string };
+    };
+    expect(v.milestone.title).toBe("Fechar o corpo");
+  });
+
   test("arquivo inválido é recusado e o projeto atual fica como estava", () => {
     resetParts(TEXT);
     const before = JSON.stringify(dispatch("project.export"));

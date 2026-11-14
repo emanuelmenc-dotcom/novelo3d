@@ -45,9 +45,8 @@ test("os botões de modo, forma, pincel e desfazer e os do tutorial saíram das 
   for (const id of ["mode-select", "sel-rect", "brush-brush", "undo", "redo"]) {
     await expect(page.locator(`[data-panel="points"] [data-testid="${id}"]`)).toHaveCount(0);
   }
-  await page.getByRole("tab", { name: "Tutorial", exact: true }).click();
-  await expect(page.getByTestId("tutorial")).toBeVisible();
-  await expect(page.locator('[data-panel="tutorial"] [data-testid="tutorial-next"]')).toHaveCount(0);
+  // o tutorial deixou de ser janela: virou o modo de leitura, aberto pelo ribbon
+  await expect(page.getByRole("tab", { name: "Tutorial", exact: true })).toHaveCount(0);
 });
 
 test("busca de comandos: Ctrl+K acha uma ferramenta pelo nome e a executa", async ({ page }) => {

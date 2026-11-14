@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Tutorial passo a passo (P4, docs/13 seção 8): a janela mostra o passo, o 3D destaca o ponto e as bases, e o usuário
 // volta ao mesmo lugar depois de recarregar.
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, type Page, test } from "@playwright/test";
+
+const PORT = 47905;
 
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
 const state = (page: Page) => page.evaluate(() => window.__view3d?.state());
@@ -159,4 +163,49 @@ test('"Mostrar ponto" funciona nos polos da peça (voltas 1 e 17)', async ({ pag
   await page.screenshot({ path: "test-results/tutorial-polo-volta17.png" });
   const pos = await page.evaluate(() => window.__view3d?.cameraState().position ?? [0, 0, 0]);
   expect(pos.every((v) => Number.isFinite(v))).toBe(true);
+});
+
+test("setas andam o passo logo depois de abrir a aba Tutorial (o foco fica na aba)", async ({ page }) => {
+  await open(page);
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("tutorial-text")).toContainText("ponto 2 de");
+});
+
+test("o MCP anda o tutorial pelos mesmos comandos tutorial.* e o projeto leva a posição", async ({
+  page,
+}) => {
+  const client = new Client({ name: "e2e", version: "0" });
+  await client.connect(
+    new StdioClientTransport({
+      command: process.execPath,
+      args: ["tools/mcp-server/src/server.mjs"],
+      env: { ...process.env, NOVELO_BRIDGE_PORT: String(PORT) } as Record<string, string>,
+    }),
+  );
+  const call = async (method: string, params: Record<string, unknown> = {}) => {
+    const r = await client.callTool({ name: "novelo_bridge_call", arguments: { method, params } });
+    const text = (r.content as { text: string }[])[0]?.text ?? "";
+    return { isError: r.isError === true, text, json: r.isError ? null : JSON.parse(text) };
+  };
+  try {
+    await page.goto(`/?bridge=${PORT}`);
+    await expect(page.getByTestId("bridge-state")).toContainText("conectada", { timeout: 15_000 });
+    await tab(page, "3D").click();
+    await tab(page, "Tutorial").click();
+    const text = await page.getByLabel("Receita", { exact: true }).inputValue();
+    const r = await call("tutorial.goto", { text, round: 2 });
+    expect(r.isError, r.text).toBe(false);
+    expect(r.json.step.round).toBe(2);
+    await expect(page.getByTestId("tutorial-text")).toContainText("Volta 2, ponto 1");
+    const bad = await call("tutorial.goto", { text, round: 99 });
+    expect(bad.isError).toBe(true);
+    const sl = await call("tutorial.script", { text, from: 0, count: 3 });
+    expect(sl.json.steps.length).toBe(3);
+    const proj = await call("project.export");
+    expect(proj.isError, proj.text).toBe(false);
+    expect(proj.json.app).toBe("novelo3d");
+    expect(proj.json.tutorial.p1.index).toBe(6);
+  } finally {
+    await client.close();
+  }
 });

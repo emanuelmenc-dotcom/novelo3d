@@ -442,12 +442,10 @@ function App() {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el && /^(TEXTAREA|INPUT|SELECT)$/.test(el.tagName)) return;
-      // elementos que já usam as setas (abas, divisores, controles deslizantes) ficam com elas; botões comuns não
+      // elementos que já usam as setas (divisores, controles deslizantes, menus) ficam com elas; botões e abas não
       if (
         el &&
-        /^(tab|separator|slider|spinbutton|listbox|menuitem|menuitemradio)$/.test(
-          el.getAttribute("role") ?? "",
-        )
+        /^(separator|slider|spinbutton|listbox|menuitem|menuitemradio)$/.test(el.getAttribute("role") ?? "")
       )
         return;
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;

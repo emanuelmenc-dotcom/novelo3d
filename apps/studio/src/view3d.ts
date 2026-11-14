@@ -261,6 +261,7 @@ export function mountView3D(
   // estados de um ponto na pintura, do mais fraco ao mais forte: 0 normal, 1 por fazer (tutorial), 2 volta, 3 ponto, 4 selecionado
   const EDGE_TINT = [null, null, ROW_TINT, SET_TINT, SELECT] as const;
   const FADE_TO = new THREE.Color("#f4f1e8");
+  const wireBase = new THREE.Color(); // cor de trabalho do paint(): reaproveitada, sem alocar por segmento
   const FADE = 0.82;
   let tut: TutorialView | null = null;
   let tutFaded = 0;
@@ -384,10 +385,7 @@ export function mountView3D(
           );
           const tint = EDGE_TINT[st];
           const col =
-            tint ??
-            (isRowEdge[k] ? WIRE_ROW : WIRE_COL)
-              .clone()
-              .lerp(st === 1 ? FADE_TO : WIRE_ROW, st === 1 ? FADE : 0);
+            tint ?? wireBase.copy(isRowEdge[k] ? WIRE_ROW : WIRE_COL).lerp(FADE_TO, st === 1 ? FADE : 0);
           wc.setXYZ(k * 2, col.r, col.g, col.b);
           wc.setXYZ(k * 2 + 1, col.r, col.g, col.b);
         }

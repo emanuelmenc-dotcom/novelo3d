@@ -147,6 +147,7 @@ interface TutorialStep {
 - Um passo por operação, e não por nó: um aumento é um passo com dois nós.
 - `stuffNow` é emitido quando faltam poucas voltas para o fechamento.
 - A lista é determinada só pelo grafo e pelo dialeto; a interface cuida de câmera e animação.
+- **Implementado (P4, D-59):** os alertas são `rowStart`, `rowEnd` e `yarnChange`; `stuffNow`, `placeMarker` e `adaptation` ficam para depois. O `rowLabel` nomeia a volta única (7, 8, ... para "7–12"). `rowTotal` conta todos os passos da volta (inclui pular e fechar) e por isso pode passar da contagem da tabela de verificação. Marcadores de texto da receita não são passos. O fio de cada passo vem do grafo já pintado (`applyPaint`).
 
 ## 6. Propriedades que os testes devem garantir
 

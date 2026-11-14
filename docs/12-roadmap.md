@@ -4,7 +4,7 @@
 
 ## Estado em 2026-11-13: pausas e próxima etapa
 
-Pausados (D-57, interruptores em `packages/commands/src/features.ts`): série R (render 3D realista, R3b a R3d), R4 (path tracing), 3D realista dos pontos (R1), criador de pontos (B a E, `docs/16`) e Plano D (Electron). A etapa H (fio relaxado) foi encerrada sem sucesso (D-54). **Próxima etapa: P4 (tutorial)**, que só precisa do grafo de pontos e do 3D no estilo CrochetPARADE.
+Pausados (D-57, interruptores em `packages/commands/src/features.ts`): série R (render 3D realista, R3b a R3d), R4 (path tracing), 3D realista dos pontos (R1), criador de pontos (B a E, `docs/16`) e Plano D (Electron). A etapa H (fio relaxado) foi encerrada sem sucesso (D-54). **P4 (tutorial) feito em 2026-11-13 (D-59); aguardando o usuário experimentar.** Próxima: P5 (modelagem além da revolução), só depois da aprovação.
 
 ## Visão geral
 
@@ -65,6 +65,8 @@ Aceite: pintar 3 voltas gera as trocas nas linhas certas; a pintura sobrevive à
 ## P4 — Tutorial
 
 Roteiro ordenado de passos ligado ao 3D (ponto atual destacado, avisos de troca de cor). Aceite: número de passos igual ao da receita expandida.
+
+**Feito em 2026-11-13 (D-59).** Pacote `packages/tutorial` (`tutorialScript`), comandos `tutorial.get|next|prev|goto|script|reset`, janela "Tutorial" (anterior, próximo, ir à volta, setas do teclado, "Mostrar ponto"), destaque no 3D (ponto atual laranja, bases azuis, feito colorido, por fazer esmaecido), posição guardada por peça e no projeto. P-BOLA dá 402 passos (T1). Ficou de fora, por decisão: tocar/pausar e velocidade, câmera que segue o ponto, miniatura do gráfico, e os avisos `stuffNow`, `placeMarker` e `adaptation`.
 
 ## P5 — Modelagem além da revolução
 

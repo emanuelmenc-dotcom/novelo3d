@@ -62,6 +62,8 @@ O usuário não avança do passo 1 para o 2 sem confirmar a transcrição, porqu
 
 ## 7. Tutorial
 
+> **P4 (2026-11-13):** o tutorial é a janela "Tutorial", na área de baixo à direita do layout clássico (junto do 3D, que precisa estar à vista para mostrar o destaque). Quem tem layout salvo antigo a encontra no menu Layout, em painéis ocultos, ou escolhendo um preset. Atalhos: setas esquerda e direita (fora de campos de texto). A barra de tocar, pausar e velocidade e a miniatura do gráfico não foram feitas.
+
 - Ocupa a área principal quando ativo.
 - Barra inferior: anterior, tocar ou pausar, próximo, velocidade, seletor de volta.
 - Faixa de texto grande com a instrução do passo.

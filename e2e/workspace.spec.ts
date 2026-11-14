@@ -123,7 +123,7 @@ test("presets: Foco no 3D, Tudo em abas e volta ao clássico", async ({ page }) 
   await page.getByRole("button", { name: "Layout" }).click();
   await page.getByRole("menuitemradio", { name: /Tudo em abas/ }).click();
   await expect(page.locator("section.ws-leaf")).toHaveCount(1);
-  await expect(page.getByRole("tab")).toHaveCount(9);
+  await expect(page.getByRole("tab")).toHaveCount(10);
   await page.getByRole("tab", { name: "Receita", exact: true }).click();
   await expect(page.getByLabel("Receita", { exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/ws-abas.png" });

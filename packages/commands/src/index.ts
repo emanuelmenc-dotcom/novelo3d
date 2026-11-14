@@ -35,6 +35,7 @@ import {
 import { fromCp, parseCpDot, toCp } from "@novelo/interop";
 import { parsePattern, printPattern, printPatternWithYarns, splitLines } from "@novelo/notation";
 import { bandOf, MAX_LEGS, modelKey, tensionLevel } from "@novelo/stitch3d";
+import { type TutorialStep, tutorialScript } from "@novelo/tutorial";
 import { editCommands } from "./edit-commands.ts";
 import {
   engineFor,
@@ -78,6 +79,7 @@ import {
 } from "./render-store.ts";
 import { getSettings, resetSettings, type SettingsPatch, setSettings } from "./settings.ts";
 import { stitchEditorCommands } from "./stitch-editor-commands.ts";
+import { tutorialCommands } from "./tutorial-commands.ts";
 
 export {
   CUBE_POSITIONS,
@@ -185,6 +187,13 @@ export {
   subscribeRender,
 } from "./render-store.ts";
 export { stitchEditorState, stitchEditorVersion, subscribeStitchEditor } from "./stitch-editor-store.ts";
+export {
+  exportTutorial,
+  loadTutorial,
+  subscribeTutorial,
+  type TutorialPos,
+  tutorialVersion,
+} from "./tutorial-store.ts";
 export {
   BAR_PX,
   buildLayout,
@@ -389,12 +398,22 @@ function layoutOut(p: Params, yarnMap?: Record<string, string>, mirror = false):
   return out;
 }
 
+/** Roteiro do tutorial da receita (`text`, `dialect`), com a pintura do projeto, e o uid permanente de cada ponto. */
+function scriptOf(p: Params): { steps: TutorialStep[]; uidOf: (id: number) => number } {
+  const { pattern } = read(p);
+  const { paint } = paintOf(p);
+  const graph = applyPaint(buildGraph(pattern), paint);
+  const eng = engineFor(str(p, "text"), dialectOf(p));
+  return { steps: tutorialScript(pattern, graph), uidOf: (id) => eng.store.uid[id] as number };
+}
+
 export const commands: Record<string, Command> = {
   ...editCommands,
   ...partsCommands(layoutOut),
   ...materialsCommands((m, p) => dispatch(m, p)),
   ...stitchEditorCommands,
   ...projectCommands,
+  ...tutorialCommands(scriptOf),
   "system.ping": () => ({ pong: true }),
 
   // --- janela de render (R3): máquina de estados síncrona; o studio executa e relata o progresso

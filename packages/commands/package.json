@@ -13,6 +13,7 @@
     "@novelo/interop": "*",
     "@novelo/layout": "*",
     "@novelo/notation": "*",
-    "@novelo/stitch3d": "*"
+    "@novelo/stitch3d": "*",
+    "@novelo/tutorial": "*"
   }
 }

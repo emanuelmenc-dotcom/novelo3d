@@ -147,6 +147,8 @@ Depois de gerar, converter cada página em imagem e inspecionar: sobreposição 
 
 ## 4. Tutorial 3D
 
+> **P4 (2026-11-13):** entregues passo atual, ponto e bases destacados, feito e por fazer, texto, anterior/próximo/ir à volta, avisos de troca de fio e de início e fim de volta, progresso e a posição guardada. Não entregues: tocar/pausar/velocidade, câmera que segue o ponto (há o botão "Mostrar ponto"), ligação cruzada com o gráfico e a receita, avisos de marcador, encher e adaptação.
+
 Usa o roteiro de passos descrito em `09-motor-reverso.md`.
 
 | Elemento        | Comportamento                                                                            |

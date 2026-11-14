@@ -83,11 +83,25 @@ export interface LayoutData {
   parts?: { id: string; name: string; offset: number; count: number; error: string | null }[];
 }
 
+/** Estado do tutorial na vista: os pontos de `start` a `end` (exclusivo) são da peça do tutorial; os de fora ficam como estão. */
+export interface TutorialView {
+  current: number[];
+  parents: number[];
+  /** Último ponto já feito (índice da vista, inclusive). */
+  doneThrough: number;
+  start: number;
+  end: number;
+}
+
 export interface View3D {
   setData(data: LayoutData | null): void;
   /** Destaca todos os pontos das voltas dadas (índices expandidos) ou limpa com null. */
   highlightRows(rows: number[] | null, part?: string): void;
   setShowGraph(on: boolean): void;
+  /** Tutorial (P4): ponto atual, bases, o que já foi feito e o que falta (esmaecido). Índices dos pontos desta vista; null desliga. */
+  setTutorial(t: TutorialView | null): void;
+  /** Leva a câmera até o ponto `i` (índice da vista), olhando de fora da peça. */
+  focusOn(i: number): void;
   /** Só as linhas das ligações (azul: dentro da volta, vermelho: entre voltas), como a vista padrão do CrochetPARADE. */
   setWire(on: boolean): void;
   /** Cor de base (fio) de um ponto, como #rrggbb; para testes e ferramentas. */
@@ -145,6 +159,8 @@ export interface View3D {
     viewCube: ViewCubeOptions;
     /** Retângulo real do cubo em pixels do canvas (encolhe em 3D pequeno; visible=false quando some). */
     cubeRect: { x: number; y: number; size: number; visible: boolean };
+    /** Tutorial: pontos esmaecidos (por fazer) e pontos em destaque agora; vazio sem tutorial. */
+    tutorial: { faded: number; current: number[]; parents: number[] };
   };
 }
 
@@ -242,7 +258,14 @@ export function mountView3D(
   let wire = false;
   const edgeGeo = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true);
   const edgeMat = new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0 });
-  const EDGE_TINT = [null, ROW_TINT, SET_TINT, SELECT] as const;
+  // estados de um ponto na pintura, do mais fraco ao mais forte: 0 normal, 1 por fazer (tutorial), 2 volta, 3 ponto, 4 selecionado
+  const EDGE_TINT = [null, null, ROW_TINT, SET_TINT, SELECT] as const;
+  const FADE_TO = new THREE.Color("#f4f1e8");
+  const FADE = 0.82;
+  let tut: TutorialView | null = null;
+  let tutFaded = 0;
+  let tutCurrent: number[] = [];
+  let tutParents: number[] = [];
   const WIRE_ROW = new THREE.Color("#2a6fdb");
   const WIRE_COL = new THREE.Color("#d63a2a");
   let isRowEdge = new Uint8Array(0);
@@ -283,20 +306,38 @@ export function mountView3D(
     const c = new THREE.Color();
     if (nodeRGB.length !== nodes.length * 3) nodeRGB = new Float32Array(nodes.length * 3);
     const nodeState = new Uint8Array(nodes.length);
+    let faded = 0;
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i] as NodeMeta;
       c.copy(base[i] as THREE.Color);
       if (rowSel?.has(n.row) && (!rowPart || n.part === rowPart)) {
         c.copy(ROW_TINT);
-        nodeState[i] = 1;
+        nodeState[i] = 2;
       }
       if (setSel?.has(i)) {
         c.copy(SET_TINT);
-        nodeState[i] = 2;
+        nodeState[i] = 3;
       }
       if (selected === i) {
         c.copy(SELECT);
-        nodeState[i] = 3;
+        nodeState[i] = 4;
+      }
+      if (tut && i >= tut.start && i < tut.end) {
+        // no tutorial o que importa é o passo: ponto atual, bases, feito (cor do fio) e por fazer (esmaecido)
+        if (tut.current.includes(i)) {
+          c.copy(SELECT);
+          nodeState[i] = 4;
+        } else if (tut.parents.includes(i)) {
+          c.copy(SET_TINT);
+          nodeState[i] = 3;
+        } else if (i > tut.doneThrough) {
+          c.copy(base[i] as THREE.Color).lerp(FADE_TO, FADE);
+          nodeState[i] = 1;
+          faded++;
+        } else {
+          c.copy(base[i] as THREE.Color);
+          nodeState[i] = 0;
+        }
       }
       const b = batchMeshes[nodeBatch[i] as number];
       if (b) b.setColorAt(nodeSlot[i] as number, c);
@@ -318,7 +359,8 @@ export function mountView3D(
       for (let k = 0; k < edgeA.length; k++) {
         const a = edgeA[k] as number;
         const b = edgeB[k] as number;
-        const tint = EDGE_TINT[Math.max(nodeState[a] as number, nodeState[b] as number)];
+        const st = Math.max(nodeState[a] as number, nodeState[b] as number);
+        const tint = EDGE_TINT[st];
         if (tint) ec.copy(tint);
         else {
           ec.setRGB(
@@ -326,6 +368,8 @@ export function mountView3D(
             ((nodeRGB[a * 3 + 1] as number) + (nodeRGB[b * 3 + 1] as number)) / 2,
             ((nodeRGB[a * 3 + 2] as number) + (nodeRGB[b * 3 + 2] as number)) / 2,
           );
+          // segmento que ainda não foi feito (uma das pontas por fazer): esmaecido como os pontos
+          if (st === 1) ec.lerp(FADE_TO, FADE);
         }
         edgeMesh.setColorAt(k, ec);
       }
@@ -334,17 +378,25 @@ export function mountView3D(
         // "só linhas": vermelho/azul de fábrica, mas o destaque (volta, ponto, seleção) também aparece
         const wc = wireLines.geometry.getAttribute("color") as THREE.BufferAttribute;
         for (let k = 0; k < edgeA.length; k++) {
-          const tint =
-            EDGE_TINT[
-              Math.max(nodeState[edgeA[k] as number] as number, nodeState[edgeB[k] as number] as number)
-            ];
-          const col = tint ?? (isRowEdge[k] ? WIRE_ROW : WIRE_COL);
+          const st = Math.max(
+            nodeState[edgeA[k] as number] as number,
+            nodeState[edgeB[k] as number] as number,
+          );
+          const tint = EDGE_TINT[st];
+          const col =
+            tint ??
+            (isRowEdge[k] ? WIRE_ROW : WIRE_COL)
+              .clone()
+              .lerp(st === 1 ? FADE_TO : WIRE_ROW, st === 1 ? FADE : 0);
           wc.setXYZ(k * 2, col.r, col.g, col.b);
           wc.setXYZ(k * 2 + 1, col.r, col.g, col.b);
         }
         wc.needsUpdate = true;
       }
     }
+    tutFaded = faded;
+    tutCurrent = tut ? [...tut.current] : [];
+    tutParents = tut ? [...tut.parents] : [];
     for (const b of batchMeshes) if (b.instanceColor) b.instanceColor.needsUpdate = true;
     if (tubeMesh) (tubeMesh.geometry.getAttribute("color") as THREE.BufferAttribute).needsUpdate = true;
     invalidate();
@@ -1009,6 +1061,29 @@ export function mountView3D(
       showGraph = on;
       if (lines) lines.visible = on;
     },
+    focusOn(i) {
+      if (i < 0 || i >= nodes.length) return;
+      const p = new THREE.Vector3(centers[i * 3], centers[i * 3 + 1], centers[i * 3 + 2]);
+      const dir = p.clone().sub(fitCenter);
+      if (dir.lengthSq() < 1e-6) dir.set(0, -1, 0);
+      dir.normalize();
+      // nos polos (voltas 1, 2 e as últimas) "para cima" (Z) degenera: tira a câmera um pouco do eixo, como o snapView
+      const side = Math.hypot(dir.x, dir.y);
+      if (side < 0.2) {
+        if (side < 1e-6) dir.set(0, -0.2, Math.sign(dir.z) || 1);
+        else dir.set((dir.x / side) * 0.2, (dir.y / side) * 0.2, dir.z);
+        dir.normalize();
+      }
+      anim = null;
+      controls.target.copy(p);
+      camera.position.copy(p).addScaledVector(dir, Math.max(fitRadius * 0.9, 4));
+      controls.update();
+      invalidate();
+    },
+    setTutorial(t) {
+      tut = t;
+      paint();
+    },
     setWire(on) {
       wire = on;
       applyDetail();
@@ -1109,6 +1184,7 @@ export function mountView3D(
         animating: anim !== null,
         viewCube: { ...cubeOpts },
         cubeRect: cubeRect(cubeOpts, renderer.domElement.clientWidth, renderer.domElement.clientHeight),
+        tutorial: { faded: tutFaded, current: tutCurrent, parents: tutParents },
       };
     },
   };

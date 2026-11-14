@@ -8,6 +8,7 @@ import {
   mountView3D,
   type NodeMeta,
   type Tool,
+  type TutorialView,
   type View3D,
   type ViewCubeOptions,
 } from "./view3d.ts";
@@ -24,6 +25,8 @@ export function Viewer3D(props: {
   showGraph: boolean;
   /** Só as linhas das ligações (estilo CrochetPARADE). */
   wire?: boolean;
+  /** Passo do tutorial a destacar no 3D, ou null. */
+  tutorial?: TutorialView | null;
   rows: number[] | null;
   /** Peça cujas voltas/seleção aparecem destacadas (montagem). */
   activePart?: string;
@@ -72,6 +75,9 @@ export function Viewer3D(props: {
   useEffect(() => {
     view.current?.setWire(props.wire ?? false);
   }, [props.wire]);
+  useEffect(() => {
+    view.current?.setTutorial(props.tutorial ?? null);
+  }, [props.tutorial]);
   useEffect(() => {
     view.current?.highlightRows(props.rows, props.activePart);
   }, [props.rows, props.activePart]);

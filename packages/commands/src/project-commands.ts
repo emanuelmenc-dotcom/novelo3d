@@ -4,6 +4,7 @@
 import { exportEditAll, loadEditAll } from "./edit-store.ts";
 import { exportPaintAll, loadPaintAll } from "./paint-store.ts";
 import { exportParts, loadParts, partsSnapshot, rootOf, validPartCount } from "./parts-store.ts";
+import { exportTutorial, loadTutorial } from "./tutorial-store.ts";
 
 type Params = Record<string, unknown>;
 
@@ -18,6 +19,7 @@ export function exportProject() {
     parts: exportParts(),
     edit: exportEditAll(ids),
     paint: exportPaintAll(ids),
+    tutorial: exportTutorial(ids),
   };
 }
 
@@ -35,6 +37,7 @@ export function importProject(raw: unknown, checkOnly = false): { parts: number 
   const root = rootOf(partsSnapshot().active).id;
   loadPaintAll(o.paint, root);
   loadEditAll(o.edit, root);
+  loadTutorial(o.tutorial); // projetos antigos não têm: a posição recomeça
   return { parts: partsSnapshot().parts.length };
 }
 

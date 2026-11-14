@@ -113,6 +113,7 @@ Cada pacote tem `src/`, `test/` e um `README.md` de uma página dizendo o que en
 
 - Converte o grafo de pontos em uma lista ordenada de passos com texto, pais do ponto e avisos de troca de cor.
 - Não desenha nada; a interface consome o roteiro.
+- Feito em P4 (`packages/tutorial`, depende só de `core` e `notation`); a camada de comandos guarda a posição e expõe `tutorial.*`.
 
 ### interop
 

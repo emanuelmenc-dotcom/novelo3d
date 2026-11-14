@@ -8,10 +8,12 @@ import {
   exportEditAll,
   exportPaintAll,
   exportParts,
+  exportTutorial,
   features,
   loadEditAll,
   loadPaintAll,
   loadParts,
+  loadTutorial,
   loadWorkspace,
   type PanelId,
   paintSnapshot,
@@ -24,7 +26,9 @@ import {
   subscribeParts,
   subscribeRender,
   subscribeSettings,
+  subscribeTutorial,
   subscribeWorkspace,
+  tutorialVersion,
 } from "@novelo/commands";
 import { StrictMode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
@@ -40,9 +44,10 @@ import { RenderPanel } from "./render/RenderPanel.tsx";
 import { installRenderJob, renderGeomChanged, setRenderSource } from "./render/renderJob.ts";
 import { SettingsDialog } from "./SettingsDialog.tsx";
 import { StitchEditorPanel } from "./StitchEditorPanel.tsx";
+import { type TutorialData, TutorialPanel } from "./TutorialPanel.tsx";
 import "./styles.css";
 import { Viewer3D } from "./Viewer3D.tsx";
-import type { LayoutData, NodeMeta } from "./view3d.ts";
+import type { LayoutData, NodeMeta, TutorialView } from "./view3d.ts";
 import { subscribeVisible, visibleSnapshot } from "./visibility.ts";
 import { type PanelRenderers, Workspace } from "./Workspace.tsx";
 import { YarnsPanel } from "./YarnsPanel.tsx";
@@ -127,6 +132,7 @@ function applyScale(s: { interface: { scale: number; textScale: number } }) {
 applyScale(settingsSnapshot());
 const EDIT_KEY = "novelo3d.edit"; // fio e tensão por ponto, de cada peça
 const PARTS_KEY = "novelo3d.parts"; // peças, receitas e costuras
+const TUTORIAL_KEY = "novelo3d.tutorial"; // onde o usuário parou no tutorial, por peça
 function readJson(key: string): unknown {
   try {
     const v = localStorage.getItem(key);
@@ -146,6 +152,7 @@ function readJson(key: string): unknown {
   const root = rootOf(partsSnapshot().active).id;
   loadPaintAll(readJson(PROJECT_KEY), root);
   loadEditAll(readJson(EDIT_KEY), root);
+  loadTutorial(readJson(TUTORIAL_KEY));
 }
 // gravação no navegador: se falhar (espaço cheio, armazenamento bloqueado), a tela avisa em vez de calar
 // (uma chave grande pode falhar enquanto outra pequena grava: o aviso vale enquanto qualquer uma falhar)
@@ -191,6 +198,9 @@ subscribeParts(() => {
     put(EDIT_KEY, JSON.stringify(exportEditAll(ids)));
     put(PROJECT_KEY, JSON.stringify(exportPaintAll(ids)));
   }, 300);
+});
+subscribeTutorial(() => {
+  put(TUTORIAL_KEY, JSON.stringify(exportTutorial()));
 });
 subscribeSettings((s) => {
   applyScale(s);
@@ -259,6 +269,8 @@ function App() {
   const visible = useSyncExternalStore(subscribeVisible, visibleSnapshot);
   const show3d = visible.has("view3d");
   const rstate = useSyncExternalStore(subscribeRender, renderSnapshot).state;
+  const showTutorial = visible.has("tutorial");
+  const tutVersion = useSyncExternalStore(subscribeTutorial, tutorialVersion);
   const showRender = visible.has("render") || rstate === "running" || rstate === "paused";
   const edit = useSyncExternalStore(subscribeEdit, editSnapshot);
   const tools = useSyncExternalStore(subscribeTools, toolSnapshot);
@@ -310,6 +322,34 @@ function App() {
       return null;
     }
   }, [show3d, ct, cd, edit.version]);
+  // passo atual do tutorial (só com a janela à vista); a receita grande usa o mesmo texto adiado do gráfico e do 3D
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a pintura e a edição (estado dos comandos) também invalidam
+  const tut = useMemo(() => {
+    if (!showTutorial) return null;
+    try {
+      const data = call<
+        TutorialData & { doneThrough: number; step: { nodeIds: number[]; parentIds: number[] } | null }
+      >("tutorial.get", { text: ct, dialect: cd, part: partsState.active });
+      return { data, error: null as string | null };
+    } catch (e) {
+      return { data: null, error: (e as Error).message };
+    }
+  }, [showTutorial, ct, cd, partsState.active, tutVersion, paintState, pver]);
+  // o mesmo passo, nos índices dos pontos da vista 3D (numa montagem a peça do tutorial começa no deslocamento dela)
+  const tutorialView = useMemo((): TutorialView | null => {
+    const step = tut?.data?.step;
+    if (!tut?.data || !step || !layout) return null;
+    const part = multi ? layout.parts?.find((q) => q.id === partsState.active) : undefined;
+    const start = part?.offset ?? 0;
+    const end = start + (part?.count ?? layout.nodes.length);
+    return {
+      current: step.nodeIds.map((id) => id + start),
+      parents: step.parentIds.map((id) => id + start),
+      doneThrough: tut.data.doneThrough + start,
+      start,
+      end,
+    };
+  }, [tut, layout, multi, partsState.active]);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
   // o render busca as posições na hora do Play (mesmo sem a aba 3D ou Render à vista) e avisa se a geometria mudar
@@ -395,6 +435,36 @@ function App() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [show3d]);
+
+  // setas esquerda e direita andam o tutorial (só com a janela à vista e fora de campos de texto)
+  useEffect(() => {
+    if (!showTutorial) return;
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && /^(TEXTAREA|INPUT|SELECT)$/.test(el.tagName)) return;
+      // elementos que já usam as setas (abas, divisores, controles deslizantes) ficam com elas; botões comuns não
+      if (
+        el &&
+        /^(tab|separator|slider|spinbutton|listbox|menuitem|menuitemradio)$/.test(
+          el.getAttribute("role") ?? "",
+        )
+      )
+        return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      try {
+        dispatch(e.key === "ArrowRight" ? "tutorial.next" : "tutorial.prev", {
+          text: ct,
+          dialect: cd,
+          part: partsState.active,
+        });
+        e.preventDefault();
+      } catch {
+        // receita inválida: nada a andar
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showTutorial, ct, cd, partsState.active]);
 
   // Ctrl+Z / Ctrl+Y (ou Ctrl+Shift+Z) desfazem e refazem as edições por ponto, fora dos campos de texto
   useEffect(() => {
@@ -633,6 +703,7 @@ function App() {
           layout={layout}
           showGraph={showGraph}
           wire={wire}
+          tutorial={tutorialView}
           rows={highlighted}
           {...(multi ? { activePart: partsState.active } : {})}
           cube={settings.interface.viewCube}
@@ -660,6 +731,20 @@ function App() {
     render: () => <RenderPanel />,
 
     stitchEditor: () => <StitchEditorPanel />,
+
+    tutorial: () => (
+      <TutorialPanel
+        data={tut?.data ?? null}
+        error={tut?.error ?? null}
+        countWarning={view.verify ? !view.verify.ok : false}
+        text={ct}
+        dialect={cd}
+        part={partsState.active}
+        {...(tutorialView && show3d
+          ? { onShow: () => window.__view3d?.focusOn(tutorialView.current[0] ?? tutorialView.start) }
+          : {})}
+      />
+    ),
 
     points: () => <PointsPanel text={text} dialect={dialect} selNode={selNode} />,
 

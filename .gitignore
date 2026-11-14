@@ -12,3 +12,6 @@ referencia/sessao-sapo/
 # sistema
 .DS_Store
 Thumbs.db
+
+# grafo de conhecimento (graphify)
+graphify-out/

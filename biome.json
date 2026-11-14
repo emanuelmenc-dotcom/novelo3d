@@ -10,7 +10,8 @@
       "!playwright-report",
       "!test-results",
       "!.claude",
-      "!docs/imagens"
+      "!docs/imagens",
+      "!graphify-out"
     ]
   },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 110 },

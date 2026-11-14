@@ -246,12 +246,18 @@ test("no modo de leitura nada edita: o mesmo arrasto que pinta na edição não 
     await page.mouse.up();
   };
   expect(await edited()).toBe(0);
+  await page.evaluate(() => window.__timeline?.run("paint.rows", { yarn: "B", from: 2, to: 2 })); // algo para desfazer
   await ribbon(page, "tutorial");
   await page.getByTestId("reading-start").click();
   await expect(page.getByTestId("reading")).toBeVisible();
   await drag();
+  await page.keyboard.press("Control+z"); // na leitura nem o desfazer edita
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("reading")).toHaveCount(0);
+  expect(await page.evaluate(() => window.__timeline?.run("history.get"))).toEqual({
+    canUndo: true,
+    canRedo: false,
+  }); // o Ctrl+Z da leitura não desfez a pintura
   expect(await edited()).toBe(0);
   // controle positivo: o mesmo arrasto, fora do modo de leitura, pinta
   await drag();

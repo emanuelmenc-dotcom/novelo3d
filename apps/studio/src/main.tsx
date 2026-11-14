@@ -520,6 +520,7 @@ function App() {
       const el = e.target as HTMLElement | null;
       if (el && /^(TEXTAREA|INPUT|SELECT)$/.test(el.tagName)) return;
       if (!(e.ctrlKey || e.metaKey)) return;
+      if (readingOn()) return; // no modo de leitura nada edita, nem desfazendo
       const k = e.key.toLowerCase();
       try {
         if (k === "z" && !e.shiftKey) dispatch("history.undo");

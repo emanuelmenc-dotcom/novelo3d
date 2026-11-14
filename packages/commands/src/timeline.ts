@@ -435,6 +435,9 @@ function runFeature(f: Feature, run: (m: string, p: Params) => unknown): void {
   } else run(f.method, rest);
 }
 
+/** Comandos de valor absoluto: dois seguidos no mesmo alvo se juntam (o último vale). */
+const COALESCE = new Set(["parts.set", "assembly.set", "seam.set", "edit.setDefaultTension", "yarns.set"]);
+
 const isRecipe = (f: Feature | undefined): boolean =>
   !!f &&
   (f.method === "parts.commitText" ||
@@ -456,6 +459,18 @@ function push(f: Feature): void {
     features[marker - 1] = { ...prev, method: "group", params: {}, items, counters: prev.counters };
     emit();
     return;
+  }
+  // ajustes de valor absoluto (digitar um nome, arrastar um controle) seguidos no mesmo alvo viram um só: vale o último
+  if (prev && !prev.suppressed && !prev.items && COALESCE.has(f.method) && prev.method === f.method) {
+    const same =
+      f.method === "edit.setDefaultTension" ||
+      f.method === "yarns.set" ||
+      (f.params.id !== undefined && prev.params.id === f.params.id);
+    if (same && prev.params.part === f.params.part) {
+      features[marker - 1] = { ...prev, params: { ...prev.params, ...f.params } };
+      emit();
+      return;
+    }
   }
   f.id = nextId++;
   // uma feature nova entra no marcador: as de depois dele continuam (D-68)

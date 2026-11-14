@@ -377,11 +377,11 @@ describe("revisão do G6", () => {
 
   test("depois de muitas features as mais antigas viram base e o desfazer das recentes continua", () => {
     dispatch("parts.instance", { id: "p1" });
-    for (let i = 0; i < 230; i++) dispatch("parts.set", { id: "p2", pos: [i, 0, 0] });
+    for (let i = 0; i < 230; i++) dispatch("parts.set", { id: i % 2 ? "p2" : "p1", pos: [i, 0, 0] });
     const t = timelineView();
     expect(t.features.length).toBeLessThanOrEqual(200);
     dispatch("history.undo");
-    expect((dispatch("parts.get") as { parts: { pos: number[] }[] }).parts[1]?.pos[0]).toBe(228);
+    expect((dispatch("parts.get") as { parts: { pos: number[] }[] }).parts[1]?.pos[0]).toBe(227);
   });
 
   test("desfazer a criação da peça ativa devolve a edição para uma peça que existe", () => {
@@ -402,5 +402,29 @@ describe("revisão do G6", () => {
     dispatch("parts.copy", { id: "p1" });
     dispatch("history.undo");
     expect((dispatch("parts.get") as { draft: { a: unknown } }).draft.a).not.toBeNull();
+  });
+});
+
+describe("ajustes seguidos viram uma feature só", () => {
+  test("digitar um nome (8 teclas), arrastar a tensão padrão e a paleta não enchem a linha do tempo", () => {
+    dispatch("parts.instance", { id: "p1" });
+    for (const nome of ["A", "Al", "Alt", "Alta", "Altan", "Altane", "Altaner", "Altaneira"])
+      dispatch("parts.set", { id: "p2", name: nome });
+    for (let i = 0; i < 20; i++) dispatch("edit.setDefaultTension", { value: i / 20 });
+    expect(methods()).toEqual(["parts.instance", "parts.set", "edit.setDefaultTension"]);
+    expect((dispatch("parts.get") as { parts: { name: string }[] }).parts[1]?.name).toBe("Altaneira");
+    // mexer em outro alvo ou em outro campo da mesma peça não junta com o anterior se for outro comando
+    dispatch("parts.set", { id: "p1", pos: [1, 0, 0] });
+    expect(methods()).toHaveLength(4);
+  });
+
+  test("a feature juntada reexecuta igual (valor do último ajuste)", () => {
+    dispatch("parts.instance", { id: "p1" });
+    dispatch("parts.set", { id: "p2", pos: [3, 0, 0] });
+    dispatch("parts.set", { id: "p2", pos: [7, 0, 0] });
+    dispatch("parts.set", { id: "p2", name: "Z" });
+    replayTimeline();
+    const p = (dispatch("parts.get") as { parts: { pos: number[]; name: string }[] }).parts[1];
+    expect(p).toMatchObject({ pos: [7, 0, 0], name: "Z" });
   });
 });

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Desfazer pela linha do tempo (G6): reexecutar tudo a cada Ctrl+Z precisa continuar rápido numa receita grande.
 import { expect, test } from "@playwright/test";
-import { showTab } from "./ribbon.ts";
+import { expectTimelineOk, showTab } from "./ribbon.ts";
 
 const bola = (voltas: number): string => {
   const rows = ["V1: 6 pb no anel mágico (6)", "V2: 6 aum (12)"];
@@ -26,30 +26,36 @@ test("Ctrl+Z numa receita de 6 mil pontos, depois de editar a receita e 20 traç
     const recipe =
       (t.run("project.export") as { parts: { parts: { text: string }[] } }).parts.parts[0]?.text ?? "";
     const last = (t.run("points.info", { text: recipe }) as { lastUid: number }).lastUid;
+    t.run("parts.instance", { id: "p1" });
+    const frames = () =>
+      new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));
+    // tempo de uma ação até o 3D e o gráfico recalcularem (dois quadros depois)
+    const timed = async (fn: () => void): Promise<number> => {
+      const t0 = performance.now();
+      fn();
+      await frames();
+      return performance.now() - t0;
+    };
     for (let k = 0; k < 20; k++) {
       t.run("history.begin");
       t.run("tool.brush", { text: recipe, uid: last - 10 - k * 40, hops: 1, prop: "tension", value: 0.5 });
       t.run("history.end");
     }
+    const moveDo = await timed(() => t.run("parts.set", { id: "p2", pos: [30, 0, 0] }));
+    const moveUndo = await timed(() => t.run("history.undo"));
+    const strokeDo = await timed(() =>
+      t.run("tool.brush", { text: recipe, uid: last - 5, hops: 1, prop: "tension", value: 0.1 }),
+    );
     const edits = () => (t.run("edit.get") as { tensionOverrides: number }).tensionOverrides;
-    // referência: quanto custa uma edição comum de ponto até o 3D e o gráfico recalcularem
-    const r0 = performance.now();
-    t.run("tool.brush", { text: recipe, uid: last - 5, hops: 0, prop: "tension", value: 0.1 });
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));
-    const ref = performance.now() - r0;
-    const before2 = edits();
-    const t0 = performance.now();
-    t.run("history.undo");
-    // até o 3D e o gráfico recalcularem: dois quadros depois da mudança
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));
-    const dt = performance.now() - t0;
-    if (edits() >= before2) throw new Error("o desfazer não mudou as edições");
-    return { dt, ref };
+    const before = edits();
+    const strokeUndo = await timed(() => t.run("history.undo"));
+    if (edits() >= before) throw new Error("o desfazer não mudou as edições");
+    return { moveDo, moveUndo, strokeDo, strokeUndo };
   });
   console.log(
-    `desfazer levou ${ms.dt.toFixed(0)} ms; uma edição comum levou ${ms.ref.toFixed(0)} ms (até 3D e gráfico recalcularem)`,
+    `fazer/desfazer: mover peça ${ms.moveDo.toFixed(0)}/${ms.moveUndo.toFixed(0)} ms; traço de tensão ${ms.strokeDo.toFixed(0)}/${ms.strokeUndo.toFixed(0)} ms`,
   );
-  expect(ms.dt).toBeLessThan(10_000);
+  expect(ms.strokeUndo).toBeLessThan(10_000);
   // digitar a receita em vários passos vira uma feature só na faixa
   await showTab(page, "Receita");
   const area = page.getByLabel("Receita", { exact: true });
@@ -69,6 +75,7 @@ test("Ctrl+Z numa receita de 6 mil pontos, depois de editar a receita e 20 traç
   const feats = recipes.length;
   expect(feats).toBe(2);
   expect((recipes[1] as { label?: string }).label).toContain("3 edições");
+  await expectTimelineOk(page);
 });
 
 test("o desfazer sobrevive a recarregar a página; uma linha do tempo fora de sincronia é descartada sem perder o projeto", async ({

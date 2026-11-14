@@ -180,3 +180,36 @@ test("montagens na tela: nova montagem pelo ribbon, mover pelas propriedades, es
   await expect(page.locator("[data-part]")).toHaveCount(1);
   await expect.poll(() => count(page)).toBe(433);
 });
+
+test("o MCP anda a linha do tempo: lê, volta o marcador, suprime, edita, exclui e confere a reexecução", async ({
+  page,
+}) => {
+  await withBridge(page, async (call) => {
+    await expect.poll(() => count(page)).toBe(433);
+    await call("parts.instance", { id: "p1" });
+    await call("paint.rows", { yarn: "B", from: 2, to: 2 });
+    const t = await call("timeline.get");
+    expect(t.json.features.map((f: { method: string }) => f.method)).toEqual([
+      "parts.instance",
+      "paint.rows",
+    ]);
+    expect(t.json).toMatchObject({ marker: 2, canUndo: true, canRedo: false });
+    const back = await call("timeline.rollTo", { index: 1 });
+    expect(back.json.marker).toBe(1);
+    await expect.poll(() => count(page)).toBe(866);
+    expect((await call("timeline.rollTo", { index: 9 })).isError).toBe(true);
+    const id = t.json.features[1].id;
+    const edited = await call("timeline.edit", { id, params: { from: 1, to: 3 } });
+    expect(edited.json.features[1].params).toMatchObject({ from: 1, to: 3 });
+    const sup = await call("timeline.suppress", { id: t.json.features[0].id });
+    expect(sup.json.features[0].suppressed).toBe(true);
+    await expect.poll(() => count(page)).toBe(433);
+    await call("timeline.suppress", { id: t.json.features[0].id });
+    const ok = await call("timeline.verify");
+    expect(ok.json).toMatchObject({ ok: true, diff: null });
+    expect((await call("history.undo")).isError).toBe(false);
+    const gone = await call("timeline.remove", { id });
+    expect(gone.json.features.map((f: { method: string }) => f.method)).toEqual(["parts.instance"]);
+    expect((await call("timeline.remove", { id: 9999 })).isError).toBe(true);
+  });
+});

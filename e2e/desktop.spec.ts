@@ -30,6 +30,15 @@ test("o executável abre o studio, mostra a receita de exemplo e guarda o projet
     const second = spawn(exe, [`--user-data-dir=${profile}`], { stdio: "ignore" });
     const code = await new Promise((r) => second.once("exit", r).once("error", () => r("erro")));
     expect(code).toBe(0);
+    // ir para outro endereço (o que acontece ao soltar um arquivo na janela) é bloqueado: o app continua na tela
+    const url = page.url();
+    await page.evaluate(() => {
+      location.href = "file:///C:/";
+    });
+    await page.waitForTimeout(1000);
+    expect(page.url()).toBe(url);
+    // (o Playwright fica esperando a navegação bloqueada terminar, então confere o texto direto na página)
+    expect(await page.evaluate(() => document.body.innerText.includes("866 nós"))).toBe(true);
     await page.waitForTimeout(1500); // a gravação automática tem atraso
     await first.close();
 
@@ -42,6 +51,10 @@ test("o executável abre o studio, mostra a receita de exemplo e guarda o projet
     });
     await reopened.close();
   } finally {
-    rmSync(profile, { recursive: true, force: true });
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+    } catch {
+      // shortcut: no Windows o Electron às vezes segura o perfil por mais alguns segundos; sobra só a pasta temporária
+    }
   }
 });

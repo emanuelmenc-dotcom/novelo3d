@@ -18,5 +18,7 @@ app.whenReady().then(() => {
   win = new BrowserWindow({ width: 1400, height: 900, title: "Novelo3D", backgroundColor: "#f4f1e8" });
   win.loadFile(path.join(__dirname, "web", "index.html"));
   win.on("page-title-updated", (e) => e.preventDefault());
+  // soltar um arquivo fora das áreas do app levaria a janela até ele, sem menu nem botão para voltar
+  win.webContents.on("will-navigate", (e) => e.preventDefault());
 });
 app.on("window-all-closed", () => app.quit());

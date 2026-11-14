@@ -175,3 +175,16 @@ test("faixa da linha do tempo: ícones, opções por clique, falha em vermelho, 
   await page.getByTestId("timeline-collapse").click();
   await expect(page.getByTestId("timeline-first")).toHaveCount(0);
 });
+
+test("fechar ou recarregar logo depois de mudar não perde a mudança nem o desfazer", async ({ page }) => {
+  await page.goto("/");
+  await expect.poll(() => page.evaluate(() => window.__view3d?.state().count ?? 0)).toBe(433);
+  await page.evaluate(() => {
+    window.__timeline?.run("parts.instance", { id: "p1" });
+    window.__timeline?.run("paint.rows", { yarn: "B", from: 2, to: 2 });
+  });
+  await page.reload(); // sem esperar a gravação com atraso
+  await expect.poll(() => page.evaluate(() => window.__view3d?.state().count ?? 0)).toBe(866);
+  const t = (await page.evaluate(() => window.__timeline?.run("timeline.get"))) as { features: unknown[] };
+  expect(t.features).toHaveLength(2);
+});

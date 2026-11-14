@@ -27,6 +27,25 @@ const refused = (fn: () => unknown): string => {
 };
 
 describe("project.export / project.import", () => {
+  test("arquivo com linha do tempo fora de sincronia abre como está e sem histórico; em sincronia mantém o desfazer", () => {
+    resetParts(TEXT);
+    dispatch("paint.rows", { yarn: "B", from: 2, to: 2 });
+    const good = JSON.parse(JSON.stringify(dispatch("project.export")));
+    // arquivo editado à mão (ou de outra versão): a peça não está onde a linha do tempo a deixa. (Receita diferente não
+    // serve de exemplo: vira uma feature de receita pendente, que dá para desfazer.)
+    const edited = JSON.parse(JSON.stringify(good));
+    edited.parts.parts[0].pos = [99, 0, 0];
+    resetParts("");
+    const r = dispatch("project.import", { project: edited }) as { history: string };
+    expect(r.history).toBe("descartado");
+    expect(partsSnapshot().parts[0]?.pos).toEqual([99, 0, 0]);
+    expect(dispatch("history.get")).toEqual({ canUndo: false, canRedo: false });
+    // o arquivo bom mantém o desfazer
+    const ok = dispatch("project.import", { project: good }) as { history: string };
+    expect(ok.history).toBe("mantido");
+    expect((dispatch("history.get") as { canUndo: boolean }).canUndo).toBe(true);
+  });
+
   test("ida e volta: receita, pintura e tensão por ponto voltam iguais", () => {
     resetParts(TEXT);
     dispatch("paint.rows", { yarn: "B", from: 2, to: 2 });

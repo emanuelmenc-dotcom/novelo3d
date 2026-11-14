@@ -59,7 +59,7 @@ import {
 } from "./paint-store.ts";
 import { partsCommands } from "./parts-commands.ts";
 import { assemblyContents, partById } from "./parts-store.ts";
-import { projectCommands } from "./project-commands.ts";
+import { importProject, projectCommands } from "./project-commands.ts";
 import {
   completeRender,
   failRender,
@@ -838,6 +838,18 @@ const mmOf = (v: number[]): number[] => v.map((x) => Math.round(x * sw() * 10) /
 const r3 = (v: number[]): number[] => v.map((x) => Math.round(x * 1000) / 1000);
 
 Object.assign(commands, {
+  /**
+   * Abre um projeto (`project`, o JSON de `project.export`; `check: true` só confere). A linha do tempo do arquivo só vale
+   * se reexecutá-la dá o projeto do arquivo (outra versão do app ou arquivo editado à mão): senão o projeto fica como está
+   * no arquivo e o histórico recomeça vazio, como na abertura do app. `history`: "mantido", "descartado" ou "vazio".
+   */
+  "project.import": (p: Params) => {
+    const r = importProject(p.project, p.check === true);
+    if (p.check === true) return r;
+    if (timelineView().features.length === 0) return { ...r, history: "vazio" };
+    const v = (commands["timeline.verify"] as Command)({ keep: true }) as { ok: boolean };
+    return { ...r, history: v.ok ? "mantido" : "descartado" };
+  },
   /**
    * Tamanho estimado do que está à vista: `target` = "all" (padrão), "part" ou "assembly" com `id`. Posições do mundo
    * (peça e montagens por fora dela), só peças visíveis. Em larguras de ponto e em mm (largura do ponto das configurações):

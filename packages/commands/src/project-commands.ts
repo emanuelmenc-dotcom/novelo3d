@@ -46,6 +46,5 @@ export function importProject(raw: unknown, checkOnly = false): { parts: number 
 export const projectCommands: Record<string, (p: Params) => unknown> = {
   /** Todo o projeto como JSON (versão 1): parts, edit, paint. */
   "project.export": () => ({ ...exportProject(), timeline: exportTimeline() }),
-  /** Substitui o projeto atual por `project` (o JSON de `project.export`). Com `check: true` só confere o arquivo, sem carregar. Erro claro e nada muda se o arquivo for inválido. */
-  "project.import": (p) => importProject(p.project, p.check === true),
+  // `project.import` fica em index.ts: depois de carregar, confere a linha do tempo com `timeline.verify`
 };

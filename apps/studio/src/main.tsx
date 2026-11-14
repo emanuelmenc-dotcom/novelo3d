@@ -10,6 +10,7 @@ import {
   exportParts,
   exportTutorial,
   features,
+  flushText,
   loadEditAll,
   loadPaintAll,
   loadParts,
@@ -195,48 +196,54 @@ const subscribeSave = (fn: () => void) => {
   return () => void saveListeners.delete(fn);
 };
 const saveFailedNow = () => saveFailed;
-let editTimer: ReturnType<typeof setTimeout> | undefined;
-subscribeEdit(() => {
-  // grava com atraso: um arrasto de pincel dispara muitas edições seguidas
-  clearTimeout(editTimer);
-  editTimer = setTimeout(() => {
-    put(EDIT_KEY, JSON.stringify(exportEditAll(partsSnapshot().parts.map((q) => q.id))));
-  }, 400);
-});
+const saveEdit = () => put(EDIT_KEY, JSON.stringify(exportEditAll(partsSnapshot().parts.map((q) => q.id))));
+const saveParts = () => {
+  const ids = partsSnapshot().parts.map((q) => q.id);
+  put(PARTS_KEY, JSON.stringify(exportParts()));
+  // copiar, remover/desfazer e destacar peças mexem nas edições e na pintura delas: grava junto
+  put(EDIT_KEY, JSON.stringify(exportEditAll(ids)));
+  put(PROJECT_KEY, JSON.stringify(exportPaintAll(ids)));
+};
+let tlBase: unknown;
+const saveTimeline = () => {
+  const t = dispatch("timeline.save") as { base: unknown } | null;
+  if (!t) return put(TIMELINE_KEY, "null");
+  // só regrava a base quando ela muda (ela é a parte grande)
+  if (t.base !== tlBase) {
+    put(TIMELINE_BASE_KEY, JSON.stringify(t.base));
+    tlBase = t.base;
+  }
+  put(TIMELINE_KEY, JSON.stringify({ ...t, base: undefined }));
+};
+// grava com atraso (um arrasto de pincel dispara muitas mudanças seguidas); ao fechar, o que estava esperando grava já
+const pending = new Map<() => void, ReturnType<typeof setTimeout>>();
+const later = (save: () => void, ms: number) => () => {
+  clearTimeout(pending.get(save));
+  pending.set(
+    save,
+    setTimeout(() => {
+      pending.delete(save);
+      save();
+    }, ms),
+  );
+};
+subscribeEdit(later(saveEdit, 400));
+subscribeParts(later(saveParts, 300));
+subscribeTimeline(later(saveTimeline, 500));
 subscribePaint(() => {
   put(PROJECT_KEY, JSON.stringify(exportPaintAll(partsSnapshot().parts.map((q) => q.id))));
-});
-let partsTimer: ReturnType<typeof setTimeout> | undefined;
-subscribeParts(() => {
-  clearTimeout(partsTimer);
-  partsTimer = setTimeout(() => {
-    const ids = partsSnapshot().parts.map((q) => q.id);
-    put(PARTS_KEY, JSON.stringify(exportParts()));
-    // copiar, remover/desfazer e destacar peças mexem nas edições e na pintura delas: grava junto
-    put(EDIT_KEY, JSON.stringify(exportEditAll(ids)));
-    put(PROJECT_KEY, JSON.stringify(exportPaintAll(ids)));
-  }, 300);
 });
 subscribeTutorial(() => {
   put(TUTORIAL_KEY, JSON.stringify(exportTutorial()));
 });
-let tlTimer: ReturnType<typeof setTimeout> | undefined;
-let tlBase: unknown;
-subscribeTimeline(() => {
-  // grava com atraso e só regrava a base quando ela muda (ela é a parte grande)
-  clearTimeout(tlTimer);
-  tlTimer = setTimeout(() => {
-    const t = dispatch("timeline.save") as { base: unknown } | null;
-    if (!t) {
-      put(TIMELINE_KEY, "null");
-      return;
-    }
-    if (t.base !== tlBase) {
-      put(TIMELINE_BASE_KEY, JSON.stringify(t.base));
-      tlBase = t.base;
-    }
-    put(TIMELINE_KEY, JSON.stringify({ ...t, base: undefined }));
-  }, 500);
+window.addEventListener("pagehide", () => {
+  flushText(); // receita digitada e ainda não confirmada entra na linha do tempo
+  for (const [save, timer] of [...pending]) {
+    clearTimeout(timer);
+    save();
+  }
+  pending.clear();
+  saveTimeline();
 });
 subscribeSettings((s) => {
   applyScale(s);
@@ -564,8 +571,14 @@ function App() {
       const project = JSON.parse(await file.text()) as unknown;
       dispatch("project.import", { project, check: true }); // arquivo errado nem oferece a troca
       if (!window.confirm("Abrir este projeto substitui o projeto atual. Salvou o atual? Continuar?")) return;
-      const r = dispatch("project.import", { project }) as { parts: number };
-      setProjectMsg(`Projeto aberto: ${file.name} (${r.parts} peça${r.parts === 1 ? "" : "s"}).`);
+      const r = dispatch("project.import", { project }) as { parts: number; history: string };
+      setProjectMsg(
+        `Projeto aberto: ${file.name} (${r.parts} peça${r.parts === 1 ? "" : "s"}).${
+          r.history === "descartado"
+            ? " O histórico do arquivo não batia com o projeto (outra versão do app?): abriu sem desfazer."
+            : ""
+        }`,
+      );
     } catch (e) {
       setProjectMsg(`Não consegui abrir o projeto: ${(e as Error).message}`);
     }

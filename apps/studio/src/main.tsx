@@ -251,7 +251,9 @@ function App() {
       text: rootPart.text,
       ...(d !== "auto" ? { dialect: d } : {}),
     });
-  const multi = partsState.parts.length > 1 || partsState.seams.length > 0;
+  // com uma peça escondida o desenho vem da montagem (que sabe pular peças), mesmo com uma peça só
+  const multi =
+    partsState.parts.length > 1 || partsState.seams.length > 0 || partsState.parts.some((q) => q.hidden);
   // confirma a receita quando a digitação para: só daí os uids passam a ser realinhados contra ela
   // biome-ignore lint/correctness/useExhaustiveDependencies: o texto e o dialeto da peça disparam a confirmação
   useEffect(() => {
@@ -374,6 +376,8 @@ function App() {
     if (!tut?.data || !step || !layout) return null;
     const part = multi ? layout.parts?.find((q) => q.id === partsState.active) : undefined;
     const start = part?.offset ?? 0;
+    // a peça ativa está escondida: não há o que destacar (o deslocamento dela já é o da peça seguinte)
+    if (part && part.count === 0) return null;
     const end = start + (part?.count ?? layout.nodes.length);
     return {
       // no slide de estado nada fica em destaque: só o que já foi feito e o que falta

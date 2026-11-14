@@ -25,6 +25,7 @@ import {
   type SeamType,
   setActive,
   setDraft,
+  setPartsHidden,
   setPartText,
   transact,
   withPart,
@@ -65,8 +66,12 @@ const view = () => {
 
 const treeView = () => {
   const s = partsSnapshot();
+  // seleção da árvore: a raiz ou uma costura que ainda existe; senão acompanha a peça ativa (clicar numa peça no 3D a ativa)
+  const saved = treeSelected();
+  const selected =
+    saved === "root" || (saved !== null && s.seams.some((m) => m.id === saved)) ? saved : s.active;
   return {
-    selected: treeSelected(),
+    selected,
     active: s.active,
     root: {
       id: "root",
@@ -333,24 +338,18 @@ export function partsCommands(
     /** Mostra ou esconde uma peça no 3D. Escondida não desenha nem recebe clique, mas continua nos materiais e nas costuras. */
     "parts.setVisible": (p) => {
       if (typeof p.visible !== "boolean") throw new Error("'visible' deve ser verdadeiro ou falso");
-      patchPart(String(p.id), { hidden: !p.visible });
+      setPartsHidden({ [partById(String(p.id)).id]: !p.visible });
       return view();
     },
-    /** Só esta peça fica à vista (as outras são escondidas), num único passo do histórico. */
+    /** Só esta peça fica à vista (as outras são escondidas). Esconder e mostrar ficam fora do desfazer. */
     "parts.isolate": (p) => {
       const keep = partById(String(p.id)).id;
-      transact(() => {
-        for (const q of partsSnapshot().parts) {
-          if ((q.hidden ?? false) !== (q.id !== keep)) patchPart(q.id, { hidden: q.id !== keep });
-        }
-      });
+      setPartsHidden(Object.fromEntries(partsSnapshot().parts.map((q) => [q.id, q.id !== keep])));
       return view();
     },
     /** Todas as peças voltam a aparecer. */
     "parts.showAll": () => {
-      transact(() => {
-        for (const q of partsSnapshot().parts) if (q.hidden) patchPart(q.id, { hidden: false });
-      });
+      setPartsHidden(Object.fromEntries(partsSnapshot().parts.map((q) => [q.id, false])));
       return view();
     },
     /**

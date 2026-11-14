@@ -92,13 +92,49 @@ describe("visibilidade", () => {
     expect(JSON.stringify(dispatch("materials.list", {}))).toBe(mats);
   });
 
-  test("isolar deixa só uma peça; mostrar tudo as traz de volta; cada um é um passo do desfazer", () => {
+  test("isolar deixa só uma peça e mostrar tudo as traz de volta, sem entrar no desfazer nem apagar o refazer", () => {
+    dispatch("parts.set", { id: "p2", pos: [30, 0, 0] });
+    dispatch("history.undo"); // deixa um passo para refazer
     dispatch("parts.isolate", { id: "p1" });
     expect(tree().root.children.map((n) => n.visible)).toEqual([true, false]);
+    expect((dispatch("history.get", {}) as { canRedo: boolean }).canRedo).toBe(true); // o refazer continua
     dispatch("parts.showAll");
     expect(tree().root.children.map((n) => n.visible)).toEqual([true, true]);
-    dispatch("history.undo"); // desfaz o "mostrar tudo" inteiro
-    expect(tree().root.children.map((n) => n.visible)).toEqual([true, false]);
+    dispatch("parts.setVisible", { id: "p2", visible: false });
+    dispatch("history.redo"); // refaz o movimento; p2 continua escondida
+    expect(tree().root.children[1]?.visible).toBe(false);
+  });
+
+  test("a cópia de uma peça escondida nasce visível", () => {
+    dispatch("parts.setVisible", { id: "p1", visible: false });
+    dispatch("parts.copy", { id: "p1" });
+    expect(tree().root.children.at(-1)?.visible).toBe(true);
+  });
+
+  test("costura com um lado escondido: a árvore mostra ok, o layout pula a curva e fechar a montagem funciona", () => {
+    dispatch("parts.set", { id: "p2", pos: [20, 15, -9] });
+    dispatch("selection.select", { text: TEXT, by: { kind: "group", from: 2, to: 2 } });
+    dispatch("seam.draft", { side: "a" });
+    dispatch("parts.setActive", { id: "p2" });
+    dispatch("seam.draft", { side: "b" });
+    dispatch("seam.add", {});
+    const seam = tree().root.children.find((n) => n.kind === "seam");
+    expect(seam).toMatchObject({ kind: "seam", parts: ["p1", "p2"], ok: true });
+    dispatch("parts.setVisible", { id: "p2", visible: false });
+    const lay = dispatch("assembly.layout", {}) as { seamCurves: { pairs: number[] }[] };
+    expect(lay.seamCurves.every((c) => c.pairs.length === 0)).toBe(true);
+    const closed = dispatch("assembly.close", {}) as { unconnected: string[] };
+    expect(closed.unconnected).toEqual([]);
+  });
+
+  test("a seleção da árvore acompanha a peça ativa e esquece costura que deixou de existir", () => {
+    dispatch("tree.select", { id: "p1" });
+    dispatch("parts.setActive", { id: "p2" }); // como um clique em outra peça no 3D
+    expect(tree().selected).toBe("p2");
+    dispatch("tree.select", { id: "root" });
+    expect(tree().selected).toBe("root");
+    setTreeSelected("s99"); // costura inexistente
+    expect(tree().selected).toBe("p2");
   });
 
   test("valores inválidos são recusados", () => {

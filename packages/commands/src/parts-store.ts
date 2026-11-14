@@ -145,8 +145,12 @@ function restoreStep(step: PartsStep): void {
     ...step.state,
     parts: step.state.parts.map((p) => {
       const cur = now.get(p.id);
-      if (!cur || p.kind !== "own" || cur.kind !== "own") return p;
-      const { dialect: _d, ...rest } = p;
+      if (!cur) return p;
+      // esconder não é passo do histórico: vale sempre o estado atual
+      const { hidden: _h, ...base } = p;
+      const keep = cur.hidden ? { ...base, hidden: true } : base;
+      if (p.kind !== "own" || cur.kind !== "own") return keep;
+      const { dialect: _d, ...rest } = keep;
       return { ...rest, text: cur.text, ...(cur.dialect ? { dialect: cur.dialect } : {}) };
     }),
   };
@@ -318,6 +322,20 @@ export function removePart(id: string): PartsState {
   return commit({ ...state, parts, active, draft });
 }
 
+/**
+ * Mostra ou esconde peças (`hidden[id]`). Não é uma edição do projeto: fica fora do histórico (esconder para olhar outra
+ * coisa não pode apagar o "refazer") e desfazer não mexe nela. Vai no arquivo do projeto.
+ */
+export function setPartsHidden(hidden: Record<string, boolean>): PartsState {
+  for (const id of Object.keys(hidden)) partById(id);
+  const parts = state.parts.map((p) => {
+    if (!(p.id in hidden)) return p;
+    const { hidden: _h, ...rest } = p;
+    return hidden[p.id] ? { ...rest, hidden: true } : rest;
+  });
+  return commit({ ...state, parts }, false);
+}
+
 export function patchPart(id: string, patch: Record<string, unknown>): PartsState {
   const p = partById(id);
   const next: Part = { ...p };
@@ -326,10 +344,6 @@ export function patchPart(id: string, patch: Record<string, unknown>): PartsStat
       throw new Error("o nome deve ter de 1 a 40 caracteres");
     }
     next.name = patch.name.trim();
-  }
-  if (patch.hidden !== undefined) {
-    if (typeof patch.hidden !== "boolean") throw new Error("'hidden' deve ser verdadeiro ou falso");
-    next.hidden = patch.hidden ? true : undefined;
   }
   if (patch.pos !== undefined) next.pos = num3(patch.pos, "pos");
   if (patch.rot !== undefined) next.rot = num3(patch.rot, "rot");

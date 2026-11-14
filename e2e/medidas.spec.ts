@@ -50,10 +50,32 @@ test("distância entre dois cliques, em mm estimados, e fora do modo de leitura"
     if ((pts[i * 2] as number) < (pts[a * 2] as number)) a = i;
     if ((pts[i * 2] as number) > (pts[b * 2] as number)) b = i;
   }
-  await page.mouse.click(box.x + (pts[a * 2] as number) + 3, box.y + (pts[a * 2 + 1] as number));
+  await page.mouse.click(box.x + (pts[a * 2] as number), box.y + (pts[a * 2 + 1] as number));
   await expect(page.getByTestId("options-bar")).toContainText("segundo ponto");
-  await page.mouse.click(box.x + (pts[b * 2] as number) - 3, box.y + (pts[b * 2 + 1] as number));
-  await expect(page.getByTestId("options-bar")).toContainText(/Distância ≈ [\d.]+ mm .* estimativa/);
+  await page.mouse.click(box.x + (pts[b * 2] as number), box.y + (pts[b * 2 + 1] as number));
+  const bar = page.getByTestId("options-bar");
+  await expect(bar).toContainText(/Distância ≈ [\d.]+ mm .* estimativa/);
+  // a tela mede os pontos que estavam sob os cliques (o raio acerta o ponto mais perto da câmera, que pode não ser o
+  // extremo da silhueta); o valor tem de ser o do comando para esses dois pontos
+  const shown = Number(/\(([\d.]+) larguras/.exec((await bar.textContent()) ?? "")?.[1]);
+  const expected = (await page.evaluate(
+    ([ax, ay, bx, by]) => {
+      const v = window.__view3d;
+      const lay = window.__timeline?.run("assembly.layout") as { nodes: { part: string; uid: number }[] };
+      const i = v?.pickAt(ax as number, ay as number);
+      const j = v?.pickAt(bx as number, by as number);
+      if (i == null || j == null) throw new Error("clique sem ponto");
+      const d = window.__timeline?.run("measure.distance", { a: lay.nodes[i], b: lay.nodes[j] });
+      return (d as { distance: number }).distance;
+    },
+    [
+      box.x + (pts[a * 2] as number),
+      box.y + (pts[a * 2 + 1] as number),
+      box.x + (pts[b * 2] as number),
+      box.y + (pts[b * 2 + 1] as number),
+    ],
+  )) as number;
+  expect(shown).toBeCloseTo(expected, 2);
   await page.screenshot({ path: "test-results/medidas-distancia.png" });
   // no modo de leitura não há medir
   await ribbon(page, "tutorial");
@@ -139,6 +161,7 @@ test("com uma instância movida, o corte em X vale no mundo (metade do conjunto)
   await page.getByTestId("section-x").click();
   await expect.poll(async () => (await state(page))?.section.clipped ?? 0).toBeGreaterThan(300);
   expect((await state(page))?.section.clipped ?? 0).toBeLessThan(566);
+  await page.screenshot({ path: "test-results/corte-instancia.png" });
   const b = (await page.evaluate(() => window.__timeline?.run("measure.bounds", { target: "all" }))) as {
     size: number[];
   };

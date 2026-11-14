@@ -115,6 +115,8 @@ export interface View3D {
   setSelectionUids(uids: number[] | null, part?: string): void;
   /** Projeção atual de todos os pontos em pixels do canvas: [x0,y0,x1,y1,...]. */
   projectAll(): number[];
+  /** O ponto sob um pixel da página (ignora o cortado), ou null. */
+  pickAt(clientX: number, clientY: number): number | null;
   /** Posição, formato e tamanho do cubo de vistas (aba Interface das configurações). */
   setViewCube(o: ViewCubeOptions): void;
   /** Enquadra a peça inteira (como "Ajustar tudo" do FreeCAD). */
@@ -1157,6 +1159,7 @@ export function mountView3D(
       paint();
     },
     projectAll,
+    pickAt,
     nodeColor: (id) => (base[id] ? `#${base[id].getHexString()}` : null),
     fit: () => {
       fit();

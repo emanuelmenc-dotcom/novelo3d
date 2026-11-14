@@ -55,18 +55,25 @@ test("distância entre dois cliques, em mm estimados, e fora do modo de leitura"
   await page.mouse.click(box.x + (pts[b * 2] as number), box.y + (pts[b * 2 + 1] as number));
   const bar = page.getByTestId("options-bar");
   await expect(bar).toContainText(/Distância ≈ [\d.]+ mm .* estimativa/);
-  // a tela mede os pontos que estavam sob os cliques (o raio acerta o ponto mais perto da câmera, que pode não ser o
-  // extremo da silhueta); o valor tem de ser o do comando para esses dois pontos
+  // a tela mede os pontos que estavam sob os cliques; o valor tem de ser o do comando para esses dois pontos
   const shown = Number(/\(([\d.]+) larguras/.exec((await bar.textContent()) ?? "")?.[1]);
-  const expected = (await page.evaluate(
+  const r = await page.evaluate(
     ([ax, ay, bx, by]) => {
       const v = window.__view3d;
       const lay = window.__timeline?.run("assembly.layout") as { nodes: { part: string; uid: number }[] };
+      const px = v?.projectAll() ?? [];
+      const box = document.querySelector('[data-testid="scene"] canvas')?.getBoundingClientRect();
       const i = v?.pickAt(ax as number, ay as number);
       const j = v?.pickAt(bx as number, by as number);
-      if (i == null || j == null) throw new Error("clique sem ponto");
+      if (i == null || j == null || !box) throw new Error("clique sem ponto");
       const d = window.__timeline?.run("measure.distance", { a: lay.nodes[i], b: lay.nodes[j] });
-      return (d as { distance: number }).distance;
+      const off = (k: number, x: number, y: number) =>
+        Math.hypot(box.left + (px[k * 2] as number) - x, box.top + (px[k * 2 + 1] as number) - y);
+      return {
+        distance: (d as { distance: number }).distance,
+        pixelsA: off(i, ax as number, ay as number),
+        pixelsB: off(j, bx as number, by as number),
+      };
     },
     [
       box.x + (pts[a * 2] as number),
@@ -74,8 +81,13 @@ test("distância entre dois cliques, em mm estimados, e fora do modo de leitura"
       box.x + (pts[b * 2] as number),
       box.y + (pts[b * 2 + 1] as number),
     ],
-  )) as number;
-  expect(shown).toBeCloseTo(expected, 2);
+  );
+  console.log(
+    `distância: tela ${shown}, comando ${r.distance}; pixels do clique ao ponto achado: ${r.pixelsA.toFixed(1)} e ${r.pixelsB.toFixed(1)}`,
+  );
+  expect(shown).toBeCloseTo(r.distance, 2);
+  // o ponto achado fica a menos de um ponto de crochê (~17 px nesta vista) do clique: a silhueta pega o mais próximo da câmera
+  expect(Math.max(r.pixelsA, r.pixelsB)).toBeLessThan(20);
   await page.screenshot({ path: "test-results/medidas-distancia.png" });
   // no modo de leitura não há medir
   await ribbon(page, "tutorial");
@@ -148,7 +160,7 @@ test("corte: some a metade, clique e seleção por forma ignoram o cortado e o c
   await expect(page.getByTestId("section-z")).not.toHaveAttribute("aria-pressed", "true");
 });
 
-test("com uma instância movida, o corte em X vale no mundo (metade do conjunto) e o conjunto mede mais que a peça", async ({
+test("com uma instância movida, o corte em X vale no mundo, o conjunto mede mais que a peça e a medida usa a peça de cada clique", async ({
   page,
 }) => {
   await open(page);
@@ -157,7 +169,58 @@ test("com uma instância movida, o corte em X vale no mundo (metade do conjunto)
     window.__timeline?.run("parts.set", { id: "p2", pos: [30, 0, 0] });
   });
   await expect.poll(() => count(page)).toBe(866);
+  // medir um ponto em cada bola: a peça de cada clique tem de ser a certa (as instâncias repartem os mesmos uids)
+  await page.evaluate(() => window.__view3d?.fit());
+  await page.waitForTimeout(700);
   await ribbon(page, "vista");
+  await page.getByTestId("mode-measure").click();
+  const box = await page.getByTestId("scene").locator("canvas").boundingBox();
+  if (!box) throw new Error("sem 3D");
+  const all = await xy(page);
+  // o ponto de cada bola mais perto do centro da sua nuvem na tela
+  const centre = (from: number, to: number): [number, number] => {
+    let sx = 0;
+    let sy = 0;
+    for (let k = from; k < to; k++) {
+      sx += all[k * 2] as number;
+      sy += all[k * 2 + 1] as number;
+    }
+    const cx = sx / (to - from);
+    const cy = sy / (to - from);
+    let best = from;
+    for (let k = from; k < to; k++)
+      if (
+        Math.hypot((all[k * 2] as number) - cx, (all[k * 2 + 1] as number) - cy) <
+        Math.hypot((all[best * 2] as number) - cx, (all[best * 2 + 1] as number) - cy)
+      )
+        best = k;
+    return [all[best * 2] as number, all[best * 2 + 1] as number];
+  };
+  const [p1x, p1y] = centre(0, 433);
+  const [p2x, p2y] = centre(433, 866);
+  await page.mouse.click(box.x + p1x, box.y + p1y);
+  await page.mouse.click(box.x + p2x, box.y + p2y);
+  const bar = page.getByTestId("options-bar");
+  await expect(bar).toContainText(/Distância ≈/);
+  const shown = Number(/\(([\d.]+) larguras/.exec((await bar.textContent()) ?? "")?.[1]);
+  const expected = await page.evaluate(
+    ([ax, ay, bx, by]) => {
+      const v = window.__view3d;
+      const lay = window.__timeline?.run("assembly.layout") as { nodes: { part: string; uid: number }[] };
+      const i = v?.pickAt(ax as number, ay as number);
+      const j = v?.pickAt(bx as number, by as number);
+      if (i == null || j == null) throw new Error("clique sem ponto");
+      const a = lay.nodes[i];
+      const b = lay.nodes[j];
+      if (a?.part === b?.part) throw new Error("os dois cliques caíram na mesma peça");
+      const d = window.__timeline?.run("measure.distance", { a, b }) as { distance: number };
+      return d.distance;
+    },
+    [box.x + p1x, box.y + p1y, box.x + p2x, box.y + p2y],
+  );
+  expect(shown).toBeCloseTo(expected, 2);
+  expect(shown).toBeGreaterThan(15); // as bolas estão a 30 larguras uma da outra
+  await page.getByTestId("mode-measure").click(); // desliga a ferramenta
   await page.getByTestId("section-x").click();
   await expect.poll(async () => (await state(page))?.section.clipped ?? 0).toBeGreaterThan(300);
   expect((await state(page))?.section.clipped ?? 0).toBeLessThan(566);

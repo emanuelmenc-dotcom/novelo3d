@@ -835,7 +835,7 @@ function App() {
         ))}
       </div>
       {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
-      {showMaterials && (
+      {showMaterials && !reading && (
         <FloatingWindow
           title="Lista de materiais"
           onClose={() => setShowMaterials(false)}

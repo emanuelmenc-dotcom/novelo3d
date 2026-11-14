@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Dobra de sequências de pontos iguais em corridas e blocos "(bloco) ×k". Vive no core para o impressor, o tutorial e a
-// tabela do gráfico usarem a mesma regra (v3, D-19).
+// tabela do gráfico usarem a mesma regra (anexo v3 do gráfico, D-62).
 
 export type Seg = { t: "run"; key: string; count: number } | { t: "block"; keys: string[]; times: number };
 

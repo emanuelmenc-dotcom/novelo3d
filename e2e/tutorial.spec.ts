@@ -189,7 +189,7 @@ test("#marco na receita vira marco com o texto escrito e aparece no slide de rev
   await page.getByTestId("tutorial-round").selectOption("2");
   await page.getByTestId("reading-review").click();
   await expect(text(page)).toContainText("Fechar o corpo");
-  await expect(text(page)).toContainText("Voltas 2 a 2");
+  await expect(text(page)).toContainText("Volta 2: o que foi feito");
 });
 
 test("numa montagem com peça espelhada o destaque cai nos pontos da peça ativa", async ({ page }) => {
@@ -219,24 +219,43 @@ test('"Ver ponto" funciona nos polos da peça (voltas 1 e 17)', async ({ page })
   expect(pos.every((v) => Number.isFinite(v))).toBe(true);
 });
 
-test("no modo de leitura nada edita: com Pintar fio ativo, arrastar no 3D não pinta e não entra no desfazer", async ({
+test("no modo de leitura nada edita: o mesmo arrasto que pinta na edição não pinta na leitura", async ({
   page,
 }) => {
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count ?? 0)).toBe(433);
-  await ribbon(page, "pintar");
+  await page.getByRole("tab", { name: "Pontos", exact: true }).click();
+  await ribbon(page, "selecionar");
   await page.getByTestId("mode-yarn").click();
+  await ribbon(page, "pintar");
+  await page.getByTestId("brush-brush").click();
+  await page.getByLabel("Fio da pintura").selectOption("B");
+  const edited = async () =>
+    Number((await page.getByTestId("points-info").textContent())?.match(/(\d+) pontos editados/)?.[1] ?? 0);
+  // arrasta o pincel por um trecho da peça que está à vista (a vista de cima não muda entre os dois modos)
+  const drag = async () => {
+    const box = await page.getByTestId("scene").locator("canvas").boundingBox();
+    const p = await page.evaluate(() => {
+      const xy = window.__view3d?.projectAll() ?? [];
+      return { x: xy[306 * 2] ?? 0, y: xy[306 * 2 + 1] ?? 0 };
+    });
+    if (!box) throw new Error("sem 3D");
+    await page.mouse.move(box.x + p.x, box.y + p.y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + p.x + 40, box.y + p.y, { steps: 8 });
+    await page.mouse.up();
+  };
+  expect(await edited()).toBe(0);
   await ribbon(page, "tutorial");
   await page.getByTestId("reading-start").click();
-  const box = await page.getByTestId("scene").locator("canvas").boundingBox();
-  if (!box) throw new Error("sem 3D");
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 40, { steps: 8 });
-  await page.mouse.up();
+  await expect(page.getByTestId("reading")).toBeVisible();
+  await drag();
   await page.keyboard.press("Escape");
-  await ribbon(page, "historico");
-  await expect(page.getByTestId("undo")).toBeDisabled();
+  await expect(page.getByTestId("reading")).toHaveCount(0);
+  expect(await edited()).toBe(0);
+  // controle positivo: o mesmo arrasto, fora do modo de leitura, pinta
+  await drag();
+  await expect.poll(edited).toBeGreaterThan(3);
 });
 
 test("no modo de leitura a barra de título só tem os avisos: sem busca de comandos e sem menu Janelas", async ({

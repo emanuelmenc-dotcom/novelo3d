@@ -165,7 +165,7 @@ export function ReadingMode(props: {
                   <strong className="reading-chain">{m?.title}</strong>
                   <span className="reading-line">
                     {s.kind === "review"
-                      ? `Voltas ${m?.fromRound} a ${m?.toRound}: o que foi feito desde o último marco (em destaque no 3D).`
+                      ? `${m && m.fromRound !== m.toRound ? `Voltas ${m.fromRound} a ${m.toRound}` : `Volta ${m?.toRound}`}: o que foi feito desde o último marco (em destaque no 3D).`
                       : "Como a peça deve estar agora: compare com a sua."}
                   </span>
                 </>

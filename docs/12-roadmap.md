@@ -230,7 +230,7 @@ Plano aprovado pelo usuário, com mockup (`docs/imagens`: ver o relatório da et
 
 ### Perguntas guardadas (usuário autorizou seguir sem perguntar; responder quando puder)
 
-1. **Caso G12 do anexo v3.** O anexo espera `(1x aum; 1x pb) ×6` na volta 3 da bola, mas a receita do projeto escreve `(1 pb, 1 aum) x6`. Por regra, valor de referência não muda para o teste passar. Seguindo a ordem da receita até o usuário decidir; a decisão trava a etapa G3.
+1. **Caso G12 do anexo v3.** O anexo espera `(1x aum; 1x pb) ×6` na volta 3 da bola, mas a receita do projeto escreve `(1 pb, 1 aum) x6`. Por regra, valor de referência não muda para o teste passar: sigo a ordem da receita (o teste confere o que o código produz e aponta para esta pergunta) até o usuário decidir.
 2. **Marco escrito na receita.** Assumido: uma linha `#marco texto` marca o fim de marco depois da volta anterior (hoje `#` é comentário).
 3. **Projeto com várias peças no modo de leitura.** Assumido: só a peça ativa, as outras esmaecidas.
 4. **Troca de fio.** Assumido: aparece como aviso no passo, não vira marco.

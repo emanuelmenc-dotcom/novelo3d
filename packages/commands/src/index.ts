@@ -78,6 +78,7 @@ import {
 } from "./render-store.ts";
 import { getSettings, resetSettings, type SettingsPatch, setSettings } from "./settings.ts";
 import { stitchEditorCommands } from "./stitch-editor-commands.ts";
+import { pendingTexts, recordAndRun, replay as replayTimelineWith } from "./timeline.ts";
 import { type ScriptCtx, tutorialCommands } from "./tutorial-commands.ts";
 
 export {
@@ -746,5 +747,13 @@ export function dispatch(method: string, params: Params = {}): unknown {
       `recurso pausado: ${FEATURE_NAMES[feature]} (${method}); veja features.ts e a decisão D-57`,
     );
   }
-  return fn(params);
+  return recordAndRun(method, params, fn);
 }
+
+/** Reexecuta a linha do tempo a partir do projeto-base (até o marcador): usado pelos comandos timeline.* e pelos testes. */
+export function replayTimeline(upTo?: number): void {
+  // receita digitada e ainda não confirmada entra na linha do tempo antes de reexecutar
+  for (const id of pendingTexts()) dispatch("parts.commitText", { id });
+  replayTimelineWith((m, p) => (commands[m] as Command)(p), upTo);
+}
+export { CLASS as COMMAND_CLASS, subscribeTimeline, timelineVersion, timelineView } from "./timeline.ts";

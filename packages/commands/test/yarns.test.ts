@@ -2,6 +2,7 @@
 // Biblioteca de fios pelos comandos: yarns.library, yarns.preview, relatório com espessura e cor no layout 3D.
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { dispatch, loadEdit, loadPaint, resetPaint } from "../src/index.ts";
+import { expectReplayMatchesLive } from "./replay-check.ts";
 
 const text = [
   "V1: 6 pb no anel mágico (6)",
@@ -15,6 +16,7 @@ beforeEach(() => {
   loadPaint({});
 });
 afterEach(() => {
+  expectReplayMatchesLive();
   loadEdit({});
   resetPaint();
 });

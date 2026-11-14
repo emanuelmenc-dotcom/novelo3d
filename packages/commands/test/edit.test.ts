@@ -2,6 +2,7 @@
 // Edição por ponto via comandos: uids, seleção, ferramentas, tensão no layout, histórico e persistência.
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { dispatch, exportEdit, loadEdit, loadPaint, resetPaint } from "../src/index.ts";
+import { expectReplayMatchesLive } from "./replay-check.ts";
 
 const BOLA = [
   "V1: 6 pb no anel mágico (6)",
@@ -22,6 +23,7 @@ beforeEach(() => {
   loadPaint({});
 });
 afterEach(() => {
+  expectReplayMatchesLive();
   loadEdit({});
   resetPaint();
 });

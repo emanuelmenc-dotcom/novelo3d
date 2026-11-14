@@ -11,3 +11,10 @@ export function registerRedoClear(kind: string, fn: () => void): void {
 export function clearRedoExcept(kind: string): void {
   for (const [k, fn] of clearers) if (k !== kind) fn();
 }
+
+const resets = new Set<() => void>();
+/** Quem precisa saber quando o projeto inteiro é trocado (novo, importado, carregado do disco). */
+export const onProjectReset = (fn: () => void): void => void resets.add(fn);
+export const fireProjectReset = (): void => {
+  for (const fn of resets) fn();
+};

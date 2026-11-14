@@ -13,6 +13,7 @@ import {
   resetPaint,
   resetParts,
 } from "../src/index.ts";
+import { expectReplayMatchesLive } from "./replay-check.ts";
 
 const TEXT = [
   "V1: 6 pb no anel mágico (6)",
@@ -53,6 +54,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  expectReplayMatchesLive();
   loadEdit({});
   resetParts("");
   resetPaint();

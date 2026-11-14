@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Fios e pintura do projeto aberto: paleta e regiões de pintura. Mesmo padrão das configurações e do espaço de
 // trabalho: estado na camada de comandos (D-21), persistência no studio. A interface e o MCP veem o mesmo estado.
+
 import {
   DEFAULT_YARNS,
   MAX_YARNS,
@@ -9,6 +10,7 @@ import {
   validateYarns,
   type Yarn,
 } from "@novelo/core";
+import { fireProjectReset } from "./history-tick.ts";
 
 export interface PaintState {
   yarns: Yarn[];
@@ -61,6 +63,7 @@ export function clearPaint(): PaintState {
 }
 
 export function resetPaint(): PaintState {
+  fireProjectReset();
   slotPaint.clear();
   return commit(initial());
 }
@@ -77,6 +80,7 @@ export function nextYarnId(yarns: Yarn[] = current.yarns): string | undefined {
 
 /** Carrega o que foi gravado (localStorage). Valores inválidos são ignorados, sem lançar erro. */
 export function loadPaint(raw: unknown): PaintState {
+  fireProjectReset();
   const o = (raw ?? {}) as { yarns?: unknown; paint?: unknown };
   let yarns = initial().yarns;
   try {
@@ -141,6 +145,7 @@ export function exportPaintAll(keep?: string[]): PaintAll {
 
 /** Carrega paleta e regras de todas as peças; o formato antigo ({yarns, paint}) vira a peça `p1`. */
 export function loadPaintAll(raw: unknown, active: string): PaintState {
+  fireProjectReset();
   const o = (raw ?? {}) as { yarns?: unknown; paint?: unknown; slots?: Record<string, unknown> };
   let yarns = initial().yarns;
   try {

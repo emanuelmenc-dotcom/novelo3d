@@ -2,6 +2,7 @@
 // Fechar a montagem (corpo rígido), padrão de fios e costura nas configurações, lista de materiais e troca de fio.
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { dispatch, loadEdit, loadPaint, resetPaint, resetParts, resetSettings } from "../src/index.ts";
+import { expectReplayMatchesLive } from "./replay-check.ts";
 
 const TEXT = [
   "V1: 6 pb no anel mágico (6)",
@@ -24,6 +25,7 @@ beforeEach(() => {
   dispatch("yarns.set", { yarns: YARNS });
 });
 afterEach(() => {
+  expectReplayMatchesLive();
   loadEdit({});
   resetParts("");
   resetPaint();

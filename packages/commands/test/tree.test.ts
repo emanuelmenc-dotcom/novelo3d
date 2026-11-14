@@ -2,6 +2,7 @@
 // Árvore do projeto (G4): `tree.get`, `tree.select` e a visibilidade das peças (`parts.setVisible/isolate/showAll`).
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { dispatch, partsSnapshot, resetParts, setTreeSelected } from "../src/index.ts";
+import { expectReplayMatchesLive } from "./replay-check.ts";
 
 const TEXT = "V1: 6 pb no anel mágico (6)\nV2: 6 aum (12)";
 interface Node {
@@ -33,6 +34,7 @@ beforeEach(() => {
   setTreeSelected(null);
 });
 afterEach(() => {
+  expectReplayMatchesLive();
   resetParts("");
   setTreeSelected(null);
 });

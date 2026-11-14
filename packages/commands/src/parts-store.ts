@@ -4,7 +4,7 @@
 // Costuras ligam duas linhas contínuas de pontos, na mesma peça ou entre peças. Estado na camada de comandos (D-21).
 import type { Dialect } from "@novelo/core";
 import { cloneSlot, currentSlot, resetSlots, switchSlot } from "./edit-store.ts";
-import { clearRedoExcept, nextTick, registerRedoClear } from "./history-tick.ts";
+import { clearRedoExcept, fireProjectReset, nextTick, registerRedoClear } from "./history-tick.ts";
 import {
   clonePaintSlot,
   paintToken,
@@ -404,15 +404,16 @@ const subtree = (id: string): { asm: Set<string>; parts: Set<string> } => {
 export function addAssembly(input: { name?: string; parts?: string[]; parent?: string }): PartsState {
   const members = (input.parts ?? []).map((id) => partById(id).id);
   if (input.parent) asmById(input.parent);
+  const name = input.name?.trim() || `Montagem ${asmNo + 1}`;
+  if (name.length > 40) throw new Error("o nome deve ter de 1 a 40 caracteres");
   asmNo++;
   const asm: Assembly = {
     id: `a${asmNo}`,
-    name: input.name?.trim() || `Montagem ${asmNo}`,
+    name,
     pos: [0, 0, 0],
     rot: [0, 0, 0],
     ...(input.parent ? { parent: input.parent } : {}),
   };
-  if (asm.name.length > 40) throw new Error("o nome deve ter de 1 a 40 caracteres");
   return commit({
     ...state,
     assemblies: [...state.assemblies, asm],
@@ -679,7 +680,21 @@ export function loadParts(raw: unknown, fallback: { text: string; dialect?: Dial
 function reload(): PartsState {
   ustack.length = 0;
   rstack = [];
-  return publish({ ...state, version: state.version + 1 });
+  const out = publish({ ...state, version: state.version + 1 });
+  fireProjectReset();
+  return out;
+}
+
+/** Contadores de ids (peça, costura, montagem): a linha do tempo os restaura para reexecutar com os mesmos ids. */
+export const getIdCounters = (): { part: number; seam: number; asm: number } => ({
+  part: partNo,
+  seam: seamNo,
+  asm: asmNo,
+});
+export function setIdCounters(c: { part: number; seam: number; asm: number }): void {
+  partNo = c.part;
+  seamNo = c.seam;
+  asmNo = c.asm;
 }
 
 /** Volta ao projeto de uma peça só (usado em testes e ao "novo projeto"). */

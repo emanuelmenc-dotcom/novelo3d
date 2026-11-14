@@ -19,7 +19,7 @@ import {
 } from "@novelo/core";
 import { type LayoutResult, layoutGraph } from "@novelo/layout";
 import { parsePattern } from "@novelo/notation";
-import { clearRedoExcept, nextTick, registerRedoClear } from "./history-tick.ts";
+import { clearRedoExcept, fireProjectReset, nextTick, registerRedoClear } from "./history-tick.ts";
 import { paintSnapshot } from "./paint-store.ts";
 
 export const TENSION_MIN = -1;
@@ -578,6 +578,7 @@ export const exportEdit = (): EditJson => jsonOf(capture());
 
 /** Carrega o que foi gravado na peça ativa; valores inválidos são ignorados, sem lançar erro. */
 export function loadEdit(raw: unknown): EditView {
+  fireProjectReset(); // a linha do tempo só vale para o estado que ela mesma construiu
   const prev = st;
   restoreSlot(slotFromJson(raw));
   st.version = prev.version;
@@ -594,6 +595,7 @@ export function exportEditAll(keep?: string[]): Record<string, EditJson> {
 
 /** Carrega as edições de todas as peças; o formato antigo (uma peça só) vira a peça `p1`. */
 export function loadEditAll(raw: unknown, active: string): EditView {
+  fireProjectReset();
   const map: Record<string, unknown> =
     raw && typeof raw === "object" && Array.isArray((raw as { yarn?: unknown }).yarn)
       ? { p1: raw }

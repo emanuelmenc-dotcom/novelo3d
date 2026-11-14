@@ -46,7 +46,7 @@ describe("gravação", () => {
     expect(timelineView().features).toEqual([]);
   });
 
-  test("receita: texto igual não grava e edições seguidas da mesma peça ficam cada uma a sua feature (juntar mudaria os uids)", () => {
+  test("receita: texto igual não grava e edições seguidas da mesma peça formam uma feature só que reexecuta cada uma em ordem", () => {
     dispatch("points.info", { text: TEXT }); // motor construído e confirmado
     dispatch("parts.commitText", { id: "p1" }); // foco saiu sem mudar nada
     expect(timelineView().features).toEqual([]);
@@ -54,7 +54,8 @@ describe("gravação", () => {
     dispatch("parts.commitText", { id: "p1" });
     dispatch("parts.setText", { id: "p1", text: `${TEXT}\nV4: 18 pb (18)\nV5: 18 pb (18)` });
     dispatch("parts.commitText", { id: "p1" });
-    expect(methods()).toEqual(["parts.commitText", "parts.commitText"]);
+    expect(methods()).toEqual(["group"]);
+    expect(timelineView().features[0]?.items).toHaveLength(2);
   });
 
   test("um traço de pincel (history.begin...end) é uma feature só", () => {
@@ -352,5 +353,54 @@ describe("arquivo do projeto", () => {
     const bytes = JSON.stringify(dispatch("project.export")).length;
     console.log(`arquivo com 50 traços: ${(bytes / 1024).toFixed(0)} KB`);
     expect(bytes).toBeLessThan(5_000_000);
+  });
+});
+
+describe("revisão do G6", () => {
+  test("receita meio digitada que o motor recusa não vira feature", () => {
+    dispatch("parts.instance", { id: "p1" });
+    dispatch("points.info", { text: TEXT });
+    dispatch("parts.setText", { id: "p1", text: `${TEXT}${"\n"}V4: (2 pb, 1 ###` });
+    const r = dispatch("parts.commitText", { id: "p1" }) as { committed: boolean };
+    expect(r.committed).toBe(false);
+    expect(methods()).toEqual(["parts.instance"]);
+    dispatch("parts.setText", { id: "p1", text: TEXT });
+  });
+
+  test("seleção grande vira faixas e reexecuta igual", () => {
+    dispatch("selection.select", { text: TEXT, by: { kind: "all" } });
+    dispatch("points.set", { text: TEXT, prop: "tension", value: 0.3 });
+    const target = timelineView().features[0]?.params.target as { kind: string; ranges: number[][] };
+    expect(target.kind).toBe("uidRanges");
+    expect(target.ranges.length).toBeLessThan(3);
+  });
+
+  test("depois de muitas features as mais antigas viram base e o desfazer das recentes continua", () => {
+    dispatch("parts.instance", { id: "p1" });
+    for (let i = 0; i < 230; i++) dispatch("parts.set", { id: "p2", pos: [i, 0, 0] });
+    const t = timelineView();
+    expect(t.features.length).toBeLessThanOrEqual(200);
+    dispatch("history.undo");
+    expect((dispatch("parts.get") as { parts: { pos: number[] }[] }).parts[1]?.pos[0]).toBe(228);
+  });
+
+  test("desfazer a criação da peça ativa devolve a edição para uma peça que existe", () => {
+    dispatch("parts.add", { name: "X", text: TEXT }); // p2
+    dispatch("parts.setActive", { id: "p2" });
+    dispatch("history.undo");
+    expect((dispatch("parts.get") as { active: string }).active).toBe("p1");
+    dispatch("paint.rows", { yarn: "B", from: 2, to: 2 });
+    expect((dispatch("paint.report", { text: TEXT }) as { changeCount: number }).changeCount).toBeGreaterThan(
+      0,
+    );
+  });
+
+  test("lados A e B do rascunho de costura continuam depois de desfazer", () => {
+    dispatch("parts.instance", { id: "p1" });
+    dispatch("selection.select", { text: TEXT, by: { kind: "group", from: 3, to: 3 } });
+    dispatch("seam.draft", { side: "a" });
+    dispatch("parts.copy", { id: "p1" });
+    dispatch("history.undo");
+    expect((dispatch("parts.get") as { draft: { a: unknown } }).draft.a).not.toBeNull();
   });
 });

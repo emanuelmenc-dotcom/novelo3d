@@ -156,11 +156,18 @@ function readJson(key: string): unknown {
   // linha do tempo (desfazer) do navegador: só vale se reexecutá-la dá o projeto que acabou de ser carregado
   const tl = readJson(TIMELINE_KEY) as { base?: unknown } | undefined;
   if (tl) {
+    const kept = JSON.parse(JSON.stringify(dispatch("project.export"))) as Record<string, unknown>;
     try {
       dispatch("timeline.load", { timeline: { ...tl, base: readJson(TIMELINE_BASE_KEY) } });
       dispatch("timeline.verify", { keep: true });
     } catch {
-      // linha do tempo ilegível: o projeto abre sem histórico
+      // linha do tempo ilegível ou reexecução que lançou: o projeto volta como estava e abre sem histórico
+      try {
+        kept.timeline = undefined;
+        dispatch("project.import", { project: kept });
+      } catch {
+        // nada a fazer: o projeto carregado já era o certo
+      }
     }
   }
 }

@@ -20,7 +20,7 @@ test("Ctrl+Z numa receita de 6 mil pontos, depois de editar a receita e 20 traç
   await expect(page.getByText(/Receita fecha · 6210 pontos/)).toBeVisible({ timeout: 60_000 });
   await showTab(page, "Receita");
   await page.getByLabel("Receita", { exact: true }).blur();
-  const ms = await page.evaluate(() => {
+  const ms = await page.evaluate(async () => {
     const t = window.__timeline;
     if (!t) throw new Error("sem linha do tempo");
     const recipe =
@@ -31,12 +31,44 @@ test("Ctrl+Z numa receita de 6 mil pontos, depois de editar a receita e 20 traç
       t.run("tool.brush", { text: recipe, uid: last - 10 - k * 40, hops: 1, prop: "tension", value: 0.5 });
       t.run("history.end");
     }
+    const edits = () => (t.run("edit.get") as { tensionOverrides: number }).tensionOverrides;
+    // referência: quanto custa uma edição comum de ponto até o 3D e o gráfico recalcularem
+    const r0 = performance.now();
+    t.run("tool.brush", { text: recipe, uid: last - 5, hops: 0, prop: "tension", value: 0.1 });
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));
+    const ref = performance.now() - r0;
+    const before2 = edits();
     const t0 = performance.now();
     t.run("history.undo");
-    return performance.now() - t0;
+    // até o 3D e o gráfico recalcularem: dois quadros depois da mudança
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));
+    const dt = performance.now() - t0;
+    if (edits() >= before2) throw new Error("o desfazer não mudou as edições");
+    return { dt, ref };
   });
-  console.log(`desfazer levou ${ms.toFixed(0)} ms`);
-  expect(ms).toBeLessThan(5000);
+  console.log(
+    `desfazer levou ${ms.dt.toFixed(0)} ms; uma edição comum levou ${ms.ref.toFixed(0)} ms (até 3D e gráfico recalcularem)`,
+  );
+  expect(ms.dt).toBeLessThan(10_000);
+  // digitar a receita em vários passos vira uma feature só na faixa
+  await showTab(page, "Receita");
+  const area = page.getByLabel("Receita", { exact: true });
+  for (const extra of ["V46: 270 pb (270)", "V47: 270 pb (270)", "V48: 270 pb (270)"]) {
+    await area.fill(`${bola(45)}${String.fromCharCode(10)}${extra}`);
+    await area.blur();
+    await page.waitForTimeout(900);
+  }
+  await page.waitForTimeout(700);
+  const listed = (await page.evaluate(() => {
+    const t = window.__timeline;
+    if (!t) throw new Error("sem linha do tempo");
+    return t.run("timeline.get");
+  })) as { features: { kind: string; label: string }[] };
+  const recipes = listed.features.filter((f) => f.kind === "recipe");
+  // a primeira confirmação (antes dos traços) e as três de agora, juntas numa feature só
+  const feats = recipes.length;
+  expect(feats).toBe(2);
+  expect((recipes[1] as { label?: string }).label).toContain("3 edições");
 });
 
 test("o desfazer sobrevive a recarregar a página; uma linha do tempo fora de sincronia é descartada sem perder o projeto", async ({

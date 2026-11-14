@@ -12,6 +12,7 @@ import {
   rootOf,
   setActive,
   setAssemblyHidden,
+  setDraft,
   setIdCounters,
   setPartsHidden,
   useRoot,
@@ -335,6 +336,19 @@ onProjectReset(() => resetTimeline());
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
+/** Uids em ordem viram faixas [de, até]: uma seleção grande ocupa poucas linhas no arquivo. */
+const toRanges = (uids: number[]): [number, number][] => {
+  const out: [number, number][] = [];
+  for (const u of uids) {
+    const last = out[out.length - 1];
+    if (last && u === last[1] + 1) last[1] = u;
+    else out.push([u, u]);
+  }
+  return out;
+};
+const fromRanges = (ranges: [number, number][]): number[] =>
+  ranges.flatMap(([a, b]) => Array.from({ length: b - a + 1 }, (_, i) => a + i));
+
 /** Parâmetros de reexecução: o que era "o que está selecionado agora" vira explícito. Null = não grava (nada mudou). */
 function normalize(method: string, params: Params): Params | null {
   const out: Params = { ...params };
@@ -348,7 +362,7 @@ function normalize(method: string, params: Params): Params | null {
       out.dialect = undefined;
     }
     if (SELECTION_TARGET.has(method) && (out.target === undefined || out.target === "selection")) {
-      out.target = { kind: "uids", uids: selectedUids() };
+      out.target = { kind: "uidRanges", ranges: toRanges(selectedUids()) };
     }
   } else if (method === "parts.commitText") {
     const id = typeof params.id === "string" ? params.id : active;
@@ -398,6 +412,9 @@ function runFeature(f: Feature, run: (m: string, p: Params) => unknown): void {
   }
   setIdCounters(f.counters);
   const { part, ...rest } = f.params as Params & { part?: string };
+  const tg = rest.target as { kind?: string; ranges?: [number, number][] } | undefined;
+  if (tg?.kind === "uidRanges" && Array.isArray(tg.ranges))
+    rest.target = { kind: "uids", uids: fromRanges(tg.ranges) };
   if (f.method === "parts.commitText") {
     ensureEngine(String(rest.id), rest.prev, run);
     run("parts.setText", {
@@ -418,8 +435,28 @@ function runFeature(f: Feature, run: (m: string, p: Params) => unknown): void {
   } else run(f.method, rest);
 }
 
+const isRecipe = (f: Feature | undefined): boolean =>
+  !!f &&
+  (f.method === "parts.commitText" ||
+    (f.method === "group" && !!f.items?.every((i) => i.method === "parts.commitText")));
+const recipePart = (f: Feature): unknown => (f.items ? f.items[0]?.params.id : f.params.id);
+
 function push(f: Feature): void {
-  // cada confirmação de receita é uma feature: juntar A→B→C em A→C muda os uids permanentes dos pontos
+  // confirmações seguidas da mesma peça formam uma feature só, que reexecuta cada uma em ordem (juntar A→B→C em A→C
+  // mudaria os uids permanentes dos pontos); digitar uma receita não enche a faixa de ícones
+  const prev = features[marker - 1];
+  if (
+    f.method === "parts.commitText" &&
+    isRecipe(prev) &&
+    prev &&
+    !prev.suppressed &&
+    recipePart(prev) === f.params.id
+  ) {
+    const items = prev.items ? [...prev.items, f] : [prev, f];
+    features[marker - 1] = { ...prev, method: "group", params: {}, items, counters: prev.counters };
+    emit();
+    return;
+  }
   f.id = nextId++;
   // uma feature nova entra no marcador: as de depois dele continuam (D-68)
   features = [...features.slice(0, marker), f, ...features.slice(marker)];
@@ -482,7 +519,11 @@ export function removeFeature(id: number, run: (m: string, p: Params) => unknown
 }
 /** Texto curto de uma feature para a faixa e para o MCP. */
 export function labelOf(f: Feature): string {
-  if (f.items) return `traço de pincel (${f.items.length} pontos)`;
+  if (f.items) {
+    if (f.items.every((i) => i.method === "parts.commitText"))
+      return `receita de ${String(f.items[0]?.params.id)} (${f.items.length} edições)`;
+    return `traço de pincel (${f.items.length} pontos)`;
+  }
   const p = f.params;
   switch (f.method) {
     case "parts.commitText":
@@ -519,8 +560,8 @@ export function commitPending(run: (m: string, p: Params) => unknown): void {
     const norm = normalize("parts.commitText", { id });
     const counters = getIdCounters();
     if (norm) ensureEngine(id, norm.prev, run);
-    run("parts.commitText", { id });
-    if (norm) {
+    const out = run("parts.commitText", { id }) as { committed?: boolean } | null;
+    if (norm && out?.committed !== false) {
       setCommitted(String(norm.id), rootOf(String(norm.id)));
       push({ id: 0, method: "parts.commitText", params: norm, counters, suppressed: false, status: "ok" });
     }
@@ -560,6 +601,26 @@ function closeGroup(): void {
   }
 }
 
+const MAX_FEATURES = 200;
+const KEEP_FEATURES = 150;
+
+/**
+ * O arquivo da linha do tempo não cresce sem fim: passado o limite, as features mais antigas viram parte da base
+ * (o que era desfazível lá atrás deixa de ser). Só dobra o que está antes do marcador.
+ */
+function compactIfNeeded(): void {
+  if (!rawRun || features.length <= MAX_FEATURES) return;
+  const k = Math.min(features.length - KEEP_FEATURES, marker);
+  if (k <= 0) return;
+  const keepMarker = marker;
+  const run = rawRun;
+  replay(run, k);
+  captureBase();
+  features = features.slice(k);
+  marker = keepMarker - k;
+  replay(run);
+}
+
 /** `dispatch` de nível mais alto: executa e, se for feature e der certo, grava. */
 export function recordAndRun(method: string, params: Params, run: (p: Params) => unknown): unknown {
   const cls = CLASS[method];
@@ -597,7 +658,10 @@ export function recordAndRun(method: string, params: Params, run: (p: Params) =>
   } finally {
     depth--;
   }
-  if (norm !== null) {
+  // receita que o motor recusou (meio digitada) volta `committed: false` sem lançar: não vira feature
+  const refused =
+    method === "parts.commitText" && (result as { committed?: boolean } | null)?.committed === false;
+  if (norm !== null && !refused) {
     if (method === "parts.commitText") setCommitted(String(norm.id), rootOf(String(norm.id)));
     seedTexts(); // peça nova: o texto dela já é o ponto de partida
     highWater = maxC(highWater, getIdCounters());
@@ -614,7 +678,10 @@ export function recordAndRun(method: string, params: Params, run: (p: Params) =>
           }
         : { id: 0, method, params: norm, counters, suppressed: false, status: "ok" };
     if (openGroup) openGroup.push(f);
-    else push(f);
+    else {
+      push(f);
+      compactIfNeeded();
+    }
   }
   return result;
 }
@@ -632,6 +699,7 @@ export function replay(run: (m: string, p: Params) => unknown, upTo = marker): v
   const sel = treeSelected();
   const keepEdit = exportEditAll(s.parts.map((p) => p.id));
   const keepTutorial = exportTutorial();
+  const keepDraft = s.draft;
   replaying = true;
   try {
     importProject(clone(base), false);
@@ -654,7 +722,12 @@ export function replay(run: (m: string, p: Params) => unknown, upTo = marker): v
     setPartsHidden(ph);
     for (const a of now.assemblies)
       if (a.id in hiddenAsm) setAssemblyHidden(a.id, hiddenAsm[a.id] as boolean);
-    if (now.parts.some((p) => p.id === active)) setActive(active);
+    // a peça ativa que deixou de existir passa a ser a primeira: o armazém de pontos e a paleta acompanham
+    setActive(now.parts.some((p) => p.id === active) ? active : (now.parts[0] as { id: string }).id);
+    for (const side of ["a", "b"] as const) {
+      const d = keepDraft[side];
+      if (d && now.parts.some((p) => p.id === d.part)) setDraft(side, d);
+    }
     setTreeSelected(sel);
     // a seleção de pontos e o ponto do tutorial são da sessão: voltam como estavam
     for (const [id, old] of Object.entries(keepEdit as Record<string, { selection?: number[] }>))

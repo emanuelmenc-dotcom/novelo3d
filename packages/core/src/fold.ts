@@ -61,9 +61,17 @@ export interface Chains {
   tail: ChainRun[];
 }
 
-/** Início: corrente que não conta. Fim: pontos baixíssimos que fecham a volta (tentados do maior fim para o menor). */
-const isStart = (k: string): boolean => k === "CH0";
-const isSlip = (k: string): boolean => k === "SL" || k === "SL0" || k === "JOIN" || k === "SLINTO";
+/** O que é início (corrente que não conta) e fim (pontos baixíssimos que fecham a volta) numa lista de chaves. */
+export interface ChainRules {
+  isStart: (key: string) => boolean;
+  isEnd: (key: string) => boolean;
+}
+
+/** Chaves dos átomos da receita (`atomKey`). */
+export const ATOM_RULES: ChainRules = {
+  isStart: (k) => k === "CH0",
+  isEnd: (k) => k === "SL" || k === "SL0" || k === "JOIN" || k === "SLINTO",
+};
 
 const sameRun = (a: ChainRun, b: ChainRun): boolean => a.key === b.key && a.count === b.count;
 
@@ -81,21 +89,23 @@ function period(body: ChainRun[]): { unit: ChainRun[]; times: number } | undefin
 /**
  * Regra de `compress` do v3.py (§4.4 do anexo): separa o início (itens de contagem 1) e o fim, junta pontos iguais em
  * corridas e, no miolo, procura o menor período de 1 a 4 corridas que, repetido k ≥ 2 vezes, cobre o miolo inteiro.
- * O fim é o maior grupo de pontos baixíssimos finais que deixa o miolo dobrar; se nenhum deixa, todos ficam no fim.
+ * O fim (`rules.isEnd`) é o maior grupo de pontos baixíssimos finais que deixa o miolo dobrar; se nenhum deixa, todos ficam no fim.
  * Marcadores (`M:`) não entram.
  */
-export function chainsOf(keys: string[]): Chains {
+export function chainsOf(keys: string[], rules: ChainRules = ATOM_RULES): Chains {
+  const { isStart, isEnd } = rules;
   const L: ChainRun[] = [];
   for (const key of keys) {
     if (key.startsWith("M:")) continue;
     const last = L[L.length - 1];
-    if (last && last.key === key && !isStart(key)) last.count++;
+    if (last && last.key === key) last.count++;
     else L.push({ key, count: 1 });
   }
   let i = 0;
-  while (i < L.length && isStart((L[i] as ChainRun).key) && (L[i] as ChainRun).count === 1) i++;
+  // o v3.py só aceita itens de início com contagem 1; aqui "2 corr (não conta)" também fica no início (`2x corr*`)
+  while (i < L.length && isStart((L[i] as ChainRun).key)) i++;
   let maxTail = 0;
-  while (L.length - maxTail > i && isSlip((L[L.length - 1 - maxTail] as ChainRun).key)) maxTail++;
+  while (L.length - maxTail > i && isEnd((L[L.length - 1 - maxTail] as ChainRun).key)) maxTail++;
   const head = L.slice(0, i);
   // fim por corridas inteiras: "2x pbx" no fim é uma corrida só
   for (let t = maxTail; t >= 0; t--) {

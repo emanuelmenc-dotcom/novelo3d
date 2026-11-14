@@ -37,9 +37,10 @@ export class Svg {
     col: string = COLOR.black,
     anchor = "start",
     bold = false,
+    italic = false,
   ): void {
     this.add(
-      `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${FONT}" font-size="${size}" fill="${col}" text-anchor="${anchor}"${bold ? ' font-weight="bold"' : ""}>${esc(t)}</text>`,
+      `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-family="${FONT}" font-size="${size}" fill="${col}" text-anchor="${anchor}"${bold ? ' font-weight="bold"' : ""}${italic ? ' font-style="italic"' : ""}>${esc(t)}</text>`,
     );
   }
   circle(c: P, r: number, attrs: string): void {

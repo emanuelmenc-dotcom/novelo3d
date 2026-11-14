@@ -5,12 +5,14 @@ import {
   applyPaint,
   buildGraph,
   DEFAULT_YARNS,
+  expandRounds,
   type Issue,
   type PaintRegion,
   type Pattern,
   type StitchNode,
   type Yarn,
 } from "@novelo/core";
+import { drawRunBands, findRuns, type PendingTag, placeTags } from "./bands.ts";
 import {
   arrow,
   COLOR,
@@ -32,6 +34,15 @@ import {
   yarnCard,
 } from "./draw.ts";
 import { type Item, layoutRing, WIDTH } from "./layout.ts";
+import {
+  chainsOfItems,
+  drawTable,
+  type MarkKey,
+  markStrip,
+  NOTE_RUN,
+  type TableRow,
+  tableHeight,
+} from "./table.ts";
 
 export interface ChartOptions {
   /** Versão para iniciantes: cores alternadas, total por volta e rótulos coloridos. */
@@ -70,6 +81,8 @@ interface Entry {
   items: Item[];
   /** Fio da volta lisa (única cor), quando plain. */
   yarn?: string;
+  /** A volta termina com o ponto baixíssimo que fecha (não é um ponto: o grafo não o guarda). */
+  closing?: boolean;
 }
 
 const C: P = [105, 128];
@@ -106,6 +119,7 @@ function typOf(n: StitchNode, heads: Set<number>): string | null {
 
 function buildEntries(pattern: Pattern, issues: Issue[], paint: PaintRegion[]): Entry[] {
   const g0 = buildGraph(pattern);
+  const rounds = expandRounds(pattern);
   const g = paint.length > 0 ? applyPaint(g0, paint) : g0;
   const itemOf = new Map<number, Item>();
   const entries: Entry[] = [];
@@ -172,11 +186,22 @@ function buildEntries(pattern: Pattern, issues: Issue[], paint: PaintRegion[]): 
         });
       }
       const parents = n.parents.map((p) => itemOf.get(p)).filter((x): x is Item => x !== undefined);
-      const it = { ...mk(typ, n.counted, parents), yarn: n.yarnId };
+      const it = {
+        ...mk(typ, n.counted, parents),
+        yarn: n.yarnId,
+        grp: n.groupWith ?? (heads.has(n.id) ? n.id : undefined),
+      };
       items.push(it);
       itemOf.set(n.id, it);
     }
-    entries.push({ first: i + 1, last: i + 1, count: counted.length, plain: false, items });
+    entries.push({
+      first: i + 1,
+      last: i + 1,
+      count: counted.length,
+      plain: false,
+      items,
+      closing: rounds[i]?.atoms.some((a) => a.kind === "join"),
+    });
     prevCountedItems = items.filter((it) => it.counted);
     prevCount = counted.length;
   });
@@ -230,86 +255,6 @@ function splitPages(entries: Entry[], maxRings: number): PageSpec[] {
     flush();
   }
   return pages;
-}
-
-const LEGEND: Record<string, string> = {
-  am: "anel mágico (am)",
-  pb: "ponto baixo (pb)",
-  aum: "aumento (aum): 2 pb no mesmo ponto da volta anterior",
-  dim: "diminuição (dim): 2 pb fechados juntos",
-  d3: "3 pb fechados juntos (pb3jun)",
-  d4: "4 pb fechados juntos (pb4jun)",
-  mpa: "meio ponto alto (mpa)",
-  dc: "ponto alto (pa)",
-  tr: "ponto alto duplo (pad)",
-  ch: "corrente (corr)",
-  ch0: "corrente que não conta como ponto",
-  pbx: "ponto baixíssimo (pbx)",
-  ref: "volta anterior (referência, em cinza)",
-  ini: "primeiro ponto do diagrama (começar aqui)",
-  fim: "último ponto do diagrama",
-  liso: "anel tracejado: voltas só de pb",
-};
-
-function drawLegend(s: Svg, x0: number, y0: number, keys: string[]): number {
-  s.text(x0, y0, "Legenda", 3.4, COLOR.black, "start", true);
-  const U: P = [0, -1];
-  const T: P = [1, 0];
-  keys.forEach((k, i) => {
-    const cx = x0 + 5 + (i % 2) * 93;
-    const cy = y0 + 6.5 + Math.floor(i / 2) * 7.6;
-    const o: P = [cx, cy];
-    if (k === "am") symAm(s, o, COLOR.black);
-    else if (k === "pb") symPb(s, o, U, T, COLOR.black);
-    else if (k === "ref") symPb(s, o, U, T, COLOR.grey, 0.85);
-    else if (k === "mpa") symMpa(s, o, U, T, COLOR.black);
-    else if (k === "dc") symTall(s, o, U, T, COLOR.black, 1);
-    else if (k === "tr") symTall(s, o, U, T, COLOR.black, 2);
-    else if (k === "ch" || k === "ch0") symCh(s, o, T, COLOR.black);
-    else if (k === "pbx") symPbx(s, o, COLOR.black);
-    else if (k === "ini") startMark(s, [cx + 0.4, cy], [1, 0]);
-    else if (k === "fim") endMark(s, o);
-    else if (k === "liso")
-      s.add(
-        `<line x1="${cx - 3.5}" y1="${cy}" x2="${cx + 3.5}" y2="${cy}" stroke="${COLOR.link}" stroke-width="0.3" stroke-dasharray="1.2 0.9"/>`,
-      );
-    else if (k === "aum")
-      symInc(
-        s,
-        [cx, cy + 2.4],
-        [
-          [cx - 2.35, cy - 2.2],
-          [cx + 2.35, cy - 2.2],
-        ],
-        COLOR.black,
-      );
-    else if (k === "dim")
-      symTog(
-        s,
-        [cx, cy - 2.3],
-        [
-          [cx - 2.1, cy + 2.3],
-          [cx + 2.1, cy + 2.3],
-        ],
-        COLOR.black,
-      );
-    else if (k === "d3")
-      symTog(
-        s,
-        [cx, cy - 2.3],
-        [-3.2, 0, 3.2].map((d): P => [cx + d, cy + 2.3]),
-        COLOR.black,
-      );
-    else if (k === "d4")
-      symTog(
-        s,
-        [cx, cy - 2.3],
-        [-3.6, -1.2, 1.2, 3.6].map((d): P => [cx + d, cy + 2.3]),
-        COLOR.black,
-      );
-    s.text(cx + 7, cy + 1, LEGEND[k] ?? k, 2.75);
-  });
-  return y0 + 6.5 + Math.ceil(keys.length / 2) * 7.6;
 }
 
 interface Pt {
@@ -399,6 +344,23 @@ function drawRing(
   return used;
 }
 
+const pt = (p: P): { x: number; y: number } => ({ x: p[0], y: p[1] });
+
+/** Etiquetas Nx (retângulo de w por 2,4 mm) que encostam em outra etiqueta ou num símbolo. */
+function countTagOverlaps(tags: { m: P; w: number }[], others: Pt[]): number {
+  let n = 0;
+  tags.forEach((a, i) => {
+    for (const b of tags.slice(i + 1))
+      if (Math.abs(a.m[0] - b.m[0]) < (a.w + b.w) / 2 && Math.abs(a.m[1] - b.m[1]) < 2.4) n++;
+    for (const o of others) {
+      const dx = Math.max(0, Math.abs(a.m[0] - o.x) - a.w / 2);
+      const dy = Math.max(0, Math.abs(a.m[1] - o.y) - 1.2);
+      if (Math.hypot(dx, dy) < o.rad * 0.6) n++;
+    }
+  });
+  return n;
+}
+
 function countOverlaps(pts: Pt[]): number {
   let n = 0;
   for (let i = 0; i < pts.length; i++) {
@@ -426,7 +388,9 @@ export function renderChart(pattern: Pattern, options: ChartOptions = {}): Chart
   const pages: ChartPage[] = [];
   const startsWithRing = pattern.rows[0]?.start === "magicRing";
 
+  let pageNo = 0;
   specs.forEach((spec, pi) => {
+    const myNo = ++pageNo;
     const s = new Svg();
     const g = spec.inward ? -1 : 1;
     const rowsAll: Entry[] = spec.ref ? [spec.ref, ...spec.rows] : spec.rows;
@@ -449,22 +413,71 @@ export function renderChart(pattern: Pattern, options: ChartOptions = {}): Chart
         radii.push(r0 - i * pitch);
       });
     }
+    const hasPlainPage = rowsAll.some((e, i) => !(spec.ref && i === 0) && e.plain);
+    // tabela "Receita volta a volta": uma linha por entrada desta página, com as cores dos anéis
+    const tableRows: TableRow[] = spec.rows.map((e) => {
+      const ci = rowsAll.indexOf(e);
+      const col = e.plain ? COLOR.grey : beginner ? (COLOR.alt[ci % 2] as string) : COLOR.black;
+      const firstAm = pi === 0 && startsWithRing && e.first === 1;
+      return {
+        label: range(e),
+        color: col,
+        chains: chainsOfItems(e.items, firstAm, e.closing),
+        total: e.count,
+        plain: e.plain,
+      };
+    });
+    const hasRuns = rowsAll.some(
+      (e, i) => !(spec.ref && i === 0) && !e.plain && findRuns(e.items).length > 0,
+    );
+    const marks: MarkKey[] = ["ini", "fim"];
+    if (spec.ref) marks.push("ref");
+    if (hasPlainPage) marks.push("liso");
+    if (hasRuns) marks.push("run");
+    const notes: string[] = [];
+    if (spec.inward)
+      notes.push(
+        "Este gráfico vai de fora para dentro: o anel cinza externo é a volta anterior (referência).",
+      );
+    else if (pi > 0) notes.push("O anel cinza interno é a volta anterior (referência).");
+    if (pi < specs.length - 1) notes.push("Continua na página seguinte.");
+    if (hasPlainPage)
+      notes.push("Anéis tracejados: voltas só de ponto baixo, uma em cada ponto da volta anterior.");
+    if (showYarns)
+      notes.push(
+        "Os círculos coloridos atrás dos símbolos marcam os pontos que não são do fio A; veja os cartões no alto da página.",
+      );
+    if (hasRuns) notes.push(NOTE_RUN);
     const rMax = Math.max(...radii);
+    const notesH = notes.length > 0 ? 4.5 * notes.length + 3 : 0;
+    const tableH = tableHeight(tableRows);
+    const needH = tableH + 10 + notesH + 8;
+
     // ampliação uniforme para aproveitar a folha (raio útil de 88 mm incluindo a seta de sentido)
-    const k = Math.min(1.8, 88 / (rMax + 12));
+    const kFull = Math.min(1.8, 88 / (rMax + 12));
+    // o diagrama sobe e encolhe para a tabela caber na mesma página; abaixo de 85% a tabela vai para a página seguinte
+    const kFit = (287 - needH - 14 - 22) / (2 * (rMax + 12));
+    const together = kFit >= 0.85;
+    const k = together ? Math.min(kFull, kFit) : kFull;
+    const dy = together ? 22 + k * (rMax + 12) - C[1] : 0;
     if (k < 0.85)
       issues.push({
         code: "CHART_TOO_LARGE",
         severity: "warning",
         message: `Página ${pi + 1}: o gráfico é grande e foi reduzido (${Math.round(k * 100)}%).`,
       });
-    s.add(`<g transform="translate(${C[0]} ${C[1]}) scale(${k.toFixed(3)}) translate(${-C[0]} ${-C[1]})">`);
+    s.add(
+      `<g transform="translate(0 ${dy.toFixed(2)}) translate(${C[0]} ${C[1]}) scale(${k.toFixed(3)}) translate(${-C[0]} ${-C[1]})">`,
+    );
 
     // layout e desenho
     const pts: Pt[] = [];
     const used = new Set<string>();
     const pageYarns = new Set<string>();
     const plainAngle: number[] = [];
+    const tags: PendingTag[] = [];
+    // o que as etiquetas Nx não podem cobrir além dos símbolos: etiquetas de volta e marcas de início e fim
+    const extra: Pt[] = [];
     let plainCount = 0;
     let hasPlain = false;
     let lastLab = 0;
@@ -502,9 +515,11 @@ export function renderChart(pattern: Pattern, options: ChartOptions = {}): Chart
       const halo = showYarns
         ? (it: Item) => (it.yarn && it.yarn !== "A" ? colorOf(it.yarn) : undefined)
         : undefined;
+      tags.push(...drawRunBands(s, C, r, e.items, col));
       for (const t of drawRing(s, r, e.items, col, g, pts, halo)) used.add(t);
       for (const it of e.items) if (it.yarn) pageYarns.add(it.yarn);
       drawLabel(s, C, r, lab, num, cnt, col);
+      extra.push({ ...pt(frame(C, r, lab).o), rad: labW / 2 + 1 });
     });
 
     // centro, início, fim, sentido
@@ -520,21 +535,39 @@ export function renderChart(pattern: Pattern, options: ChartOptions = {}): Chart
       void o;
       const p = frame(C, (radii[firstDrawn] as number) - g * 4.2, it0.a).o;
       startMark(s, p, [g * u[0], g * u[1]]);
+      extra.push({ ...pt(p), rad: 3 });
       used.add("ini");
     }
     const lastIdx = rowsAll.length - 1;
     const le = rowsAll[lastIdx] as Entry;
     const lr = radii[lastIdx] as number;
     if (le.plain) {
-      endMark(s, frame(C, lr, (plainAngle[lastIdx] ?? Math.PI / 2) - ((1.28 * 12) / 2 + 3.2 + 2) / lr).o);
+      const ep = frame(C, lr, (plainAngle[lastIdx] ?? Math.PI / 2) - ((1.28 * 12) / 2 + 3.2 + 2) / lr).o;
+      endMark(s, ep);
+      extra.push({ ...pt(ep), rad: 3 });
     } else {
       // volta sem pontos (receita incompleta): sem marca de fim
       const itn = le.items[le.items.length - 1];
-      if (itn) endMark(s, frame(C, lr + g * 4.2, itn.a).o);
+      if (itn) {
+        const ep = frame(C, lr + g * 4.2, itn.a).o;
+        endMark(s, ep);
+        extra.push({ ...pt(ep), rad: 3 });
+      }
     }
     used.add("fim");
     if (hasPlain) used.add("liso");
     void lastLab;
+    // etiquetas "Nx": depois de tudo, no lado com mais folga em relação a símbolos, etiquetas de volta e marcas
+    const placed = placeTags(
+      s,
+      C,
+      tags,
+      [...pts, ...extra].map((p): P => [p.x, p.y]),
+    );
+    const tagOverlaps = countTagOverlaps(
+      placed.map((m, i) => ({ m, w: 1.45 * (tags[i]?.txt.length ?? 0) + 1.4 })),
+      [...pts, ...extra],
+    );
     arrow(s, C, rMax + 8, 0.15 * Math.PI, 0.55 * Math.PI, COLOR.start);
     const ap = frame(C, rMax + 11, 0.4 * Math.PI).o;
     s.text(ap[0] + 2, ap[1], "sentido do trabalho", 2.6, COLOR.start);
@@ -545,7 +578,7 @@ export function renderChart(pattern: Pattern, options: ChartOptions = {}): Chart
     const firstRound = (spec.rows[0] as Entry).first;
     const label = `voltas ${firstRound}–${lastRound}`;
     s.text(12, 13, options.title ?? "Gráfico circular", 5, COLOR.black, "start", true);
-    s.text(12, 18.5, `${label} · página ${pi + 1} de ${specs.length} · leitura anti-horária`, 3, "#555555");
+    s.text(12, 18.5, `${label} · página ${myNo} de @@TOTAL@@ · leitura anti-horária`, 3, "#555555");
     // cartões de fio, alinhados à direita, abaixo do título
     const cardYarns = showYarns ? yarns.filter((y) => pageYarns.has(y.id)) : [];
     [...cardYarns].reverse().forEach((y, i) => {
@@ -571,20 +604,11 @@ export function renderChart(pattern: Pattern, options: ChartOptions = {}): Chart
       "fim",
     ];
     const keys = order.filter((k) => used.has(k));
-    let y = drawLegend(s, 12, 226, keys) + 3;
-    const notes: string[] = [];
-    if (spec.inward)
-      notes.push(
-        "Este gráfico vai de fora para dentro: o anel cinza externo é a volta anterior (referência).",
-      );
-    else if (pi > 0) notes.push("O anel cinza interno é a volta anterior (referência).");
-    if (pi < specs.length - 1) notes.push("Continua na página seguinte.");
-    if (hasPlain)
-      notes.push("Anéis tracejados: voltas só de ponto baixo, uma em cada ponto da volta anterior.");
-    if (showYarns)
-      notes.push(
-        "Os círculos coloridos atrás dos símbolos marcam os pontos que não são do fio A; veja os cartões no alto da página.",
-      );
+    // ordem vertical: diagrama, tabela, faixa de marcas, notas; a tabela vai para outra página se não couber
+    const y0 = C[1] + dy + k * (rMax + 12) + 14;
+    let y = y0;
+    if (together) y = drawTable(s, 12, y, tableRows) + 4;
+    y = markStrip(s, 12, y + 2, marks, beginner ? undefined : COLOR.black) + 6;
     if (notes.length > 0) {
       s.text(12, y, "Notas", 3.2, COLOR.black, "start", true);
       for (const n of notes) {
@@ -605,10 +629,27 @@ export function renderChart(pattern: Pattern, options: ChartOptions = {}): Chart
       svg: s.toString(),
       label,
       rings: rowsAll.length,
-      overlaps: countOverlaps(pts),
+      overlaps: countOverlaps(pts) + tagOverlaps,
       symbols: keys,
       yarns: cardYarns.map((y) => y.id),
     });
+    if (!together) {
+      // página de continuação: o mesmo título com " (receita)" e só a tabela
+      const t = new Svg();
+      t.text(12, 13, `${options.title ?? "Gráfico circular"} (receita)`, 5, COLOR.black, "start", true);
+      t.text(12, 18.5, `${label} · página ${++pageNo} de @@TOTAL@@`, 3, "#555555");
+      drawTable(t, 12, 28, tableRows);
+      t.text(198, 293.5, "Gerado pelo Novelo3D.", 2.2, "#777777", "end");
+      pages.push({
+        svg: t.toString(),
+        label: `${label} (receita)`,
+        rings: 0,
+        overlaps: 0,
+        symbols: [],
+        yarns: [],
+      });
+    }
   });
+  for (const p of pages) p.svg = p.svg.replaceAll("@@TOTAL@@", String(pageNo));
   return { pages, issues };
 }

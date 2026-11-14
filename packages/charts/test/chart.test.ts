@@ -66,7 +66,8 @@ describe("gráfico circular", () => {
   test("versão padrão: traço preto e sem total por volta", () => {
     const std = renderChart(pBola(), { beginner: false });
     expect(std.pages[0]?.svg).not.toContain("#1b4f8a");
-    expect(std.pages[0]?.svg).not.toMatch(/>\(\d+\)</);
+    // o total por volta do diagrama é só da versão para iniciantes; a tabela traz o total nas duas
+    expect(std.pages[0]?.svg).toContain("Receita volta a volta");
     expect(r.pages[0]?.svg).toMatch(/>\(\d+\)</);
   });
 

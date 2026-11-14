@@ -14,6 +14,8 @@ export interface Item {
   ref?: boolean;
   /** Fio do ponto (id da paleta), quando há pintura. */
   yarn?: string;
+  /** Grupo de aumento do grafo (id do primeiro ponto do grupo): os pontos do mesmo grupo contam um item na tabela. */
+  grp?: number;
 }
 
 /** Largura reservada por símbolo (mm). Doc 10 seção 2.5. */

@@ -34,7 +34,8 @@ describe("chainsOf com atomos reais", () => {
       "V1: 27 pb no anel mágico (27)\nV2: 1 corr (não conta), 4 pb, 3 pbx, 4 pb, 3 pbx, pbx na corrente inicial",
       2,
     );
-    // a regra do v3.py dobra (4 pb; 3 pbx) x2; o anexo espera o miolo por extenso (pergunta 6 em docs/12)
+    // a regra do v3.py dobra (4 pb; 3 pbx) x2 e o fechamento fica à parte; o anexo espera outra coisa para uma linha
+    // parecida (pergunta 6 em docs/12). A linha deste teste foi escrita para o projeto.
     expect(show(chainsOf(k))).toBe("1CH0 | (4SC 3SL0) x2 | 1JOIN");
   });
   test("pbx na corr sozinho não é reconhecido como fechamento (pergunta 6 em docs/12)", () => {

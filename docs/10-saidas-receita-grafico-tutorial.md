@@ -1,5 +1,7 @@
 # 10 — Saídas: receita, gráfico e tutorial
 
+> **Gráfico v3 (2026-11-14, aguardando aprovação visual):** o gráfico circular já traz a faixa de pb seguidos, a etiqueta "Nx", a tabela "Receita volta a volta" (no lugar da legenda), a faixa de marcas e a página de continuação, conforme `17-atualizacao-graficos-v3.md` (D-60 a D-64). Enquanto o usuário não aprovar o desenho, este documento continua sendo a referência do formato e o v3 não é contrato (regra 7 do `CLAUDE.md`).
+
 ## 1. Receita escrita
 
 - Uma seção por peça, com: nome, quantidade ("fazer 2"), fios, amostra, linhas da receita, notas e acabamento.

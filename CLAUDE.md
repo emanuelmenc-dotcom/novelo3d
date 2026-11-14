@@ -23,27 +23,28 @@ Aplicativo web local para projetar amigurumis: modelagem 3D por peças, regiões
 
 ## Onde está cada coisa
 
-| Preciso saber                                   | Ler                                          |
-| ----------------------------------------------- | -------------------------------------------- |
-| O que o produto é e não é                       | `docs/00-visao-e-escopo.md`                  |
-| O que já existe no mercado e por que construir  | `docs/01-pesquisa-de-ferramentas.md`         |
-| Artigos e fatos geométricos                     | `docs/02-referencias-tecnicas.md`            |
-| O que pode ser copiado de outros projetos       | `docs/03-licencas-e-reuso.md`                |
-| Requisitos numerados                            | `docs/04-requisitos.md`                      |
-| Pacotes, camadas e fluxo de dados               | `docs/05-arquitetura.md`                     |
-| Tipos e regras de contagem                      | `docs/06-modelo-de-dados.md`                 |
-| Dialetos, leitura de receita e validação        | `docs/07-notacao-e-validacao.md`             |
-| Algoritmo geometria → receita                   | `docs/08-motor-direto.md`                    |
-| Algoritmo receita → geometria e tutorial        | `docs/09-motor-reverso.md`                   |
-| Formato do gráfico, PDF e tutorial 3D           | `docs/10-saidas-receita-grafico-tutorial.md` |
-| Motor de pontos, seleção, tensão, peças         | `docs/15-motor-de-pontos.md`                 |
-| Criador de pontos (etapas B a E, plano)         | `docs/16-criador-de-pontos.md`               |
-| Telas e interações                              | `docs/11-interface.md`                       |
-| Marcos e critérios de aceite                    | `docs/12-roadmap.md`                         |
-| Casos de teste com valores esperados            | `docs/13-plano-de-testes.md`                 |
-| Decisões tomadas, riscos e perguntas abertas    | `docs/14-decisoes-e-riscos.md`               |
-| Termos de crochê em BR, US e UK                 | `docs/glossario.md`                          |
-| Implementação de referência do gráfico (Python) | `referencia/graficos-python/chart.py`        |
+| Preciso saber                                   | Ler                                                                      |
+| ----------------------------------------------- | ------------------------------------------------------------------------ |
+| O que o produto é e não é                       | `docs/00-visao-e-escopo.md`                                              |
+| O que já existe no mercado e por que construir  | `docs/01-pesquisa-de-ferramentas.md`                                     |
+| Artigos e fatos geométricos                     | `docs/02-referencias-tecnicas.md`                                        |
+| O que pode ser copiado de outros projetos       | `docs/03-licencas-e-reuso.md`                                            |
+| Requisitos numerados                            | `docs/04-requisitos.md`                                                  |
+| Pacotes, camadas e fluxo de dados               | `docs/05-arquitetura.md`                                                 |
+| Tipos e regras de contagem                      | `docs/06-modelo-de-dados.md`                                             |
+| Dialetos, leitura de receita e validação        | `docs/07-notacao-e-validacao.md`                                         |
+| Algoritmo geometria → receita                   | `docs/08-motor-direto.md`                                                |
+| Algoritmo receita → geometria e tutorial        | `docs/09-motor-reverso.md`                                               |
+| Formato do gráfico, PDF e tutorial 3D           | `docs/10-saidas-receita-grafico-tutorial.md`                             |
+| Motor de pontos, seleção, tensão, peças         | `docs/15-motor-de-pontos.md`                                             |
+| Criador de pontos (etapas B a E, plano)         | `docs/16-criador-de-pontos.md`                                           |
+| Telas e interações                              | `docs/11-interface.md`                                                   |
+| Marcos e critérios de aceite                    | `docs/12-roadmap.md`                                                     |
+| Casos de teste com valores esperados            | `docs/13-plano-de-testes.md`                                             |
+| Decisões tomadas, riscos e perguntas abertas    | `docs/14-decisoes-e-riscos.md`                                           |
+| Termos de crochê em BR, US e UK                 | `docs/glossario.md`                                                      |
+| Implementação de referência do gráfico (Python) | `referencia/graficos-python/chart.py`                                    |
+| Gráfico v3: faixas, tabela, paginação (anexo)   | `docs/17-atualizacao-graficos-v3.md`, `referencia/graficos-python/v3.py` |
 
 Leia o documento do assunto antes de implementar. Não releia tudo a cada sessão.
 

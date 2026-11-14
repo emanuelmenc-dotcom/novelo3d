@@ -179,3 +179,18 @@ Verificação comum: nenhuma etiqueta "Nx" sobrepõe símbolo ou outra etiqueta;
 | `referencia/graficos-python/chart.py` | Biblioteca base (sem mudança de comportamento desde 2026-11-11; recopiada para garantir a versão usada)                                                                                                                                                                                  |
 
 Observações para o porte em TypeScript: `v3.py` mede a tabela desenhando em um objeto falso (`Null`) antes de desenhar de verdade; no produto, separar medição e desenho em funções puras. As larguras de texto são estimadas por número de caracteres; no produto, medir com a fonte embutida.
+
+## 11. O que está feito e o que ficou de fora (2026-11-14)
+
+Feito no gráfico circular (`packages/charts`): faixa de pb seguidos e etiqueta "Nx" (seções 2 e 3); tabela "Receita volta a volta" com símbolo e abreviação, repetições `(bloco) ×k`, início (corr*, am) e fim (pbx de fechamento, `join`) separados, cor cinza nas voltas lisas, `pa` e `pad` (seção 4); faixa de marcas com primeiro ponto, último ponto, volta lisa, pb seguidos e ponto de referência (seção 5); ordem diagrama, tabela, marcas e notas, com o diagrama subindo e encolhendo até 85% e a tabela indo para uma página "(receita)" quando não cabe (seção 6). A versão padrão (sem iniciantes) deixou de ter total no diagrama, mas a tabela traz o total nas duas versões; o teste que afirmava o contrário foi trocado.
+
+**Ficou de fora** (a aprovação visual vale só para o que existe):
+
+- marcadores dentro da volta (`| texto:`): a receita não os produz hoje (`#marco` é por linha, para o modo de leitura);
+- instrução curta depois da sequência ("arrematar" etc.) e o texto complementar do anel liso;
+- carreira de início (corrente de base) como primeira linha própria e a etiqueta cinza-escura dela;
+- compactação do diagrama além de subir e encolher (passo entre voltas de 5,9 mm, raio inicial menor);
+- marca `lig` (não há linhas de ligação no gráfico), `unw` e as adaptações em magenta;
+- gráficos linear e retangular, faixas retas e a tabela de 94 mm em coluna;
+- faixa e etiqueta nos anéis lisos tracejados (pergunta 9 de `docs/12`);
+- abreviações de outros dialetos (a tabela é pt-BR) e a medida de texto com a fonte real (usa o número de caracteres).

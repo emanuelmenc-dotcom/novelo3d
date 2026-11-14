@@ -216,4 +216,13 @@ describe("tabela Receita volta a volta", () => {
     );
     expect(alto).toContain(">pa<");
   });
+
+  test("volta lisa que termina em join mostra o pbx de fechamento e não se junta à volta lisa sem ele", () => {
+    const base = row("1", [sc(36)], { start: "magicRing" });
+    const closed = renderChart(pat(base, row("2", [sc("rest"), { kind: "join" }])));
+    expect(closed.pages[0]?.svg).toContain(">pbx<"); // o item 1x pbx do fechamento
+    const two = renderChart(pat(base, row("2", [sc("rest"), { kind: "join" }]), row("3", [sc("rest")])));
+    // as voltas 2 e 3 só diferem no fechamento: duas linhas, não "2–3"
+    expect(two.pages[0]?.svg).not.toContain("2–3");
+  });
 });

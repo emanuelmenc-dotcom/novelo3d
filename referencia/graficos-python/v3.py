@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Versão 3 dos gráficos: faixas de pb seguidos, contagem "Nx" no 1º ponto,
 tabela "Receita volta a volta" com símbolo + abreviação e faixa de marcas."""
+# Referência do formato (docs/17). Em 2026-11-14 foram tirados deste arquivo os trechos ligados a uma receita comercial
+# (uma chave de símbolo e um exemplo de marcador); o resto está como foi recebido. O projeto não executa este arquivo.
 import math
 import chart
 from chart import *
 
 ABR = {"pb": "pb", "aum": "aum", "dim": "dim", "d4": "pb4jun", "ch0": "corr*", "ch": "corr",
-       "pbx": "pbx", "pbxj": "pbx", "am": "am", "toe": "dedo", "unw": "não trab.", "mpa": "mpa"}
+       "pbx": "pbx", "pbxj": "pbx", "am": "am", "unw": "não trab.", "mpa": "mpa"}
 MINRUN = 5
 PENDING = []                      # rótulos "Nx" da página atual
 
@@ -113,10 +115,6 @@ def tsym(s, key, cx, cy, col):
         s.line((cx, cy - 2.1), (cx, cy + 2.1), col); s.line((cx - 1.5, cy - 2.1), (cx + 1.5, cy - 2.1), col)
     elif key == "am":
         s.add(f'<circle cx="{cx}" cy="{cy}" r="2.2" fill="none" stroke="{col}" stroke-width="0.45"/>')
-    elif key == "toe":
-        for dy in (-1.2, 1.2):
-            s.add(f'<ellipse cx="{cx}" cy="{cy+dy}" rx="0.6" ry="1.15" fill="none" stroke="{col}" stroke-width="0.35"/>')
-        s.line((cx + 1.6, cy - 2.0), (cx + 1.6, cy + 2.0), col, 0.35)
     elif key == "unw":
         s.add(f'<circle cx="{cx}" cy="{cy}" r="1.8" fill="none" stroke="{ADAPT}" stroke-width="0.45" stroke-dasharray="1.0 0.7"/>')
     return {"d4": 9.0, "am": 5.6}.get(key, 5.2)
@@ -141,7 +139,7 @@ def _row(s, x0, y, lab, col, toks, tot, extra, adapt, plain, RH=5.6, LH=4.7, W=1
     def emit(tok, last):
         nonlocal x
         key, n = tok
-        if isinstance(key, tuple):                      # marcador (ex.: perna 2)
+        if isinstance(key, tuple):                      # marcador (texto livre)
             w = 1.55 * len(key[1]) + 3; need(w)
             s.text(x, cy + 0.95, "| " + key[1] + ":", 2.6, "#333333", bold=True); x += w; return
         if key == "am":

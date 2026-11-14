@@ -146,8 +146,16 @@ function buildEntries(pattern: Pattern, issues: Issue[], paint: PaintRegion[]): 
       nodes.every(
         (n) => n.code === "SC" && n.parents.length === 1 && n.groupWith === undefined && !heads.has(n.id),
       );
+    // o pbx que fecha a volta (`join`) não é um ponto do grafo: vem das operações da receita
+    const closing = rounds[i]?.atoms.some((a) => a.kind === "join") ?? false;
     const last = entries[entries.length - 1];
-    if (plain && last?.plain && last.count === counted.length && last.yarn === roundYarn) {
+    if (
+      plain &&
+      last?.plain &&
+      last.count === counted.length &&
+      last.yarn === roundYarn &&
+      (last.closing ?? false) === closing
+    ) {
       last.last = i + 1;
       nodes.forEach((n, k) => {
         itemOf.set(n.id, last.items[k] as Item);
@@ -169,6 +177,7 @@ function buildEntries(pattern: Pattern, issues: Issue[], paint: PaintRegion[]): 
         plain: true,
         items,
         yarn: roundYarn as string,
+        closing,
       });
       prevCountedItems = items;
       prevCount = counted.length;
@@ -200,7 +209,7 @@ function buildEntries(pattern: Pattern, issues: Issue[], paint: PaintRegion[]): 
       count: counted.length,
       plain: false,
       items,
-      closing: rounds[i]?.atoms.some((a) => a.kind === "join"),
+      closing,
     });
     prevCountedItems = items.filter((it) => it.counted);
     prevCount = counted.length;
@@ -459,7 +468,9 @@ export function renderChart(pattern: Pattern, options: ChartOptions = {}): Chart
     const kFit = (287 - needH - 14 - 22) / (2 * (rMax + 12));
     const together = kFit >= 0.85;
     const k = together ? Math.min(kFull, kFit) : kFull;
-    const dy = together ? 22 + k * (rMax + 12) - C[1] : 0;
+    // sobra de altura entre o título e a tabela: o diagrama desce metade dela, para não colar no título
+    const free = together ? 287 - needH - 14 - 22 - 2 * k * (rMax + 12) : 0;
+    const dy = together ? 22 + k * (rMax + 12) - C[1] + Math.min(25, Math.max(0, free) / 2) : 0;
     if (k < 0.85)
       issues.push({
         code: "CHART_TOO_LARGE",

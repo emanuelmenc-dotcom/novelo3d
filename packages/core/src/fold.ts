@@ -49,28 +49,58 @@ export function foldKeys(K: string[]): Seg[] {
   return runs(K);
 }
 
+export interface ChainRun {
+  key: string;
+  count: number;
+}
+/** Linha de uma volta no formato do gráfico v3: início, bloco repetido k vezes (ou o miolo por extenso) e fim. */
+export interface Chains {
+  head: ChainRun[];
+  body: ChainRun[];
+  times: number;
+  tail: ChainRun[];
+}
+
+/** Início: corrente que não conta. Fim: pontos baixíssimos que fecham a volta (tentados do maior fim para o menor). */
 const isStart = (k: string): boolean => k === "CH0";
-const isEnd = (k: string): boolean => k === "JOIN" || k === "SL";
+const isSlip = (k: string): boolean => k === "SL" || k === "SL0" || k === "JOIN" || k === "SLINTO";
+
+const sameRun = (a: ChainRun, b: ChainRun): boolean => a.key === b.key && a.count === b.count;
+
+/** Menor período de 1 a 4 corridas que, repetido k ≥ 2 vezes, cobre o miolo inteiro. */
+function period(body: ChainRun[]): { unit: ChainRun[]; times: number } | undefined {
+  const n = body.length;
+  for (let p = 1; p <= 4; p++) {
+    if (n % p !== 0 || n / p < 2) continue;
+    if (body.every((r, x) => sameRun(r, body[x % p] as ChainRun)))
+      return { unit: body.slice(0, p), times: n / p };
+  }
+  return undefined;
+}
 
 /**
- * Cadeias de uma volta, regra do gráfico v3 (§4.4): o início (corr*) e o fim (fechamento) ficam fora; no miolo, o menor
- * período de 2 a 4 pontos que, repetido k ≥ 2 vezes, cobre o miolo inteiro vira `(bloco) ×k`; senão, corridas de pontos
- * iguais. Marcadores (`M:`) não entram.
+ * Regra de `compress` do v3.py (§4.4 do anexo): separa o início (itens de contagem 1) e o fim, junta pontos iguais em
+ * corridas e, no miolo, procura o menor período de 1 a 4 corridas que, repetido k ≥ 2 vezes, cobre o miolo inteiro.
+ * O fim é o maior grupo de pontos baixíssimos finais que deixa o miolo dobrar; se nenhum deixa, todos ficam no fim.
+ * Marcadores (`M:`) não entram.
  */
-export function chainSegs(keys: string[]): Seg[] {
-  const K = keys.filter((k) => !k.startsWith("M:"));
-  let s = 0;
-  while (s < K.length && isStart(K[s] as string)) s++;
-  let e = K.length;
-  while (e > s && isEnd(K[e - 1] as string)) e--;
-  const mid = K.slice(s, e);
-  let middle: Seg[] = runs(mid);
-  for (let p = 2; p <= 4; p++) {
-    if (mid.length % p !== 0 || mid.length / p < 2 || distinct(mid.slice(0, p)) < 2) continue;
-    if (same(mid, 0, p, mid.length - p)) {
-      middle = [{ t: "block", keys: mid.slice(0, p), times: mid.length / p }];
-      break;
-    }
+export function chainsOf(keys: string[]): Chains {
+  const L: ChainRun[] = [];
+  for (const key of keys) {
+    if (key.startsWith("M:")) continue;
+    const last = L[L.length - 1];
+    if (last && last.key === key && !isStart(key)) last.count++;
+    else L.push({ key, count: 1 });
   }
-  return [...runs(K.slice(0, s)), ...middle, ...runs(K.slice(e))];
+  let i = 0;
+  while (i < L.length && isStart((L[i] as ChainRun).key) && (L[i] as ChainRun).count === 1) i++;
+  let maxTail = 0;
+  while (L.length - maxTail > i && isSlip((L[L.length - 1 - maxTail] as ChainRun).key)) maxTail++;
+  const head = L.slice(0, i);
+  // fim por corridas inteiras: "2x pbx" no fim é uma corrida só
+  for (let t = maxTail; t >= 0; t--) {
+    const found = period(L.slice(i, L.length - t));
+    if (found) return { head, body: found.unit, times: found.times, tail: L.slice(L.length - t) };
+  }
+  return { head, body: L.slice(i, L.length - maxTail), times: 1, tail: L.slice(L.length - maxTail) };
 }

@@ -85,7 +85,7 @@ export function printPattern(pattern: Pattern, dialect: Dialect = pattern.dialec
   type Merged = { e: ExpandedRow; reps: number; sig: string };
   const merged: Merged[] = [];
   for (const e of rows) {
-    const sig = `${e.atoms.map(atomKey).join(",")}|${e.prevCounted}|${e.produced}|${e.row.start ?? ""}|${e.row.kind}`;
+    const sig = `${e.atoms.map(atomKey).join(",")}|${e.prevCounted}|${e.produced}|${e.row.start ?? ""}|${e.row.kind}${e.row.milestone === undefined ? "" : `|M${merged.length}`}`;
     const last = merged[merged.length - 1];
     if (last && last.sig === sig && e.row.start === undefined) last.reps += e.reps;
     else merged.push({ e, reps: e.reps, sig });
@@ -98,6 +98,7 @@ export function printPattern(pattern: Pattern, dialect: Dialect = pattern.dialec
     const pre = PREFIX[dialect][m.e.row.kind];
     if (dialect === "xva" && m.e.row.start === "magicRing") lines.push("R0: MR");
     lines.push(`${pre}${label}: ${rowBody(m.e, dialect)} (${m.e.produced})`);
+    if (m.e.row.milestone !== undefined) lines.push(`#marco ${m.e.row.milestone}`);
   }
   return lines.join("\n");
 }

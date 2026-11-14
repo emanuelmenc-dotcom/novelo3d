@@ -90,3 +90,5 @@ export function tutorialScript(pattern: Pattern, graph: StitchGraph): TutorialSt
   }
   return steps;
 }
+
+export * from "./reading.ts";

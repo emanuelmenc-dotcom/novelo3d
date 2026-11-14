@@ -235,3 +235,5 @@ Plano aprovado pelo usuário, com mockup (`docs/imagens`: ver o relatório da et
 3. **Projeto com várias peças no modo de leitura.** Assumido: só a peça ativa, as outras esmaecidas.
 4. **Troca de fio.** Assumido: aparece como aviso no passo, não vira marco.
 5. **Ordem dos botões do ribbon.** Escolhi a ordem de uso pela minha leitura do fluxo de trabalho; o usuário pediu "tente estruturar de forma lógica": ajustar depois de usar.
+6. **Caso G14 do anexo v3.** O texto `..., 4 pb, 3 pbx, 4 pb, 3 pbx, pbx na corr` sai do parser como `4 pb, 4 pbx, 1 corr` na segunda metade (o "pbx na corr" não vira o fechamento `JOIN`); o anexo espera `1x pbx` separado. A regra do `v3.py` (período de 1 a 4 corridas) também dobraria `(4 pb; 3 pbx) ×2` se as corridas fossem iguais. Não mudei o valor do anexo; decidir antes de G3.
+7. **Marco de leitura: sintaxe e comportamento.** Além de `#marco texto` (pergunta 2): pular e fechar são passos próprios no modo de leitura, e cada repetição de um bloco `(…) ×k` é um passo separado, com "repetição i de k" na faixa (padrão assumido).

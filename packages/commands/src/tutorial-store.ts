@@ -31,6 +31,16 @@ export const setTutorialPos = (part: string, pos: TutorialPos): void => commit({
 
 export const resetTutorial = (): void => commit({});
 
+/** Modo de leitura ligado ou não: estado só da sessão, fora do projeto e do desfazer. */
+let reading = false;
+export const readingOn = (): boolean => reading;
+export function setReading(on: boolean): void {
+  if (reading === on) return;
+  reading = on;
+  version++;
+  for (const fn of listeners) fn();
+}
+
 /** Posições de todas as peças (ou só das de `keep`), prontas para gravar. */
 export function exportTutorial(keep?: string[]): Record<string, TutorialPos> {
   const out: Record<string, TutorialPos> = {};

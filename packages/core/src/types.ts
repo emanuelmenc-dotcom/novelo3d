@@ -38,6 +38,8 @@ export interface Row {
   declaredCount?: number;
   yarnId?: string;
   note?: string;
+  /** Marco do modo de leitura (`#marco texto` depois da volta): o texto que a pessoa lê ao chegar aqui. */
+  milestone?: string;
   sourceText?: string;
 }
 

@@ -102,7 +102,7 @@ export function printPatternWithYarns(
 
     const leadless = lead ? pieces.slice(1) : pieces;
     const body = pieces.join(", ");
-    const sig = `${leadless.join(",")}|${segs.map((s) => s.yarn).join("")}|${r.prevCounted}|${r.produced}|${r.row.start ?? ""}|${r.row.kind}`;
+    const sig = `${leadless.join(",")}|${segs.map((s) => s.yarn).join("")}|${r.prevCounted}|${r.produced}|${r.row.start ?? ""}|${r.row.kind}${r.row.milestone === undefined ? "" : `|M${entries.length}`}`;
     const last = entries[entries.length - 1];
     // junta voltas iguais; uma volta que repete a troca do começo só entra se a primeira também a tinha
     if (last && last.sig === sig && r.row.start === undefined && (lead === null || lead === last.lead)) {
@@ -118,6 +118,7 @@ export function printPatternWithYarns(
     const label = e.count > 1 ? `${a}–${a + e.count - 1}` : String(a);
     if (dialect === "xva" && e.first.row.start === "magicRing") lines.push("R0: MR");
     lines.push(`${PREFIX[dialect][e.first.row.kind]}${label}: ${e.body} (${e.first.produced})`);
+    if (e.first.row.milestone !== undefined) lines.push(`#marco ${e.first.row.milestone}`);
   }
   return { text: lines.join("\n"), changes };
 }

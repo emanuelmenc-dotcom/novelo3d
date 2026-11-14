@@ -316,6 +316,12 @@ export function parsePattern(text: string, options: ParseOptions = {}): ParseRes
   let total = 0;
   for (const raw of text.split(/\r?\n/)) {
     let line = raw.trim();
+    const mark = /^#\s*marco\b[\s:]*(.*)$/i.exec(line);
+    if (mark) {
+      const prev = rows[rows.length - 1];
+      if (prev) prev.milestone = (mark[1] ?? "").trim() || "Marco";
+      continue;
+    }
     if (line === "" || line.startsWith("#") || line.startsWith("//")) continue;
     const lm = LABEL.exec(line);
     let label = String(nextNumber);

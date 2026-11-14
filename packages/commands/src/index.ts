@@ -35,7 +35,7 @@ import {
 import { fromCp, parseCpDot, toCp } from "@novelo/interop";
 import { parsePattern, printPattern, printPatternWithYarns, splitLines } from "@novelo/notation";
 import { bandOf, MAX_LEGS, modelKey, tensionLevel } from "@novelo/stitch3d";
-import { type TutorialStep, tutorialScript } from "@novelo/tutorial";
+import { readingScript } from "@novelo/tutorial";
 import { editCommands } from "./edit-commands.ts";
 import {
   engineFor,
@@ -51,7 +51,6 @@ import {
   addRegion,
   clearPaint,
   nextYarnId,
-  type PaintState,
   paintSnapshot,
   removeRegion,
   resetPaint,
@@ -79,7 +78,7 @@ import {
 } from "./render-store.ts";
 import { getSettings, resetSettings, type SettingsPatch, setSettings } from "./settings.ts";
 import { stitchEditorCommands } from "./stitch-editor-commands.ts";
-import { tutorialCommands } from "./tutorial-commands.ts";
+import { type ScriptCtx, tutorialCommands } from "./tutorial-commands.ts";
 
 export {
   CUBE_POSITIONS,
@@ -109,7 +108,6 @@ import {
   enabledPanels,
   findLeaf,
   hiddenPanels,
-  hidePanel,
   leafOfPanel,
   movePanel,
   PANEL_IDS,
@@ -120,7 +118,6 @@ import {
   resizeSplit,
   setActive,
   setSizes,
-  showPanel,
   toggleCollapse,
   visiblePanels,
   type Zone,
@@ -411,12 +408,12 @@ function layoutOut(p: Params, yarnMap?: Record<string, string>, mirror = false):
 }
 
 /** Roteiro do tutorial da receita (`text`, `dialect`), com a pintura do projeto, e o uid permanente de cada ponto. */
-function scriptOf(p: Params): { steps: TutorialStep[]; uidOf: (id: number) => number } {
+function scriptOf(p: Params): ScriptCtx {
   const { pattern } = read(p);
   const { paint } = paintOf(p);
   const graph = applyPaint(buildGraph(pattern), paint);
   const eng = engineFor(str(p, "text"), dialectOf(p));
-  return { steps: tutorialScript(pattern, graph), uidOf: (id) => eng.store.uid[id] as number };
+  return { ...readingScript(pattern, graph), uidOf: (id) => eng.store.uid[id] as number };
 }
 
 export const commands: Record<string, Command> = {

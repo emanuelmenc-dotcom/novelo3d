@@ -17,6 +17,8 @@ export function PropsPanel(props: { text: string; dialect: string; selNode: Node
       <PointsPanel text={props.text} dialect={props.dialect} selNode={props.selNode} />
       {selected === "root" ? (
         <AssemblyPanel sections={["seam", "close"]} />
+      ) : selected?.startsWith("a") ? (
+        <AssemblyPanel sections={["asm"]} />
       ) : selected?.startsWith("s") ? (
         <p className="hint" data-testid="props-seam">
           Costura selecionada: veja a lista na árvore. Remova pelo botão × dela.

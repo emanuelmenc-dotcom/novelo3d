@@ -112,3 +112,71 @@ test("menu de contexto da árvore: clique direito e teclado chamam os mesmos com
   await page.getByRole("button", { name: "Mostrar todas" }).click();
   await expect.poll(() => count(page)).toBe(866);
 });
+
+test("o MCP cria, move, esconde e apaga montagens; apagar exige confirmação", async ({ page }) => {
+  await withBridge(page, async (call) => {
+    await expect.poll(() => count(page)).toBe(433);
+    await call("parts.instance", { id: "p1" });
+    const made = await call("assembly.add", { name: "Grupo", parts: ["p2"] });
+    expect(made.isError, made.text).toBe(false);
+    expect(made.json.root.children.find((n: { id: string }) => n.id === "a1").children[0].id).toBe("p2");
+    expect((await call("assembly.add", { parts: "p1" })).isError).toBe(true);
+    const moved = await call("assembly.set", { id: "a1", pos: [10, 0, 0], rot: [0, 0, 90] });
+    expect(moved.json.root.children[0].pos).toEqual([10, 0, 0]);
+    expect((await call("assembly.set", { id: "a1", parent: "a1" })).isError).toBe(true);
+    await call("assembly.setVisible", { id: "a1", visible: false });
+    await expect.poll(() => count(page)).toBe(433);
+    await call("assembly.setVisible", { id: "a1", visible: true });
+    await expect.poll(() => count(page)).toBe(866);
+    expect((await call("assembly.contents", { id: "a1" })).json.parts).toEqual(["p2"]);
+    expect((await call("assembly.remove", { id: "a1" })).isError).toBe(true); // sem confirm
+    const gone = await call("assembly.remove", { id: "a1", confirm: true });
+    expect(gone.isError, gone.text).toBe(false);
+    await expect.poll(() => count(page)).toBe(433);
+  });
+});
+
+test("montagens na tela: nova montagem pelo ribbon, mover pelas propriedades, esconder e apagar com confirmação", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect.poll(() => count(page)).toBe(433);
+  await ribbon(page, "montagem");
+  await page.getByRole("button", { name: "Instância" }).click();
+  await expect(page.locator("[data-part]")).toHaveCount(2);
+  await showTab(page, "Árvore");
+  // peça escolhida na árvore entra na montagem nova
+  await page.getByLabel("Editar Peça 1 (instância)").check();
+  await ribbon(page, "montagem");
+  await page.getByTestId("tool-montagem.nova-montagem").click();
+  await showTab(page, "Árvore");
+  await expect(page.locator("[data-assembly]")).toHaveCount(1);
+  await expect(page.locator("[data-assembly] + [data-part]")).toHaveCount(1); // a peça vem logo abaixo, dentro
+  // menu de contexto na raiz: montagem vazia
+  await page.getByTestId("tree-root").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Nova montagem vazia" }).click();
+  await expect(page.locator("[data-assembly]")).toHaveCount(2);
+  // propriedades da primeira montagem: posição própria
+  await page.getByRole("button", { name: /^Montagem Montagem 1$/ }).click();
+  await showTab(page, "Propriedades");
+  await page.getByLabel("Posição X da montagem").fill("30");
+  await expect(page.getByLabel("Posição X da montagem")).toHaveValue("30");
+  // esconder pela árvore
+  await showTab(page, "Árvore");
+  await page.getByRole("button", { name: "Esconder montagem Montagem 1" }).click();
+  await expect.poll(() => count(page)).toBe(433);
+  await page.getByRole("button", { name: "Mostrar montagem Montagem 1" }).click();
+  await expect.poll(() => count(page)).toBe(866);
+  // apagar pelo menu, com confirmação: recusar mantém, aceitar leva a peça junto
+  let accept = false;
+  page.on("dialog", (d) => void (accept ? d.accept() : d.dismiss()));
+  await page.getByRole("button", { name: /^Montagem Montagem 1$/ }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Remover montagem/ }).click();
+  await expect(page.locator("[data-assembly]")).toHaveCount(2);
+  accept = true;
+  await page.getByRole("button", { name: /^Montagem Montagem 1$/ }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: /Remover montagem/ }).click();
+  await expect(page.locator("[data-assembly]")).toHaveCount(1);
+  await expect(page.locator("[data-part]")).toHaveCount(1);
+  await expect.poll(() => count(page)).toBe(433);
+});

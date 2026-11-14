@@ -266,6 +266,24 @@ export function buildRibbonTabs(c: RibbonCtx): RibbonTab[] {
           ],
         },
         {
+          id: "grupo",
+          label: "Montagem",
+          items: [
+            btn(
+              "montagem",
+              "nova-montagem",
+              "Nova montagem",
+              "assembly",
+              () => c.run("assembly.add", { fromSelection: true }),
+              {
+                testid: "tool-montagem.nova-montagem",
+                title:
+                  "Cria uma montagem; a peça escolhida na árvore entra nela (sem peça escolhida, nasce vazia)",
+              },
+            ),
+          ],
+        },
+        {
           id: "espelho",
           label: "Espelhada no plano",
           items: (["x", "y", "z"] as const).map((plane) =>

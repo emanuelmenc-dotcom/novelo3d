@@ -9,8 +9,11 @@ import {
   settingsSnapshot,
   subscribePaint,
   subscribeParts,
+  subscribeTree,
+  treeVersion,
 } from "@novelo/commands";
 import { useMemo, useState, useSyncExternalStore } from "react";
+import { Icon } from "./icons.tsx";
 
 interface Check {
   ok: boolean;
@@ -61,51 +64,84 @@ function TreeMenu(props: {
   run: (method: string, params?: Record<string, unknown>) => unknown;
 }) {
   const { menu, onClose, run } = props;
-  const part = partsSnapshot().parts.find((q) => q.id === menu.id);
-  const items: [string, string, Record<string, unknown>][] = [
-    [part?.hidden ? "Mostrar" : "Esconder", "parts.setVisible", { id: menu.id, visible: !!part?.hidden }],
-    ["Isolar", "parts.isolate", { id: menu.id }],
-    ["Mostrar todas", "parts.showAll", {}],
-    ["Nova instância", "parts.instance", { id: menu.id }],
-    ["Espelhar (plano X)", "parts.mirror", { id: menu.id, plane: "x" }],
-    ["Copiar", "parts.copy", { id: menu.id }],
-    ["Remover", "parts.remove", { id: menu.id }],
-  ];
+  const st = partsSnapshot();
+  const part = st.parts.find((q) => q.id === menu.id);
+  const asm = st.assemblies.find((q) => q.id === menu.id);
+  const label = part?.name ?? asm?.name ?? "Projeto";
+  type Item = [string, string, Record<string, unknown>];
+  const items: Item[] = part
+    ? [
+        [part.hidden ? "Mostrar" : "Esconder", "parts.setVisible", { id: menu.id, visible: !!part.hidden }],
+        ["Isolar", "parts.isolate", { id: menu.id }],
+        ["Mostrar todas", "parts.showAll", {}],
+        [
+          "Nova montagem com esta peça",
+          "assembly.add",
+          { parts: [menu.id], ...(part.assembly ? { parent: part.assembly } : {}) },
+        ],
+        ...(part.assembly
+          ? ([["Tirar da montagem", "parts.set", { id: menu.id, assembly: null }]] as Item[])
+          : []),
+        ["Nova instância", "parts.instance", { id: menu.id }],
+        ["Espelhar (plano X)", "parts.mirror", { id: menu.id, plane: "x" }],
+        ["Copiar", "parts.copy", { id: menu.id }],
+        ["Remover", "parts.remove", { id: menu.id }],
+      ]
+    : asm
+      ? [
+          ["Nova montagem aqui dentro (vazia)", "assembly.add", { parent: menu.id }],
+          ["Remover montagem e tudo dentro…", "confirm-remove", { id: menu.id }],
+        ]
+      : [["Nova montagem vazia", "assembly.add", {}]];
+  const go = (method: string, params: Record<string, unknown>) => {
+    if (method === "confirm-remove") {
+      const c = dispatch("assembly.contents", params) as {
+        assemblies: string[];
+        parts: string[];
+        seams: string[];
+      };
+      const ok = window.confirm(
+        `Remover "${label}" apaga ${c.parts.length} peça(s), ${c.assemblies.length - 1} montagem(ns) de dentro e ${c.seams.length} costura(s). Dá para desfazer. Continuar?`,
+      );
+      if (ok) run("assembly.remove", { ...params, confirm: true });
+    } else run(method, params);
+  };
   return (
     <div
       role="menu"
-      aria-label={`Menu de ${part?.name ?? menu.id}`}
+      aria-label={`Menu de ${label}`}
       className="tree-menu"
       style={{ left: menu.x, top: menu.y }}
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
       }}
     >
-      {items.map(([label, method, params], i) => (
+      {items.map(([text, method, params], i) => (
         <button
-          key={label}
+          key={text}
           type="button"
           role="menuitem"
           // biome-ignore lint/a11y/noAutofocus: o menu acabou de abrir por teclado ou mouse e o foco precisa entrar nele
           autoFocus={i === 0}
           onClick={() => {
-            run(method, params);
+            go(method, params);
             onClose();
           }}
         >
-          {label}
+          {text}
         </button>
       ))}
     </div>
   );
 }
 
-export type AssemblySection = "tree" | "part" | "seam" | "close";
+export type AssemblySection = "tree" | "part" | "asm" | "seam" | "close";
 
 /** Cada seção mora numa janela: a árvore (peças e costuras), e as propriedades (peça, costura nova e fechar montagem). */
 export function AssemblyPanel(props: { sections: AssemblySection[] }) {
   const show = (x: AssemblySection) => props.sections.includes(x);
   const st = useSyncExternalStore(subscribeParts, partsSnapshot);
+  useSyncExternalStore(subscribeTree, treeVersion);
   const { yarns } = useSyncExternalStore(subscribePaint, paintSnapshot);
   const [error, setError] = useState<string | null>(null);
   const [reverse, setReverse] = useState(false);
@@ -163,61 +199,117 @@ export function AssemblyPanel(props: { sections: AssemblySection[] }) {
     run("parts.set", { id: active.id, [key]: next });
   };
 
+  const partRow = (p: (typeof st.parts)[number], depth: number) => (
+    <li
+      key={p.id}
+      data-part={p.id}
+      className={p.id === st.active ? "on" : ""}
+      style={{ paddingLeft: `${depth * 1.25}rem` }}
+    >
+      <label>
+        <input
+          type="radio"
+          name="active-part"
+          aria-label={`Editar ${p.name}`}
+          checked={p.id === st.active}
+          onChange={() => run("tree.select", { id: p.id })}
+          onClick={() => run("tree.select", { id: p.id })}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setMenu({ id: p.id, x: e.clientX, y: e.clientY });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+              e.preventDefault();
+              const r = e.currentTarget.getBoundingClientRect();
+              setMenu({ id: p.id, x: r.left, y: r.bottom });
+            }
+          }}
+        />{" "}
+        <strong>{p.name}</strong>{" "}
+        <span className="hint">
+          {KIND[p.kind]}
+          {p.source ? ` de ${nameOf(p.source)}` : ""}
+          {p.mirror ? ` · plano ${p.mirror.toUpperCase()}` : ""}
+        </span>
+      </label>
+      <button
+        type="button"
+        aria-label={`${p.hidden ? "Mostrar" : "Esconder"} ${p.name}`}
+        aria-pressed={!p.hidden}
+        onClick={() => run("parts.setVisible", { id: p.id, visible: !!p.hidden })}
+      >
+        {p.hidden ? "○" : "●"}
+      </button>
+      <button
+        type="button"
+        aria-label={`Isolar ${p.name}`}
+        onClick={() => run("parts.isolate", { id: p.id })}
+      >
+        ◎
+      </button>
+    </li>
+  );
+  const asmRow = (a: (typeof st.assemblies)[number], depth: number) => (
+    <li key={a.id} data-assembly={a.id} style={{ paddingLeft: `${depth * 1.25}rem` }}>
+      <button
+        type="button"
+        className={selectedId === a.id ? "on" : ""}
+        aria-label={`Montagem ${a.name}`}
+        title="Montagem"
+        onClick={() => run("tree.select", { id: a.id })}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenu({ id: a.id, x: e.clientX, y: e.clientY });
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+            e.preventDefault();
+            const r = e.currentTarget.getBoundingClientRect();
+            setMenu({ id: a.id, x: r.left, y: r.bottom });
+          }
+        }}
+      >
+        <Icon name="assembly" size={16} /> {a.name}
+      </button>
+      <button
+        type="button"
+        aria-label={`${a.hidden ? "Mostrar" : "Esconder"} montagem ${a.name}`}
+        aria-pressed={!a.hidden}
+        onClick={() => run("assembly.setVisible", { id: a.id, visible: !!a.hidden })}
+      >
+        {a.hidden ? "○" : "●"}
+      </button>
+    </li>
+  );
+  /** Montagens e peças de um nível da árvore, as de dentro logo abaixo da montagem que as contém. */
+  const level = (parent: string | undefined, depth: number): React.ReactNode[] => [
+    ...st.assemblies
+      .filter((a) => a.parent === parent)
+      .flatMap((a) => [asmRow(a, depth), ...level(a.id, depth + 1)]),
+    ...st.parts.filter((p) => p.assembly === parent).map((p) => partRow(p, depth)),
+  ];
+  const selectedId = (dispatch("tree.get") as { selected: string | null }).selected;
+  const selectedAsm = st.assemblies.find((a) => a.id === selectedId);
+
   return (
     <div className="panel-col scroll assembly" data-testid="assembly-panel">
       {show("tree") && (
         <>
           <h3>Peças</h3>
-          <button type="button" data-testid="tree-root" onClick={() => run("tree.select", { id: "root" })}>
+          <button
+            type="button"
+            data-testid="tree-root"
+            onClick={() => run("tree.select", { id: "root" })}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenu({ id: "root", x: e.clientX, y: e.clientY });
+            }}
+          >
             Projeto (montagem)
           </button>
           <ul className="part-list" aria-label="Peças">
-            {st.parts.map((p) => (
-              <li key={p.id} data-part={p.id} className={p.id === st.active ? "on" : ""}>
-                <label>
-                  <input
-                    type="radio"
-                    name="active-part"
-                    aria-label={`Editar ${p.name}`}
-                    checked={p.id === st.active}
-                    onChange={() => run("tree.select", { id: p.id })}
-                    onClick={() => run("tree.select", { id: p.id })}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setMenu({ id: p.id, x: e.clientX, y: e.clientY });
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
-                        e.preventDefault();
-                        const r = e.currentTarget.getBoundingClientRect();
-                        setMenu({ id: p.id, x: r.left, y: r.bottom });
-                      }
-                    }}
-                  />{" "}
-                  <strong>{p.name}</strong>{" "}
-                  <span className="hint">
-                    {KIND[p.kind]}
-                    {p.source ? ` de ${nameOf(p.source)}` : ""}
-                    {p.mirror ? ` · plano ${p.mirror.toUpperCase()}` : ""}
-                  </span>
-                </label>
-                <button
-                  type="button"
-                  aria-label={`${p.hidden ? "Mostrar" : "Esconder"} ${p.name}`}
-                  aria-pressed={!p.hidden}
-                  onClick={() => run("parts.setVisible", { id: p.id, visible: !!p.hidden })}
-                >
-                  {p.hidden ? "○" : "●"}
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Isolar ${p.name}`}
-                  onClick={() => run("parts.isolate", { id: p.id })}
-                >
-                  ◎
-                </button>
-              </li>
-            ))}
+            {level(undefined, 0)}
           </ul>
           <p className="hint">
             Instância e espelhada acompanham a original; cópia é uma peça nova e independente.
@@ -227,6 +319,78 @@ export function AssemblyPanel(props: { sections: AssemblySection[] }) {
           </button>
           {menu && <TreeMenu menu={menu} onClose={() => setMenu(null)} run={run} />}
         </>
+      )}
+
+      {show("asm") && selectedAsm && (
+        <fieldset data-testid="asm-props">
+          <legend>{selectedAsm.name}</legend>
+          <label className="block">
+            Nome{" "}
+            <input
+              aria-label="Nome da montagem"
+              value={selectedAsm.name}
+              maxLength={40}
+              onChange={(e) => run("assembly.set", { id: selectedAsm.id, name: e.target.value })}
+            />
+          </label>
+          <div className="row">
+            {(["pos", "rot"] as const).map((k) => (
+              <span key={k} className="row">
+                {k === "pos" ? "Posição" : "Rotação°"}
+                {[0, 1, 2].map((i) => (
+                  <input
+                    key={`${k}${i}`}
+                    type="number"
+                    className="num"
+                    aria-label={`${k === "pos" ? "Posição" : "Rotação"} ${"XYZ"[i]} da montagem`}
+                    value={selectedAsm[k][i]}
+                    step={k === "pos" ? 1 : 15}
+                    onChange={(e) => {
+                      const next = [...selectedAsm[k]] as [number, number, number];
+                      next[i] = Number.isFinite(Number(e.target.value)) ? Number(e.target.value) : 0;
+                      run("assembly.set", { id: selectedAsm.id, [k]: next });
+                    }}
+                  />
+                ))}
+              </span>
+            ))}
+          </div>
+          <label className="block">
+            Dentro de{" "}
+            <select
+              aria-label="Montagem que contém esta"
+              value={selectedAsm.parent ?? ""}
+              onChange={(e) => run("assembly.set", { id: selectedAsm.id, parent: e.target.value || null })}
+            >
+              <option value="">(raiz do projeto)</option>
+              {st.assemblies
+                .filter((a) => a.id !== selectedAsm.id)
+                .map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              const c = dispatch("assembly.contents", { id: selectedAsm.id }) as {
+                assemblies: string[];
+                parts: string[];
+                seams: string[];
+              };
+              if (
+                window.confirm(
+                  `Remover "${selectedAsm.name}" apaga ${c.parts.length} peça(s), ${c.assemblies.length - 1} montagem(ns) de dentro e ${c.seams.length} costura(s). Dá para desfazer. Continuar?`,
+                )
+              )
+                run("assembly.remove", { id: selectedAsm.id, confirm: true });
+            }}
+          >
+            Remover montagem e tudo dentro
+          </button>
+        </fieldset>
       )}
 
       {show("part") && active && (
@@ -241,6 +405,23 @@ export function AssemblyPanel(props: { sections: AssemblySection[] }) {
               onChange={(e) => run("parts.set", { id: active.id, name: e.target.value })}
             />
           </label>
+          {st.assemblies.length > 0 && (
+            <label className="block">
+              Montagem{" "}
+              <select
+                aria-label="Montagem da peça"
+                value={active.assembly ?? ""}
+                onChange={(e) => run("parts.set", { id: active.id, assembly: e.target.value || null })}
+              >
+                <option value="">(raiz do projeto)</option>
+                {st.assemblies.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <div className="row">
             {(["pos", "rot"] as const).map((k) => (
               <span key={k} className="row">

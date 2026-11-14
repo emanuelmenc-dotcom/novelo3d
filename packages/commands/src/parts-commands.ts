@@ -4,17 +4,23 @@
 import { type Dialect, maskFrom, orderChain } from "@novelo/core";
 import { commitText, engineFor, notifyEdit, selectionMask } from "./edit-store.ts";
 import {
+  addAssembly,
   addInstance,
   addPart,
   addSeam,
+  asmById,
+  assemblyChain,
+  assemblyContents,
   clearDraft,
   copyPart,
   detachPart,
   type Part,
   partById,
   partsSnapshot,
+  patchAssembly,
   patchPart,
   patchSeam,
+  removeAssembly,
   removePart,
   removeSeam,
   rootOf,
@@ -24,6 +30,7 @@ import {
   type SeamSide,
   type SeamType,
   setActive,
+  setAssemblyHidden,
   setDraft,
   setPartsHidden,
   setPartText,
@@ -55,7 +62,9 @@ const view = () => {
       rot: p.rot,
       yarnMap: p.yarnMap ?? null,
       hidden: p.hidden ?? false,
+      assembly: p.assembly ?? null,
     })),
+    assemblies: s.assemblies.length,
     seams: s.seams.length,
     draft: {
       a: s.draft.a ? { part: s.draft.a.part, count: s.draft.a.uids.length } : null,
@@ -64,12 +73,44 @@ const view = () => {
   };
 };
 
+type TreeNode = Record<string, unknown>;
+/** Filhos de uma montagem (ou da raiz): montagens de dentro, com os filhos delas, e peças. */
+function asmChildren(s: ReturnType<typeof partsSnapshot>, parent: string | undefined): TreeNode[] {
+  return [
+    ...s.assemblies
+      .filter((a) => a.parent === parent)
+      .map((a) => ({
+        id: a.id,
+        kind: "assembly",
+        name: a.name,
+        active: false,
+        visible: !a.hidden,
+        pos: a.pos,
+        rot: a.rot,
+        children: asmChildren(s, a.id),
+      })),
+    ...s.parts
+      .filter((q) => q.assembly === parent)
+      .map((q) => ({
+        id: q.id,
+        kind: q.kind === "own" ? "part" : q.kind,
+        name: q.name,
+        active: q.id === s.active,
+        visible: !q.hidden,
+        source: q.source ?? null,
+      })),
+  ];
+}
+
 const treeView = () => {
   const s = partsSnapshot();
   // seleção da árvore: a raiz ou uma costura que ainda existe; senão acompanha a peça ativa (clicar numa peça no 3D a ativa)
   const saved = treeSelected();
   const selected =
-    saved === "root" || (saved !== null && s.seams.some((m) => m.id === saved)) ? saved : s.active;
+    saved === "root" ||
+    (saved !== null && (s.seams.some((m) => m.id === saved) || s.assemblies.some((m) => m.id === saved)))
+      ? saved
+      : s.active;
   return {
     selected,
     active: s.active,
@@ -78,14 +119,7 @@ const treeView = () => {
       kind: "assembly",
       name: "Projeto",
       children: [
-        ...s.parts.map((q) => ({
-          id: q.id,
-          kind: q.kind === "own" ? "part" : q.kind,
-          name: q.name,
-          active: q.id === s.active,
-          visible: !q.hidden,
-          source: q.source ?? null,
-        })),
+        ...asmChildren(s, undefined),
         ...s.seams.map((m) => ({
           id: m.id,
           kind: "seam",
@@ -224,7 +258,8 @@ const typeOf = (v: unknown): SeamType => {
 // ------------------------------------------------------------------ transformação das peças na montagem
 
 const rad = (d: number) => (d * Math.PI) / 180;
-export function transformFn(part: Part): (x: number, y: number, z: number) => [number, number, number] {
+type Placed = { rot: [number, number, number]; pos: [number, number, number]; mirror?: string };
+export function transformFn(part: Placed): (x: number, y: number, z: number) => [number, number, number] {
   const [ax, ay, az] = part.rot.map(rad) as [number, number, number];
   const cx = Math.cos(ax);
   const sx = Math.sin(ax);
@@ -249,6 +284,20 @@ export function transformFn(part: Part): (x: number, y: number, z: number) => [n
     return [x3 + part.pos[0], y3 + part.pos[1], z2 + part.pos[2]];
   };
 }
+
+/** Posição final de um ponto da peça: a da peça e, por fora dela, a de cada montagem que a contém. */
+export function worldFn(part: Part): (x: number, y: number, z: number) => [number, number, number] {
+  const own = transformFn(part);
+  const chain = assemblyChain(part.assembly).map((a) => transformFn(a));
+  return (x, y, z) => {
+    let p = own(x, y, z);
+    for (const f of chain) p = f(p[0], p[1], p[2]);
+    return p;
+  };
+}
+
+/** Escondida por si ou por alguma montagem que a contém. */
+const hiddenIn = (part: Part): boolean => !!part.hidden || assemblyChain(part.assembly).some((a) => a.hidden);
 
 type LayoutNode = Record<string, unknown> & {
   id: number;
@@ -336,6 +385,51 @@ export function partsCommands(
       return view();
     },
     /** Mostra ou esconde uma peça no 3D. Escondida não desenha nem recebe clique, mas continua nos materiais e nas costuras. */
+    /** Montagem nova: as peças em `parts` (se vierem) entram nela; sem `parts` ela nasce vazia. */
+    "assembly.add": (p) => {
+      // `fromSelection`: a peça escolhida na árvore entra na montagem nova (e a montagem escolhida passa a ser a mãe)
+      const sel = p.fromSelection === true ? treeSelected() : null;
+      const selPart = sel && partsSnapshot().parts.some((q) => q.id === sel) ? [sel] : [];
+      const selAsm = sel && partsSnapshot().assemblies.some((q) => q.id === sel) ? sel : undefined;
+      if (p.parts !== undefined && !Array.isArray(p.parts))
+        throw new Error("'parts' deve ser uma lista de peças");
+      addAssembly({
+        ...(typeof p.name === "string" ? { name: p.name } : {}),
+        ...(Array.isArray(p.parts)
+          ? { parts: p.parts.map(String) }
+          : selPart.length
+            ? { parts: selPart }
+            : {}),
+        ...(typeof p.parent === "string" ? { parent: p.parent } : selAsm ? { parent: selAsm } : {}),
+      });
+      return treeView();
+    },
+    /** Muda nome, posição `pos`, rotação `rot` (graus) ou `parent` (outra montagem ou null) da montagem. */
+    "assembly.set": (p) => {
+      const { id, ...patch } = p;
+      patchAssembly(String(id), patch);
+      return treeView();
+    },
+    /** Esconde ou mostra a montagem inteira. */
+    "assembly.setVisible": (p) => {
+      if (typeof p.visible !== "boolean") throw new Error("'visible' deve ser verdadeiro ou falso");
+      setAssemblyHidden(asmById(String(p.id)).id, !p.visible);
+      return treeView();
+    },
+    /** O que sairia com a montagem (montagens, peças e costuras de dentro), sem remover nada. */
+    "assembly.contents": (p) => assemblyContents(String(p.id)),
+    /** Remove a montagem COM tudo o que há dentro; só executa com `confirm: true` (senão devolve o que seria removido). */
+    "assembly.remove": (p) => {
+      const id = String(p.id);
+      const what = assemblyContents(id);
+      if (p.confirm !== true) {
+        throw new Error(
+          `remover a montagem apaga ${what.parts.length} peça(s), ${what.assemblies.length - 1} montagem(ns) de dentro e ${what.seams.length} costura(s); repita com confirm: true`,
+        );
+      }
+      removeAssembly(id);
+      return treeView();
+    },
     "parts.setVisible": (p) => {
       if (typeof p.visible !== "boolean") throw new Error("'visible' deve ser verdadeiro ou falso");
       setPartsHidden({ [partById(String(p.id)).id]: !p.visible });
@@ -366,7 +460,8 @@ export function partsCommands(
       else if (s.parts.some((q) => q.id === id)) {
         setActive(id);
         setTreeSelected(id);
-      } else if (s.seams.some((q) => q.id === id)) setTreeSelected(id);
+      } else if (s.seams.some((q) => q.id === id) || s.assemblies.some((q) => q.id === id))
+        setTreeSelected(id);
       else throw new Error(`'${id}' não está na árvore`);
       return treeView();
     },
@@ -505,7 +600,7 @@ export function partsCommands(
         const world = (partId: string, uid: number): V3 | null => {
           const part = partById(partId);
           const v = localOf(part).pts.get(uid);
-          return v ? transformFn(part)(v[0], v[1], v[2]) : null;
+          return v ? worldFn(part)(v[0], v[1], v[2]) : null;
         };
         const before: Record<string, { pos: number[]; rot: number[] }> = {};
         const flipped: string[] = [];
@@ -554,7 +649,7 @@ export function partsCommands(
               const seamC = mean(res.w);
               const partC = applyPose(res.fit, mirror(lp.centroid));
               const partner = partById(nextIsA ? sm.b.part : sm.a.part);
-              const partnerC = transformFn(partner)(...localOf(partner).centroid);
+              const partnerC = worldFn(partner)(...localOf(partner).centroid);
               const outward = dot(sub(partC, seamC), sub(seamC, partnerC)) > 0;
               const score = res.fit.rms + (outward ? 0 : 1e6);
               if (!best || score < best.score) best = { rev, res, score };
@@ -637,7 +732,7 @@ export function partsCommands(
       const geomIdx = new Map<string, number>();
       for (const part of s.parts) {
         const base = nodes.length;
-        if (part.hidden) {
+        if (hiddenIn(part)) {
           // escondida: fora do desenho e do clique; as outras peças seguem com os índices dela de fora
           partsOut.push({ id: part.id, name: part.name, offset: base, count: 0, error: null });
           continue;
@@ -662,7 +757,7 @@ export function partsCommands(
           continue;
         }
         geomParts.push(`${res.geomKey ?? ""}${JSON.stringify([part.pos, part.rot, part.mirror ?? null])}`);
-        const tf = transformFn(part);
+        const tf = worldFn(part);
         const n = res.nodes.length;
         for (let i = 0; i < n; i++) {
           const [x, y, z] = tf(

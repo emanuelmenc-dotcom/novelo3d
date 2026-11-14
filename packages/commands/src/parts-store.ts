@@ -43,6 +43,8 @@ export interface Part {
   yarnMap?: Record<string, string>;
   /** Escondida na vista 3D (não desenha nem é clicável); continua contando na lista de materiais e nas costuras. */
   hidden?: boolean;
+  /** Montagem em que a peça está (ausente = na raiz). */
+  assembly?: string;
 }
 
 export interface SeamSide {
@@ -63,8 +65,21 @@ export interface Seam {
   type: SeamType;
 }
 
+/** Montagem: agrupa peças (e outras montagens) e move/gira o grupo todo; a posição de cada peça passa a valer dentro dela. */
+export interface Assembly {
+  id: string;
+  name: string;
+  pos: [number, number, number];
+  rot: [number, number, number];
+  /** Montagem que contém esta (ausente = fica na raiz do projeto). */
+  parent?: string;
+  /** Escondida: tudo o que há dentro some do 3D. */
+  hidden?: boolean;
+}
+
 export interface PartsState {
   parts: Part[];
+  assemblies: Assembly[];
   seams: Seam[];
   /** Peça em edição (a receita, a seleção e as ferramentas valem para ela). */
   active: string;
@@ -84,9 +99,17 @@ const first = (text: string, dialect?: Dialect): Part => ({
   rot: [0, 0, 0],
 });
 
-let state: PartsState = { parts: [first("")], seams: [], active: "p1", draft: {}, version: 0 };
+let state: PartsState = {
+  parts: [first("")],
+  assemblies: [],
+  seams: [],
+  active: "p1",
+  draft: {},
+  version: 0,
+};
 let partNo = 1;
 let seamNo = 0;
+let asmNo = 0;
 const listeners = new Set<(s: PartsState) => void>();
 
 export const partsSnapshot = (): PartsState => state;
@@ -155,6 +178,12 @@ function restoreStep(step: PartsStep): void {
     }),
   };
   const active = s.parts.some((p) => p.id === state.active) ? state.active : (s.parts[0] as Part).id;
+  // esconder montagem também não é passo do histórico
+  const nowAsm = new Map(state.assemblies.map((a) => [a.id, a]));
+  s.assemblies = s.assemblies.map((a) => {
+    const { hidden: _h, ...rest } = a;
+    return nowAsm.get(a.id)?.hidden ? { ...rest, hidden: true } : rest;
+  });
   publish({ ...s, active, draft: {}, version: state.version + 1 });
   useRoot(active);
 }
@@ -336,6 +365,133 @@ export function setPartsHidden(hidden: Record<string, boolean>): PartsState {
   return commit({ ...state, parts }, false);
 }
 
+export const asmById = (id: string, s: PartsState = state): Assembly => {
+  const a = s.assemblies.find((x) => x.id === id);
+  if (!a) throw new Error(`montagem '${id}' não existe`);
+  return a;
+};
+
+/** Montagens do item até a raiz (a mais próxima primeiro). Para se houver um ciclo (arquivo estragado). */
+export function assemblyChain(assemblyId: string | undefined, s: PartsState = state): Assembly[] {
+  const out: Assembly[] = [];
+  let cur = assemblyId;
+  while (cur && out.length < 50) {
+    const a = s.assemblies.find((x) => x.id === cur);
+    if (!a) break;
+    out.push(a);
+    cur = a.parent;
+  }
+  return out;
+}
+
+const subtree = (id: string): { asm: Set<string>; parts: Set<string> } => {
+  const asm = new Set([id]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const a of state.assemblies)
+      if (a.parent && asm.has(a.parent) && !asm.has(a.id)) {
+        asm.add(a.id);
+        grew = true;
+      }
+  }
+  return {
+    asm,
+    parts: new Set(state.parts.filter((p) => p.assembly && asm.has(p.assembly)).map((p) => p.id)),
+  };
+};
+
+/** Montagem nova; `parts` já existentes entram nela (vazia se não vier nenhuma). */
+export function addAssembly(input: { name?: string; parts?: string[]; parent?: string }): PartsState {
+  const members = (input.parts ?? []).map((id) => partById(id).id);
+  if (input.parent) asmById(input.parent);
+  asmNo++;
+  const asm: Assembly = {
+    id: `a${asmNo}`,
+    name: input.name?.trim() || `Montagem ${asmNo}`,
+    pos: [0, 0, 0],
+    rot: [0, 0, 0],
+    ...(input.parent ? { parent: input.parent } : {}),
+  };
+  if (asm.name.length > 40) throw new Error("o nome deve ter de 1 a 40 caracteres");
+  return commit({
+    ...state,
+    assemblies: [...state.assemblies, asm],
+    parts: state.parts.map((p) => (members.includes(p.id) ? { ...p, assembly: asm.id } : p)),
+  });
+}
+
+export function patchAssembly(id: string, patch: Record<string, unknown>): PartsState {
+  const a = asmById(id);
+  const next: Assembly = { ...a };
+  if (patch.name !== undefined) {
+    if (typeof patch.name !== "string" || patch.name.trim() === "" || patch.name.length > 40)
+      throw new Error("o nome deve ter de 1 a 40 caracteres");
+    next.name = patch.name.trim();
+  }
+  if (patch.pos !== undefined) next.pos = num3(patch.pos, "pos");
+  if (patch.rot !== undefined) next.rot = num3(patch.rot, "rot");
+  if (patch.parent !== undefined) {
+    if (patch.parent === null) next.parent = undefined;
+    else {
+      const pid = asmById(String(patch.parent)).id;
+      if (subtree(id).asm.has(pid)) throw new Error("uma montagem não pode ficar dentro dela mesma");
+      next.parent = pid;
+    }
+  }
+  return commit({ ...state, assemblies: state.assemblies.map((x) => (x.id === id ? next : x)) });
+}
+
+/** Esconde ou mostra uma montagem (e tudo o que há nela). Fora do histórico, como esconder uma peça. */
+export function setAssemblyHidden(id: string, hidden: boolean): PartsState {
+  asmById(id);
+  return commit(
+    {
+      ...state,
+      assemblies: state.assemblies.map((a) => {
+        if (a.id !== id) return a;
+        const { hidden: _h, ...rest } = a;
+        return hidden ? { ...rest, hidden: true } : rest;
+      }),
+    },
+    false,
+  );
+}
+
+/** O que sairia junto com a montagem: as montagens de dentro, as peças e as costuras delas. */
+export function assemblyContents(id: string): { assemblies: string[]; parts: string[]; seams: string[] } {
+  asmById(id);
+  const { asm, parts } = subtree(id);
+  const seams = state.seams.filter((s) => parts.has(s.a.part) || parts.has(s.b.part)).map((s) => s.id);
+  return { assemblies: [...asm], parts: [...parts], seams };
+}
+
+/** Remove a montagem com tudo o que há dentro (peças, montagens aninhadas e as costuras delas). */
+export function removeAssembly(id: string): PartsState {
+  const { assemblies, parts, seams } = assemblyContents(id);
+  const gone = new Set(parts);
+  const left = state.parts.filter((p) => !gone.has(p.id));
+  if (left.length === 0) throw new Error("o projeto precisa de pelo menos uma peça");
+  const dep = left.find((p) => p.source && gone.has(p.source));
+  if (dep)
+    throw new Error(`'${dep.name}' usa uma peça desta montagem como origem; mova-a ou torne-a cópia antes`);
+  let active = state.active;
+  if (gone.has(active)) {
+    active = (left[0] as Part).id;
+    useRoot(active);
+  }
+  const draft = { ...state.draft };
+  if (draft.a && gone.has(draft.a.part)) draft.a = undefined;
+  if (draft.b && gone.has(draft.b.part)) draft.b = undefined;
+  return commit({
+    ...state,
+    assemblies: state.assemblies.filter((a) => !assemblies.includes(a.id)),
+    parts: left,
+    seams: state.seams.filter((s) => !seams.includes(s.id)),
+    active,
+    draft,
+  });
+}
+
 export function patchPart(id: string, patch: Record<string, unknown>): PartsState {
   const p = partById(id);
   const next: Part = { ...p };
@@ -345,6 +501,8 @@ export function patchPart(id: string, patch: Record<string, unknown>): PartsStat
     }
     next.name = patch.name.trim();
   }
+  if (patch.assembly !== undefined)
+    next.assembly = patch.assembly === null ? undefined : asmById(String(patch.assembly)).id;
   if (patch.pos !== undefined) next.pos = num3(patch.pos, "pos");
   if (patch.rot !== undefined) next.rot = num3(patch.rot, "rot");
   if (patch.mirror !== undefined) {
@@ -429,6 +587,8 @@ export interface PartsJson {
   active: string;
   partNo: number;
   seamNo: number;
+  assemblies?: Assembly[];
+  asmNo?: number;
 }
 
 export const exportParts = (): PartsJson => ({
@@ -437,6 +597,8 @@ export const exportParts = (): PartsJson => ({
   active: state.active,
   partNo,
   seamNo,
+  assemblies: state.assemblies,
+  asmNo,
 });
 
 const isPart = (p: unknown): p is Part => {
@@ -472,8 +634,10 @@ export function loadParts(raw: unknown, fallback: { text: string; dialect?: Dial
       seams: [],
       active: "p1",
       draft: {},
+      assemblies: [],
       version: state.version,
     };
+    asmNo = 0;
     return reload();
   }
   const seams = Array.isArray(o.seams) ? o.seams.filter((s) => s && typeof (s as Seam).id === "string") : [];
@@ -486,7 +650,28 @@ export function loadParts(raw: unknown, fallback: { text: string; dialect?: Dial
     ...seams.map((s) => Number(s.id.slice(1)) || 0),
   );
   const active = parts.some((p) => p.id === o.active) ? (o.active as string) : (parts[0] as Part).id;
-  state = { parts, seams, active, draft: {}, version: state.version };
+  // montagens gravadas: só entram as válidas; pai ou montagem que não existe manda o item para a raiz
+  const rawAsm = Array.isArray(o.assemblies) ? o.assemblies : [];
+  const assemblies = rawAsm.filter(
+    (a): a is Assembly =>
+      !!a &&
+      typeof a.id === "string" &&
+      typeof a.name === "string" &&
+      Array.isArray(a.pos) &&
+      Array.isArray(a.rot),
+  );
+  const asmIds = new Set(assemblies.map((a) => a.id));
+  const fixedAsm = assemblies.map((a) =>
+    a.parent && !asmIds.has(a.parent) ? { ...a, parent: undefined } : a,
+  );
+  const fixedParts = parts.map((p) =>
+    p.assembly && !asmIds.has(p.assembly) ? { ...p, assembly: undefined } : p,
+  );
+  asmNo = Math.max(
+    typeof o.asmNo === "number" ? o.asmNo : 0,
+    ...fixedAsm.map((a) => Number(a.id.slice(1)) || 0),
+  );
+  state = { parts: fixedParts, assemblies: fixedAsm, seams, active, draft: {}, version: state.version };
   return reload();
 }
 

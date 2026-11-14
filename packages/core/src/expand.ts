@@ -29,7 +29,8 @@ export interface Round {
   atomNode: number[];
 }
 
-const nodesOf = (a: Atom): number => {
+/** Quantos nós do grafo a operação produz. */
+export const nodesOf = (a: Atom): number => {
   switch (a.kind) {
     case "stitch":
     case "dec":

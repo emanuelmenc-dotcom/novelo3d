@@ -47,20 +47,23 @@ export function drawRunBands(s: Svg, c: P, r: number, items: Item[], col: string
 }
 
 const OFFSETS = [3.1, -3.1, 2.6, -2.6];
-const FAR_OFFSETS = [4.4, -4.4, 5.4, -5.4];
+const FAR_OFFSETS = [3.1, -3.1, 4.4, -4.4, 5.4, -5.4];
 
 /** Posições das etiquetas (mm), a de maior folga entre os quatro deslocamentos radiais; desenha cada uma. */
 export function placeTags(s: Svg, c: P, tags: PendingTag[], symbols: P[]): P[] {
   const taken: P[] = [...symbols];
   const placed: P[] = [];
   for (const t of tags) {
-    let best: { d: number; m: P } | null = null;
+    let best = null as { d: number; m: P } | null;
     // os quatro deslocamentos do v3.py; se nenhum deixa folga, tenta outros mais afastados
     for (const set of [OFFSETS, FAR_OFFSETS]) {
       for (const dr of set) {
-        const m = frame(c, t.r + dr, t.a).o;
-        const d = taken.reduce((min, q) => Math.min(min, Math.hypot(m[0] - q[0], m[1] - q[1])), 9);
-        if (best === null || d > best.d) best = { d, m };
+        // o segundo conjunto também desloca a etiqueta ao longo do anel, para fugir do símbolo vizinho
+        for (const da of set === OFFSETS ? [0] : [0, 3.5 / t.r, -3.5 / t.r]) {
+          const m = frame(c, t.r + dr, t.a + da).o;
+          const d = taken.reduce((min, q) => Math.min(min, Math.hypot(m[0] - q[0], m[1] - q[1])), 9);
+          if (best === null || d > best.d) best = { d, m };
+        }
       }
       if (best && best.d >= 3.4) break;
     }

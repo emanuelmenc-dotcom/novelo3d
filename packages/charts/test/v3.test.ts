@@ -225,4 +225,13 @@ describe("tabela Receita volta a volta", () => {
     // as voltas 2 e 3 só diferem no fechamento: duas linhas, não "2–3"
     expect(two.pages[0]?.svg).not.toContain("2–3");
   });
+
+  test("etiquetas Nx em voltas vizinhas, todas com sequências longas, não se sobrepõem", () => {
+    const rows = [row("1", [inc(6)], { start: "magicRing" })];
+    for (let n = 2; n <= 7; n++) rows.push(row(String(n), [sc(9 + n), inc(1)]));
+    const r = renderChart(pat(...rows));
+    const svg = r.pages[0]?.svg ?? "";
+    expect(count(svg, BANDS)).toBeGreaterThanOrEqual(6);
+    for (const p of r.pages) expect(p.overlaps).toBe(0);
+  });
 });

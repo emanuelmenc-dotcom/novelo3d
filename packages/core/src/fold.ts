@@ -105,7 +105,9 @@ export function chainsOf(keys: string[], rules: ChainRules = ATOM_RULES): Chains
   // o v3.py só aceita itens de início com contagem 1; aqui "2 corr (não conta)" também fica no início (`2x corr*`)
   while (i < L.length && isStart((L[i] as ChainRun).key)) i++;
   let maxTail = 0;
-  while (L.length - maxTail > i && isEnd((L[L.length - 1 - maxTail] as ChainRun).key)) maxTail++;
+  // o período máximo é 4 corridas: um fim maior que isso não muda o resultado e deixava a busca quadrática
+  while (maxTail < 4 && L.length - maxTail > i && isEnd((L[L.length - 1 - maxTail] as ChainRun).key))
+    maxTail++;
   const head = L.slice(0, i);
   // fim por corridas inteiras: "2x pbx" no fim é uma corrida só
   for (let t = maxTail; t >= 0; t--) {

@@ -3,11 +3,11 @@
 // no `#marco texto`) e, depois de cada marco, dois slides de revisão: o que foi feito desde o marco anterior e o estado
 // atual. Puro: mesma receita e mesmo grafo dão o mesmo roteiro.
 import {
-  type Atom,
   atomKey,
   type ChainRun,
   chainsOf,
   expandRounds,
+  nodesOf,
   type Pattern,
   runs,
   type Seg,
@@ -56,19 +56,6 @@ export interface ReadingScript {
   steps: ReadingStep[];
   milestones: ReadingMilestone[];
 }
-
-const nodesOf = (a: Atom): number => {
-  switch (a.kind) {
-    case "stitch":
-    case "dec":
-    case "slInto":
-      return 1;
-    case "inc":
-      return a.k;
-    default:
-      return 0;
-  }
-};
 
 const expandRun = (r: ChainRun): string[] => Array(r.count).fill(r.key);
 

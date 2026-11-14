@@ -29,14 +29,25 @@ export interface ReadingData {
   } | null;
 }
 
-/** Teclas do modo de leitura, da mais usada para a menos usada: a tela mostra nesta ordem. */
-const KEYS: { keys: string; text: string; big?: boolean }[] = [
-  { keys: "Espaço  →", text: "próximo", big: true },
-  { keys: "←  Backspace", text: "voltar", big: true },
-  { keys: "↑", text: "próxima volta" },
-  { keys: "↓", text: "volta anterior" },
-  { keys: "Pg Up", text: "próximo marco" },
-  { keys: "Pg Dn", text: "marco anterior" },
+/** Teclas do modo de leitura, da mais usada para a menos usada: a tela mostra esta lista e o ouvinte lê a mesma. */
+const KEYS: { on: string[]; show: string; text: string; method: string; big?: boolean }[] = [
+  { on: [" ", "ArrowRight"], show: "Espaço  →", text: "próximo", method: "tutorial.next", big: true },
+  {
+    on: ["ArrowLeft", "Backspace"],
+    show: "←  Backspace",
+    text: "voltar",
+    method: "tutorial.prev",
+    big: true,
+  },
+  { on: ["ArrowUp"], show: "↑", text: "próxima volta", method: "tutorial.nextRound" },
+  { on: ["ArrowDown"], show: "↓", text: "volta anterior", method: "tutorial.prevRound" },
+  { on: ["PageUp"], show: "Pg Up", text: "próximo marco", method: "tutorial.nextMilestone" },
+  { on: ["PageDown"], show: "Pg Dn", text: "marco anterior", method: "tutorial.prevMilestone" },
+  { on: ["Home"], show: "Home", text: "início", method: "tutorial.first" },
+  { on: ["End"], show: "End", text: "fim", method: "tutorial.last" },
+  { on: ["f"], show: "F", text: "ver ponto", method: "show" },
+  { on: ["r"], show: "R", text: "revisão", method: "review" },
+  { on: ["Escape"], show: "Esc", text: "sair", method: "exit" },
 ];
 
 interface Latest {
@@ -46,38 +57,15 @@ interface Latest {
   kind: string | undefined;
 }
 
-/** O que cada tecla faz no modo de leitura (ver KEYS); undefined para as outras. */
+/** O que a tecla faz; undefined para as que não são do modo de leitura. */
 function keyAction(key: string, c: Latest): (() => void) | undefined {
-  const go = c.run;
-  const to = (method: string, extra?: Record<string, unknown>) => () => go(method, extra);
-  switch (key) {
-    case " ":
-    case "ArrowRight":
-      return to("tutorial.next");
-    case "ArrowLeft":
-    case "Backspace":
-      return to("tutorial.prev");
-    case "ArrowUp":
-      return to("tutorial.nextRound");
-    case "ArrowDown":
-      return to("tutorial.prevRound");
-    case "PageUp":
-      return to("tutorial.nextMilestone");
-    case "PageDown":
-      return to("tutorial.prevMilestone");
-    case "Home":
-      return to("tutorial.first");
-    case "End":
-      return to("tutorial.last");
-    case "f":
-      return c.onShow;
-    case "r":
-      return to("tutorial.slide", { kind: c.kind === "review" ? "state" : "review" });
-    case "Escape":
-      return c.onExit;
-    default:
-      return undefined;
-  }
+  const k = KEYS.find((x) => x.on.includes(key));
+  if (!k) return undefined;
+  if (k.method === "show") return c.onShow;
+  if (k.method === "exit") return c.onExit;
+  if (k.method === "review")
+    return () => c.run("tutorial.slide", { kind: c.kind === "review" ? "state" : "review" });
+  return () => c.run(k.method);
 }
 
 export function ReadingMode(props: {
@@ -255,21 +243,12 @@ export function ReadingMode(props: {
         </div>
         <ul className="reading-keys" aria-label="Teclas do modo de leitura">
           {KEYS.map((k) => (
-            <li key={k.keys} className={k.big ? "big" : ""}>
-              <kbd>{k.keys}</kbd> {k.text}
+            <li key={k.show} className={k.big ? "big" : ""}>
+              <kbd>{k.show}</kbd> {k.text}
             </li>
           ))}
           <li>
-            <kbd>F</kbd> ver ponto
-          </li>
-          <li>
-            <kbd>R</kbd> revisão
-          </li>
-          <li>
             <kbd>1</kbd>–<kbd>6</kbd> <kbd>0</kbd> vistas
-          </li>
-          <li>
-            <kbd>Esc</kbd> sair
           </li>
         </ul>
       </footer>

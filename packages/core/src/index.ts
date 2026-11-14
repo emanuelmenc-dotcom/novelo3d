@@ -2,7 +2,7 @@
 // Núcleo: tipos, simulação, validação e grafo. Sem DOM, relógio nem aleatoriedade.
 
 export * from "./engine/index.ts";
-export { type ExpandedRow, expandPattern, expandRounds, type Round } from "./expand.ts";
+export { type ExpandedRow, expandPattern, expandRounds, nodesOf, type Round } from "./expand.ts";
 export {
   ATOM_RULES,
   type ChainRules,

@@ -3,7 +3,7 @@
 // em todo o projeto, e fechar a montagem.
 import { mkdirSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
-import { openViewMenu, ribbon } from "./ribbon.ts";
+import { goProps, goTree, openViewMenu, ribbon } from "./ribbon.ts";
 
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
 const N = 433;
@@ -80,7 +80,7 @@ test("padrão dos fios novos vem das configurações e a lista de materiais troc
 
 test("fechar a montagem leva as bordas costuradas a se encontrarem", async ({ page }) => {
   await page.goto("/");
-  await tab(page, "Montagem").click();
+  await goTree(page);
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(N);
   await ribbon(page, "montagem");
   await page.getByTestId("tool-montagem.mirror-x").click();
@@ -118,6 +118,7 @@ test("fechar a montagem leva as bordas costuradas a se encontrarem", async ({ pa
       },
       [base, N],
     );
+  await goTree(page);
   await page.getByLabel("Editar Peça 1", { exact: true }).check();
   await tab(page, "Pontos").click();
   await ribbon(page, "selecionar");
@@ -126,18 +127,21 @@ test("fechar a montagem leva as bordas costuradas a se encontrarem", async ({ pa
   await page.getByTestId("sel-group").click();
   const a = await pick(0);
   await page.mouse.click(box.x + a.x, box.y + a.y);
-  await tab(page, "Montagem").click();
+  await goProps(page, "root");
   await page.getByTestId("seam-side-a").click();
   await tab(page, "Pontos").click();
   const b = await pick(N);
   await page.mouse.click(box.x + b.x, box.y + b.y);
-  await tab(page, "Montagem").click();
+  await goProps(page, "root");
   await page.getByTestId("seam-side-b").click();
   await page.getByTestId("seam-create").click();
+  await goTree(page);
   await expect(page.locator("[data-seam]")).toHaveCount(1);
 
   // afasta a peça espelhada (ativa) e fecha: a folga cai a ~0
+  await goProps(page, "part");
   await page.getByLabel("Posição X da peça").fill("40");
+  await goProps(page, "root");
   await page.getByTestId("assembly-close").click();
   await expect(page.getByTestId("assembly-close-result")).toContainText("folga média 0");
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().seamSegments)).toBe(36);
@@ -146,7 +150,8 @@ test("fechar a montagem leva as bordas costuradas a se encontrarem", async ({ pa
   await page.screenshot({ path: "test-results/montagem-fechada.png" });
 
   // desfazer o fechamento devolve a posição
-  await tab(page, "Montagem").click();
+  await goProps(page, "root");
   await page.getByTestId("assembly-undo-close").click();
+  await goProps(page, "part");
   await expect(page.getByLabel("Posição X da peça")).toHaveValue("40");
 });

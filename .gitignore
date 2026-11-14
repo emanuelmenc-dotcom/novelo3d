@@ -16,3 +16,5 @@ Thumbs.db
 # grafo de conhecimento (graphify)
 graphify-out/
 tsconfig.tsbuildinfo
+referencia/sessao-galinha/
+packages/commands/test/*.local.test.ts

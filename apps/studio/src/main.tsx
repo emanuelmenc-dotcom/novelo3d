@@ -40,6 +40,7 @@ import { lastCamera } from "./cameraStore.ts";
 import { FloatingWindow } from "./FloatingWindow.tsx";
 import { MaterialsPanel } from "./MaterialsPanel.tsx";
 import { PointsPanel } from "./PointsPanel.tsx";
+import { PropsPanel } from "./PropsPanel.tsx";
 import { makeHandlers, subscribeTools, toolSnapshot, viewerTool } from "./pointtools.ts";
 import { type ReadingData, ReadingMode } from "./ReadingMode.tsx";
 import { Ribbon } from "./Ribbon.tsx";
@@ -757,7 +758,9 @@ function App() {
       </div>
     ),
 
-    assembly: () => <AssemblyPanel />,
+    tree: () => <AssemblyPanel sections={["tree"]} />,
+
+    props: () => <PropsPanel />,
 
     materials: () => <MaterialsPanel version={pver} />,
 

@@ -154,7 +154,24 @@ export function renameCustom(id: string, name: string): WorkspaceState {
 }
 
 /** Carrega o que foi gravado (localStorage). Valores inválidos são ignorados, sem lançar erro. */
-export function loadWorkspace(raw: unknown): WorkspaceState {
+/** Layout salvo antes do G4: a janela Montagem virou Árvore e Propriedades. Troca nos dados crus, antes da validação descartar o desconhecido. */
+function migratePanels(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(migratePanels);
+  if (node && typeof node === "object") {
+    return Object.fromEntries(
+      Object.entries(node).map(([k, v]) => {
+        if ((k === "tabs" || k === "off") && Array.isArray(v) && v.includes("assembly")) {
+          return [k, [...new Set(v.flatMap((p) => (p === "assembly" ? ["tree", "props"] : [p])))]];
+        }
+        return [k, migratePanels(v)];
+      }),
+    );
+  }
+  return node;
+}
+
+export function loadWorkspace(rawSaved: unknown): WorkspaceState {
+  const raw = migratePanels(rawSaved);
   const o = (raw ?? {}) as {
     layout?: unknown;
     presetId?: unknown;

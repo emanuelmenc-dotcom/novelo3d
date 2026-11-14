@@ -195,12 +195,12 @@ test("#marco na receita vira marco com o texto escrito e aparece no slide de rev
 test("numa montagem com peça espelhada o destaque cai nos pontos da peça ativa", async ({ page }) => {
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count ?? 0)).toBe(433);
-  await page.getByRole("tab", { name: "Montagem", exact: true }).click();
+  await page.getByRole("tab", { name: "Árvore", exact: true }).click();
   await ribbon(page, "montagem");
   await page.getByTestId("tool-montagem.mirror-x").click();
   await expect(page.locator("[data-part]")).toHaveCount(2);
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(866);
-  await page.locator("[data-part]").nth(1).click();
+  await page.getByLabel("Editar Peça 1 (espelhada)").check();
   await ribbon(page, "tutorial");
   await page.getByTestId("reading-start").click();
   await expect(text(page)).toContainText("Volta 1 · cadeia 1 de 1");

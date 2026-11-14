@@ -2,7 +2,7 @@
 // Aceite do P3.5 (montagem): peça espelhada, seleção em duas peças, costura entre elas, validação, 3D e persistência.
 import { mkdirSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
-import { openViewMenu, ribbon, showTab } from "./ribbon.ts";
+import { goProps, goTree, openViewMenu, ribbon, showTab } from "./ribbon.ts";
 
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
 const N = 433;
@@ -42,7 +42,7 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
 }) => {
   mkdirSync("test-results", { recursive: true });
   await page.goto("/");
-  await tab(page, "Montagem").click();
+  await goTree(page);
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(N);
 
   // espelhada no plano X: aparecem duas peças e o 3D passa a mostrar as duas
@@ -61,6 +61,7 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
   const canvas = page.getByTestId("scene").locator("canvas");
   const box = await canvas.boundingBox();
   if (!box) throw new Error("sem canvas");
+  await goTree(page);
   await page.getByLabel("Editar Peça 1", { exact: true }).check();
   await tab(page, "Pontos").click();
   await ribbon(page, "selecionar");
@@ -71,7 +72,7 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
   await page.mouse.click(box.x + a.x, box.y + a.y);
   await ribbon(page, "selecionar");
   await expect(page.getByTestId("sel-count")).toHaveText("36");
-  await tab(page, "Montagem").click();
+  await goProps(page, "root");
   await page.getByTestId("seam-side-a").click();
   await expect(page.getByTestId("seam-draft-a")).toContainText("Peça 1 · 36 pontos");
 
@@ -81,8 +82,9 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
   await page.mouse.click(box.x + b.x, box.y + b.y);
   await ribbon(page, "selecionar");
   await expect(page.getByTestId("sel-count")).toHaveText("36");
-  await tab(page, "Montagem").click();
+  await goTree(page);
   await expect(page.getByLabel("Editar Peça 1 (espelhada)")).toBeChecked();
+  await goProps(page, "root");
   await page.getByTestId("seam-side-b").click();
   await expect(page.getByTestId("seam-draft-b")).toContainText("Peça 1 (espelhada) · 36 pontos");
   await expect(page.getByTestId("seam-check")).toContainText("Costura válida: 36 pontos em A, 36 em B");
@@ -95,10 +97,11 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
   await page.getByLabel("Pontos do lado A").selectOption("1");
 
   await page.getByTestId("seam-create").click();
+  await goTree(page);
   await expect(page.locator("[data-seam]")).toHaveCount(1);
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().seamSegments)).toBe(36);
   await page.screenshot({ path: "test-results/montagem-3d.png" });
-  await tab(page, "Montagem").click();
+  await goProps(page, "part");
 
   // não deixa remover a peça com costura
   await page.getByRole("button", { name: "Remover peça" }).click();
@@ -109,13 +112,13 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
   await page.reload();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(2 * N);
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().seamSegments)).toBe(36);
-  await tab(page, "Montagem").click();
+  await goTree(page);
   await expect(page.locator("[data-seam]")).toHaveCount(1);
 });
 
 test("instância acompanha a edição da original; cópia não", async ({ page }) => {
   await page.goto("/");
-  await tab(page, "Montagem").click();
+  await goTree(page);
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(N);
   await ribbon(page, "montagem");
   await page.getByRole("button", { name: "Instância" }).click();
@@ -142,7 +145,7 @@ test("instância acompanha a edição da original; cópia não", async ({ page }
 
 test("copiar uma peça grava as edições dela no disco", async ({ page }) => {
   await page.goto("/");
-  await tab(page, "Montagem").click();
+  await goTree(page);
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(N);
   await ribbon(page, "montagem");
   await page.getByRole("button", { name: "Cópia" }).click();

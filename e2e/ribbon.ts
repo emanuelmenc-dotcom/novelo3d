@@ -36,3 +36,14 @@ export async function classicLayout(page: Page): Promise<void> {
   await page.getByTestId("windows-menu").click();
   await page.getByRole("menuitemradio", { name: /Clássico/ }).click();
 }
+
+/** Árvore do projeto (peças e costuras). */
+export const goTree = (page: Page) => showTab(page, "Árvore");
+
+/** Propriedades de uma peça (a ativa) ou do projeto (`root`: nova costura e fechar montagem). */
+export async function goProps(page: Page, what: "part" | "root" = "part"): Promise<void> {
+  await goTree(page);
+  if (what === "root") await page.getByTestId("tree-root").click();
+  else await page.locator("[data-part].on input[type=radio]").click(); // escolhe a peça ativa na árvore
+  await showTab(page, "Propriedades");
+}

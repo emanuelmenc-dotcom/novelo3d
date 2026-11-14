@@ -340,3 +340,22 @@ describe("janelas independentes dos layouts predefinidos (menu Janelas)", () => 
     expect(() => dispatch("workspace.setPanelVisible", { panel: "cp" })).toThrow(/visible/);
   });
 });
+
+describe("migração da janela Montagem (G4)", () => {
+  const leaf = (tabs: string[], active = 0) => ({ type: "leaf", id: "l", tabs, active, collapsed: false });
+  afterEach(() => resetWorkspace());
+
+  test("layout salvo, nomeado e lista de desligadas trocam Montagem por Árvore e Propriedades", () => {
+    const layout = { root: leaf(["recipe", "assembly", "view3d"], 1) };
+    const s = loadWorkspace({
+      layout,
+      presetId: null,
+      customs: [{ id: "c1", name: "Meu", layout: { root: leaf(["assembly"]) } }],
+      off: ["assembly"],
+    });
+    const tabs = leaves(s.layout).flatMap((l) => l.tabs);
+    expect(tabs).toEqual(["recipe", "tree", "props", "view3d"]);
+    expect(s.off).toEqual(["tree", "props"]);
+    expect(leaves(s.customs[0]?.layout as Layout).flatMap((l) => l.tabs)).toEqual(["tree", "props"]);
+  });
+});

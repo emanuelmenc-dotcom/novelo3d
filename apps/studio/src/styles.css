@@ -488,7 +488,8 @@ body.ws-dragging {
 /* ---- impressão: só as páginas do gráfico ---- */
 @media print {
   .ws-root,
-  .app > header {
+  .app > header,
+  .ribbon {
     display: none !important;
   }
   .app {
@@ -757,4 +758,311 @@ input.num {
   display: block;
   width: 100%;
   height: auto;
+}
+
+/* ---- interface 2: barra de título, ribbon, menu de vista, barra de opções e busca de comandos ---- */
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.icon {
+  flex: none;
+}
+.titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  background: #2b2b2b;
+  color: #eee;
+  border-bottom: 0;
+}
+.titlebar .title-name {
+  font-size: calc(0.875rem * var(--text, 1));
+}
+.titlebar .title-search {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.375rem;
+  min-width: 15rem;
+  padding: 0.125rem 0.5rem;
+  background: #444;
+  color: #ddd;
+  border: 1px solid #555;
+  border-radius: 0.25rem;
+}
+.titlebar .title-search kbd {
+  margin-left: auto;
+  font-size: 0.6875rem;
+  opacity: 0.7;
+}
+.titlebar .title-spacer {
+  flex: 1;
+  margin: 0;
+}
+.titlebar span {
+  margin-left: 0;
+}
+.titlebar .title-msg {
+  max-width: 30rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(0.75rem * var(--text, 1));
+}
+.titlebar .title-alert {
+  display: inline-flex;
+  color: #f2b134;
+}
+.titlebar .title-bridge {
+  display: inline-flex;
+  color: #888;
+}
+.titlebar .title-bridge.connected {
+  color: #3fb950;
+}
+.titlebar .title-btn {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: #444;
+  color: #ddd;
+  border: 1px solid #555;
+}
+.titlebar .menu-pop {
+  right: 0;
+  left: auto;
+  color: var(--fg);
+}
+.ribbon {
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+.ribbon-tabs {
+  display: flex;
+  align-items: flex-end;
+  padding: 0 0.5rem;
+  background: #e7e2d3;
+}
+.ribbon-tabs button[role="tab"] {
+  margin: 0;
+  padding: 0.3125rem 0.75rem;
+  border: 0;
+  border-radius: 0.25rem 0.25rem 0 0;
+  background: transparent;
+  font-size: calc(0.8125rem * var(--text, 1));
+}
+.ribbon-tabs button[role="tab"].on {
+  background: #fbf9f3;
+  color: var(--fg);
+  font-weight: 700;
+}
+.ribbon-collapse {
+  margin: 0 0 0 auto;
+  padding: 0.25rem;
+  border: 0;
+  background: transparent;
+}
+.ribbon-collapse[aria-pressed="true"] .icon {
+  transform: rotate(180deg);
+}
+.ribbon-body {
+  display: flex;
+  padding: 0.25rem 0.5rem;
+  background: #fbf9f3;
+  overflow-x: auto;
+  min-height: 4.5rem;
+}
+.ribbon-group {
+  display: flex;
+  flex-direction: column;
+  padding: 0 0.5rem;
+  border-right: 1px solid var(--line);
+}
+.ribbon-items {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  gap: 0.125rem;
+}
+.ribbon-group-label {
+  text-align: center;
+  font-size: calc(0.6875rem * var(--text, 1));
+  color: var(--muted);
+}
+.rb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  min-width: 3.25rem;
+  padding: 0.25rem 0.375rem;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  background: transparent;
+  font: inherit;
+  font-size: calc(0.75rem * var(--text, 1));
+  text-align: center;
+  cursor: pointer;
+}
+.rb:hover:not(:disabled) {
+  background: #efeadb;
+}
+.rb.on {
+  background: #ffe0cc;
+  color: var(--fg);
+  border-color: #e8590c;
+}
+.rb:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.rc {
+  display: flex;
+  align-items: center;
+  padding: 0 0.25rem;
+}
+.rc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  font-size: calc(0.75rem * var(--text, 1));
+}
+.view3d-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.view3d-wrap .view3d {
+  flex: 1;
+  height: auto;
+  min-height: 11.25rem;
+}
+.view-menu {
+  position: absolute;
+  z-index: 5;
+}
+.view-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.25rem 0.375rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+}
+.view-pop {
+  min-width: 13rem;
+}
+.view-pop.up {
+  top: auto;
+  bottom: calc(100% + 0.25rem);
+}
+.view-pop.r {
+  left: auto;
+  right: 0;
+}
+.view-pop .views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.125rem;
+}
+.view-pop label {
+  padding: 0.25rem 0.5rem;
+}
+.optbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  background: #e7e2d3;
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+  font-size: calc(0.75rem * var(--text, 1));
+}
+.optbar-spacer {
+  flex: 1;
+}
+.node-info {
+  margin: 0;
+}
+.palette {
+  align-self: flex-start;
+  width: min(34rem, 92vw);
+  margin-top: 6rem;
+  background: var(--card);
+  border-radius: 0.5rem;
+  box-shadow: 0 0.75rem 2.5rem rgba(0, 0, 0, 0.3);
+}
+.palette-input {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+.palette-input input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  font: inherit;
+}
+.palette ul {
+  max-height: 20rem;
+  margin: 0;
+  padding: 0.25rem;
+  overflow: auto;
+  list-style: none;
+}
+.palette li button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  border: 0;
+  border-radius: 0.25rem;
+  background: transparent;
+  text-align: left;
+}
+.palette li button.on {
+  background: #efeadb;
+}
+.palette li small {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+/* cabeçalho das janelas: as abas encolhem com reticências e os controles (encolher, ocultar) ficam sempre à vista */
+.ws-head {
+  overflow: hidden;
+}
+.ws-head .ws-tab {
+  flex: 0 1 auto;
+  min-width: 2.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-head .ws-spacer {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.ws-head .ws-ctl {
+  flex: none;
+}
+.view-menu-btn,
+.ribbon-collapse {
+  min-width: 2rem;
+  min-height: 2rem;
+  justify-content: center;
 }

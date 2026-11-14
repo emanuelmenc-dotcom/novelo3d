@@ -5,6 +5,7 @@ import { mkdirSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, test } from "@playwright/test";
+import { openViewMenu, ribbon, showTab } from "./ribbon.ts";
 
 const PORT = 47897;
 
@@ -20,7 +21,6 @@ test("P2: 3D da bola, seleção ligada à receita e comando via MCP", async ({ p
   );
   try {
     await page.goto(`/?bridge=${PORT}`);
-    await page.getByRole("tab", { name: "3D", exact: true }).click();
     await expect(page.getByTestId("scene").locator("canvas")).toBeVisible();
     await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(433);
     await page.screenshot({ path: "test-results/p2-3d.png", fullPage: true });
@@ -45,6 +45,7 @@ test("P2: 3D da bola, seleção ligada à receita e comando via MCP", async ({ p
     }
     expect(picked).toBe(true);
     await expect(page.getByTestId("node-info")).toContainText(/Volta .*, ponto \d+/);
+    await showTab(page, "Verificação de contagem");
     await expect(page.getByTestId("verify-table").locator("tr.sel")).toHaveCount(1);
 
     // 2. escolher uma volta na tabela destaca todos os pontos dela no 3D
@@ -59,12 +60,15 @@ test("P2: 3D da bola, seleção ligada à receita e comando via MCP", async ({ p
     expect(rows).toEqual([6, 7, 8, 9, 10, 11]); // voltas 7 a 12 (índices expandidos)
 
     // 3. grafo (ligações) liga e desliga sem erro
+    await openViewMenu(page);
     await page.getByLabel("Mostrar grafo (ligações)").check();
     await page.screenshot({ path: "test-results/p2-3d-grafo.png", fullPage: true });
+    await openViewMenu(page);
     await page.getByLabel("Mostrar grafo (ligações)").uncheck();
 
     // 4. as mesmas posições pelo MCP
     await expect(page.getByTestId("bridge-state")).toContainText("conectada", { timeout: 15_000 });
+    await showTab(page, "Receita");
     const recipe = await page.getByLabel("Receita", { exact: true }).inputValue();
     const r = await client.callTool({
       name: "novelo_bridge_call",
@@ -81,7 +85,6 @@ test("P2: 3D da bola, seleção ligada à receita e comando via MCP", async ({ p
 test("P2: 20.000 pontos na vista 3D", async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto("/");
-  await page.getByRole("tab", { name: "3D", exact: true }).click();
   const big = [
     "V1: 6 pb no anel mágico (6)",
     "V2: 6 aum (12)",
@@ -90,6 +93,7 @@ test("P2: 20.000 pontos na vista 3D", async ({ page }) => {
     "V5–838: 1 pb em cada ponto (24)",
   ].join("\n");
   const t0 = Date.now();
+  await showTab(page, "Receita");
   await page.getByLabel("Receita", { exact: true }).fill(big);
   await expect
     .poll(() => page.evaluate(() => window.__view3d?.state().count), { timeout: 120_000 })
@@ -116,17 +120,18 @@ test("P2: 20.000 pontos na vista 3D", async ({ page }) => {
 
 test("P2: cubo de vistas, atalhos e navegação estilo FreeCAD", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("tab", { name: "3D", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(433);
   const dir = () => page.evaluate(() => window.__view3d?.state().viewDir ?? [0, 0, 0]);
   const settled = () => page.waitForFunction(() => window.__view3d?.state().animating === false);
   const near = (v: number[], t: number[]) => Math.hypot(v[0]! - t[0]!, v[1]! - t[1]!, v[2]! - t[2]!) < 0.02;
 
   // botões das vistas padrão
-  await page.getByRole("button", { name: "Frente", exact: true }).click();
+  await openViewMenu(page);
+  await page.getByRole("menuitem", { name: "Frente", exact: true }).click();
   await settled();
   expect(near(await dir(), [0, -1, 0])).toBe(true);
-  await page.getByRole("button", { name: "Direita", exact: true }).click();
+  await openViewMenu(page);
+  await page.getByRole("menuitem", { name: "Direita", exact: true }).click();
   await settled();
   expect(near(await dir(), [1, 0, 0])).toBe(true);
 
@@ -142,7 +147,8 @@ test("P2: cubo de vistas, atalhos e navegação estilo FreeCAD", async ({ page }
   // clique real no cubo (padrão: canto inferior direito): vai para uma das 26 direções (faces, arestas, cantos)
   const box = await page.getByTestId("scene").locator("canvas").boundingBox();
   if (!box) throw new Error("sem canvas");
-  await page.getByRole("button", { name: "Isométrica", exact: true }).click();
+  await openViewMenu(page);
+  await page.getByRole("menuitem", { name: "Isométrica", exact: true }).click();
   await settled();
   const cr0 = await page.evaluate(() => window.__view3d?.state().cubeRect);
   if (!cr0) throw new Error("sem cubo");
@@ -179,7 +185,6 @@ test("Configurações > Interface: posição, formato e tamanho do cubo de vista
   );
   try {
     await page.goto(`/?bridge=${PORT_S}`);
-    await page.getByRole("tab", { name: "3D", exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(433);
     const cube = () => page.evaluate(() => window.__view3d?.state().viewCube);
     const dir = () => page.evaluate(() => window.__view3d?.state().viewDir ?? [0, 0, 0]);
@@ -187,11 +192,13 @@ test("Configurações > Interface: posição, formato e tamanho do cubo de vista
     const canvas = page.getByTestId("scene").locator("canvas");
 
     // padrão: chanfrado, canto inferior direito, 112 px
-    expect(await cube()).toEqual({ position: "bottom-right", chamfered: true, size: 112 });
+    expect(await cube()).toEqual({ position: "bottom-left", chamfered: true, size: 112 });
     await page.screenshot({ path: "test-results/p2-cubo-chanfrado.png" });
 
     // abrir o menu: aba Interface
+    await ribbon(page, "arquivo");
     await page.getByRole("button", { name: "Configurações" }).click();
+    await ribbon(page, "arquivo");
     await expect(page.getByRole("dialog", { name: "Configurações" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Interface" })).toHaveAttribute("aria-selected", "true");
 
@@ -202,7 +209,8 @@ test("Configurações > Interface: posição, formato e tamanho do cubo de vista
     await expect(page.getByRole("dialog")).toHaveCount(0);
     const box = await canvas.boundingBox();
     if (!box) throw new Error("sem canvas");
-    await page.getByRole("button", { name: "Frente", exact: true }).click();
+    await openViewMenu(page);
+    await page.getByRole("menuitem", { name: "Frente", exact: true }).click();
     await settled();
     const before = await dir();
     await page.screenshot({ path: "test-results/p2-cubo-esquerda.png" });
@@ -217,6 +225,7 @@ test("Configurações > Interface: posição, formato e tamanho do cubo de vista
     ).toBeGreaterThan(0.05);
 
     // formato simples e tamanho maior
+    await ribbon(page, "arquivo");
     await page.getByRole("button", { name: "Configurações" }).click();
     await page.getByLabel("Cubo chanfrado (faces, arestas e cantos)").uncheck();
     await expect.poll(async () => (await cube())?.chamfered).toBe(false);
@@ -230,7 +239,6 @@ test("Configurações > Interface: posição, formato e tamanho do cubo de vista
     // persiste ao recarregar a página
     await page.keyboard.press("Escape");
     await page.reload();
-    await page.getByRole("tab", { name: "3D", exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(433);
     expect(await cube()).toEqual({ position: "top-left", chamfered: false, size: 132 });
 
@@ -255,9 +263,10 @@ test("Configurações > Interface: posição, formato e tamanho do cubo de vista
     expect(bad.isError).toBe(true);
 
     // restaurar padrão pelo menu
+    await ribbon(page, "arquivo");
     await page.getByRole("button", { name: "Configurações" }).click();
     await page.getByRole("button", { name: "Restaurar padrão" }).click();
-    await expect.poll(() => cube()).toEqual({ position: "bottom-right", chamfered: true, size: 112 });
+    await expect.poll(() => cube()).toEqual({ position: "bottom-left", chamfered: true, size: 112 });
   } finally {
     await client.close();
   }

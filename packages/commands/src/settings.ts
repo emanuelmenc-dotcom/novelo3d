@@ -78,7 +78,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   interface: {
-    viewCube: { position: "bottom-right", chamfered: true, size: 112 },
+    viewCube: { position: "bottom-left", chamfered: true, size: 112 },
     scale: 90,
     textScale: 100,
     min3d: 320,

@@ -3,6 +3,7 @@
 // em todo o projeto, e fechar a montagem.
 import { mkdirSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
+import { openViewMenu, ribbon } from "./ribbon.ts";
 
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
 const N = 433;
@@ -12,6 +13,7 @@ test("padrão dos fios novos vem das configurações e a lista de materiais troc
   await page.goto("/");
 
   // Configurações > Fios e costura: listras, lã, espessura Aran
+  await ribbon(page, "arquivo");
   await page.getByRole("button", { name: "Configurações" }).click();
   await page.getByRole("tab", { name: "Fios e costura" }).click();
   await page.getByLabel("Tipo de cor padrão").selectOption("stripes");
@@ -38,6 +40,7 @@ test("padrão dos fios novos vem das configurações e a lista de materiais troc
   await expect(page.locator('[data-paint="0"]')).toContainText("fio B");
 
   // janela flutuante: selecionar B, trocar por C e remover B
+  await ribbon(page, "arquivo");
   await page.getByRole("button", { name: "Lista de materiais" }).click();
   const win = page.getByTestId("materials-window");
   await expect(win).toBeVisible();
@@ -77,12 +80,13 @@ test("padrão dos fios novos vem das configurações e a lista de materiais troc
 
 test("fechar a montagem leva as bordas costuradas a se encontrarem", async ({ page }) => {
   await page.goto("/");
-  await tab(page, "3D").click();
   await tab(page, "Montagem").click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(N);
-  await page.getByRole("button", { name: "Espelhada" }).click();
+  await ribbon(page, "montagem");
+  await page.getByTestId("tool-montagem.mirror-x").click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(2 * N);
-  await page.getByRole("button", { name: "Ajustar" }).click();
+  await openViewMenu(page);
+  await page.getByRole("menuitem", { name: "Ajustar" }).click();
 
   const canvas = page.getByTestId("scene").locator("canvas");
   const box = await canvas.boundingBox();
@@ -116,7 +120,9 @@ test("fechar a montagem leva as bordas costuradas a se encontrarem", async ({ pa
     );
   await page.getByLabel("Editar Peça 1", { exact: true }).check();
   await tab(page, "Pontos").click();
+  await ribbon(page, "selecionar");
   await page.getByTestId("mode-select").click();
+  await ribbon(page, "selecionar");
   await page.getByTestId("sel-group").click();
   const a = await pick(0);
   await page.mouse.click(box.x + a.x, box.y + a.y);
@@ -135,8 +141,8 @@ test("fechar a montagem leva as bordas costuradas a se encontrarem", async ({ pa
   await page.getByTestId("assembly-close").click();
   await expect(page.getByTestId("assembly-close-result")).toContainText("folga média 0");
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().seamSegments)).toBe(36);
-  await tab(page, "3D").click();
-  await page.getByRole("button", { name: "Ajustar" }).click();
+  await openViewMenu(page);
+  await page.getByRole("menuitem", { name: "Ajustar" }).click();
   await page.screenshot({ path: "test-results/montagem-fechada.png" });
 
   // desfazer o fechamento devolve a posição

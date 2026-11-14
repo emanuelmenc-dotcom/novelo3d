@@ -213,3 +213,25 @@ Correções da revisão (D-43 a D-47): uids confirmados e casados por voltas, de
 ### R1 concluído (2026-11-12)
 
 Modelo de ponto por variante instanciado no 3D de edição (D-48 a D-51): 20 mil pontos em 1,93 M de triângulos e 2 lotes (antes 5,06 M), montagem 57 ms, 127 quadros/s no GL por software; nível tubo; registro de tipos; pacote `stitch3d`. R3b feito (janela Render: raster com sombras, play/pausar/parar, PNG; fica fora por ora AO, instanciar blocos e "simular todos"). R3c e R3d feitos (seleção; forma do ponto base, render completo ponto a ponto pausável com ritmo, reaproveitamento de blocos, AO; a simulação que move posições foi encerrada, D-53). Falta: R4 (path tracing), R4 (path tracing) e a proposta de interface do criador de pontos.
+
+## G — Interface 2 (D-65, aprovado em 2026-11-13)
+
+Plano aprovado pelo usuário, com mockup (`docs/imagens`: ver o relatório da etapa). Cada etapa termina com captura de tela e aprovação.
+
+| Etapa | Entrega                                                                                                                                                                                            | Estado              |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| G1    | Casca: barra de título, ribbon, busca de comandos, menu Janelas independente dos layouts, preset "Edição", cubo embaixo à esquerda com menu de vista, barra de opções, migração única. Os botões de ação das janelas (aplicar à seleção, listras, criar costura...) ainda ficam nelas e saem em G4 | feita em 2026-11-13 |
+| G2    | Modo de leitura do tutorial (substitui a janela Tutorial): só o 3D e a faixa do passo, passo = cadeia de pontos iguais (agrupamento do anexo v3), slides de revisão por marco, teclas bem visíveis | a fazer             |
+| G3    | Gráfico v3: faixa de pb seguidos, etiqueta "Nx", tabela "Receita volta a volta", faixa de marcas, paginação (anexo `15-atualizacao-graficos-v3`, que fica em `docs/17`)                            | a fazer             |
+| G4    | Árvore (peças, montagens e costuras, com ícones próprios), editor de propriedades, clique direito, mostrar/ocultar/isolar; saem as janelas Pontos, Fios, Montagem e Materiais                      | a fazer             |
+| G5    | Montagens com posição e rotação próprias; "Nova montagem" no clique direito (peças selecionadas entram nela)                                                                                       | a fazer             |
+| G6    | Linha do tempo de features só com ícones (⏮ ◀ ▶ ⏭, marcador, suprimir, editar, excluir, reexecução)                                                                                                | a fazer             |
+| G7    | Medir (altura, diâmetro, distância; estimativa que depende da largura do ponto) e corte (seção) do 3D                                                                                              | a fazer             |
+
+### Perguntas guardadas (usuário autorizou seguir sem perguntar; responder quando puder)
+
+1. **Caso G12 do anexo v3.** O anexo espera `(1x aum; 1x pb) ×6` na volta 3 da bola, mas a receita do projeto escreve `(1 pb, 1 aum) x6`. Por regra, valor de referência não muda para o teste passar. Seguindo a ordem da receita até o usuário decidir; a decisão trava a etapa G3.
+2. **Marco escrito na receita.** Assumido: uma linha `#marco texto` marca o fim de marco depois da volta anterior (hoje `#` é comentário).
+3. **Projeto com várias peças no modo de leitura.** Assumido: só a peça ativa, as outras esmaecidas.
+4. **Troca de fio.** Assumido: aparece como aviso no passo, não vira marco.
+5. **Ordem dos botões do ribbon.** Escolhi a ordem de uso pela minha leitura do fluxo de trabalho; o usuário pediu "tente estruturar de forma lógica": ajustar depois de usar.

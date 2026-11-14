@@ -5,12 +5,13 @@ import { mkdirSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, type Page, test } from "@playwright/test";
+import { showTab } from "./ribbon.ts";
 
 const PORT = 47893;
 
 /** Todas as seções como abas de uma só janela, para mexer no painel Fios com espaço. */
 async function allTabs(page: Page) {
-  await page.getByRole("button", { name: "Layout" }).click();
+  await page.getByTestId("windows-menu").click();
   await page.getByRole("menuitemradio", { name: /Tudo em abas/ }).click();
 }
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
@@ -72,13 +73,13 @@ test("pintar a partir da seleção (volta da tabela e ponto do 3D) e trocar a co
 }) => {
   await page.goto("/");
   // classic: tabela de verificação visível; escolhe a volta 13 e pinta com o fio B pelo painel Fios (aba junto ao texto CP)
+  await showTab(page, "Verificação de contagem");
   await page.getByTestId("verify-table").getByRole("cell", { name: "13", exact: true }).click();
   await tab(page, "Fios").click();
   await page.getByRole("button", { name: /Pintar volta selecionada \(13\)/ }).click();
   await expect(page.locator('[data-paint="0"]')).toContainText("Voltas 13");
 
   // ponto do 3D: seleciona o nó 200 (volta 9) e pinta só ele
-  await tab(page, "3D").click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(433);
   await page.evaluate(() => window.__view3d?.select(200));
   await tab(page, "Fios").click();
@@ -88,7 +89,6 @@ test("pintar a partir da seleção (volta da tabela e ponto do 3D) e trocar a co
 
   // trocar a cor do fio B muda o 3D na hora
   await page.getByLabel("Cor do fio B").fill("#ff0000");
-  await tab(page, "3D").click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.nodeColor(200))).toBe("#ff0000");
 
   // remover pintura e limpar
@@ -135,6 +135,7 @@ test("o MCP pinta, lê o relatório de fios e limpa pelos mesmos comandos", asyn
       const text = (r.content as { text: string }[])[0]?.text ?? "";
       return { isError: r.isError === true, text, json: r.isError ? null : JSON.parse(text) };
     };
+    await showTab(page, "Receita");
     const recipe = await page.getByLabel("Receita", { exact: true }).inputValue();
 
     await call("paint.rows", { yarn: "B", from: 7, to: 9 });

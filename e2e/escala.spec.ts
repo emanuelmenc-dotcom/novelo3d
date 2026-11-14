@@ -4,6 +4,7 @@ import { mkdirSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, type Page, test } from "@playwright/test";
+import { classicLayout, ribbon, showTab } from "./ribbon.ts";
 
 const PORT = 47894;
 
@@ -17,6 +18,7 @@ const leafOf = (page: Page, panel: string) =>
   page.locator("section.ws-leaf", { has: page.locator(`[data-panel="${panel}"]`) });
 
 async function openInterfaceSettings(page: Page) {
+  await ribbon(page, "arquivo");
   await page.getByRole("button", { name: "Configurações" }).click();
   await page.getByRole("tab", { name: "Interface" }).click();
 }
@@ -67,6 +69,7 @@ test("tamanho do texto extra: só o texto muda, a interface continua do mesmo ta
 
 test("largura mínima da janela 3D: os divisores param no limite configurado", async ({ page }) => {
   await page.goto("/");
+  await classicLayout(page);
   await page.getByRole("tab", { name: "3D", exact: true }).click();
   await openInterfaceSettings(page);
   await expect(page.getByTestId("min3d")).toHaveText("320 px");
@@ -90,16 +93,18 @@ test("largura mínima da janela 3D: os divisores param no limite configurado", a
 
 test("janela estreita: vira abas, mantém o layout salvo e o 3D continua utilizável", async ({ page }) => {
   await page.goto("/");
+  await classicLayout(page);
   await expect(page.getByTestId("workspace")).toHaveAttribute("data-compact", "false");
   await page.setViewportSize({ width: 700, height: 760 });
   await expect(page.getByTestId("workspace")).toHaveAttribute("data-compact", "true");
   await expect(page.locator("section.ws-leaf")).toHaveCount(1);
-  const tabs = page.getByRole("tablist").first().getByRole("tab");
+  const tabs = page.getByRole("tablist", { name: "Abas da janela" }).first().getByRole("tab");
   await expect(tabs).toHaveCount(10);
   await page.screenshot({ path: "test-results/estreita-abas.png" });
 
   // cada painel continua acessível pelas abas
   await page.getByRole("tab", { name: "Verificação de contagem" }).click();
+  await showTab(page, "Verificação de contagem");
   await expect(page.getByTestId("verify-table")).toBeVisible();
   await page.getByRole("tab", { name: "3D", exact: true }).click();
   await expect(page.getByTestId("scene").locator("canvas")).toBeVisible();
@@ -119,6 +124,7 @@ test("janela estreita: vira abas, mantém o layout salvo e o 3D continua utiliz�
 
 test("sem modo compacto: o espaço de trabalho rola em vez de espremer os painéis", async ({ page }) => {
   await page.goto("/");
+  await classicLayout(page);
   await openInterfaceSettings(page);
   await page.getByLabel("Em janela estreita, juntar os painéis em abas").uncheck();
   await page.keyboard.press("Escape");

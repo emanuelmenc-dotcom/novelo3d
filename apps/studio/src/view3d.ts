@@ -18,7 +18,7 @@ import { createViewCube, cubeRect, type ViewCubeOptions } from "./viewcube.ts";
 
 export type { ViewCubeOptions } from "./viewcube.ts";
 
-const DEFAULT_CUBE: ViewCubeOptions = { position: "bottom-right", chamfered: true, size: 112 };
+const DEFAULT_CUBE: ViewCubeOptions = { position: "bottom-left", chamfered: true, size: 112 };
 
 export interface NodeMeta {
   id: number;

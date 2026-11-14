@@ -2,6 +2,7 @@
 // Aceite do P3.5 (montagem): peça espelhada, seleção em duas peças, costura entre elas, validação, 3D e persistência.
 import { mkdirSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
+import { openViewMenu, ribbon, showTab } from "./ribbon.ts";
 
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
 const N = 433;
@@ -41,15 +42,16 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
 }) => {
   mkdirSync("test-results", { recursive: true });
   await page.goto("/");
-  await tab(page, "3D").click();
   await tab(page, "Montagem").click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(N);
 
   // espelhada no plano X: aparecem duas peças e o 3D passa a mostrar as duas
-  await page.getByRole("button", { name: "Espelhada" }).click();
+  await ribbon(page, "montagem");
+  await page.getByTestId("tool-montagem.mirror-x").click();
   await expect(page.locator("[data-part]")).toHaveCount(2);
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(2 * N);
-  await page.getByRole("button", { name: "Ajustar" }).click();
+  await openViewMenu(page);
+  await page.getByRole("menuitem", { name: "Ajustar" }).click();
   // 3D no estilo CrochetPARADE (D-57): o fio das duas peças chega ao 3D num lote só. Os modelos de ponto (tipos, pernas,
   // espelho) voltam a ser conferidos aqui quando `realistic3d` for religado em packages/commands/src/features.ts
   const models = (await page.evaluate(() => window.__view3d?.state().models)) ?? [];
@@ -61,10 +63,13 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
   if (!box) throw new Error("sem canvas");
   await page.getByLabel("Editar Peça 1", { exact: true }).check();
   await tab(page, "Pontos").click();
+  await ribbon(page, "selecionar");
   await page.getByTestId("mode-select").click();
+  await ribbon(page, "selecionar");
   await page.getByTestId("sel-group").click();
   const a = await partPoint(page, 0);
   await page.mouse.click(box.x + a.x, box.y + a.y);
+  await ribbon(page, "selecionar");
   await expect(page.getByTestId("sel-count")).toHaveText("36");
   await tab(page, "Montagem").click();
   await page.getByTestId("seam-side-a").click();
@@ -74,6 +79,7 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
   await tab(page, "Pontos").click();
   const b = await partPoint(page, N);
   await page.mouse.click(box.x + b.x, box.y + b.y);
+  await ribbon(page, "selecionar");
   await expect(page.getByTestId("sel-count")).toHaveText("36");
   await tab(page, "Montagem").click();
   await expect(page.getByLabel("Editar Peça 1 (espelhada)")).toBeChecked();
@@ -91,7 +97,6 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
   await page.getByTestId("seam-create").click();
   await expect(page.locator("[data-seam]")).toHaveCount(1);
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().seamSegments)).toBe(36);
-  await tab(page, "3D").click();
   await page.screenshot({ path: "test-results/montagem-3d.png" });
   await tab(page, "Montagem").click();
 
@@ -102,7 +107,6 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
   // persiste: peças, costura e 3D voltam ao recarregar
   await page.waitForTimeout(600);
   await page.reload();
-  await tab(page, "3D").click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(2 * N);
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().seamSegments)).toBe(36);
   await tab(page, "Montagem").click();
@@ -111,10 +115,11 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
 
 test("instância acompanha a edição da original; cópia não", async ({ page }) => {
   await page.goto("/");
-  await tab(page, "3D").click();
   await tab(page, "Montagem").click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(N);
+  await ribbon(page, "montagem");
   await page.getByRole("button", { name: "Instância" }).click();
+  await ribbon(page, "montagem");
   await page.getByRole("button", { name: "Cópia" }).click();
   await expect(page.locator("[data-part]")).toHaveCount(3);
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(3 * N);
@@ -128,16 +133,18 @@ test("instância acompanha a edição da original; cópia não", async ({ page }
   // a instância mostra a receita da original e avisa que edita a original
   await page.getByLabel("Editar Peça 1 (instância)").check();
   await expect(page.getByText("edita a original (Peça 1)")).toBeVisible();
+  await showTab(page, "Receita");
   await expect(page.getByLabel("Receita", { exact: true })).not.toHaveValue(/V17/);
   await page.getByLabel("Editar Peça 1 (cópia)").check();
+  await showTab(page, "Receita");
   await expect(page.getByLabel("Receita", { exact: true })).toHaveValue(/V17: 6 dim \(6\)/);
 });
 
 test("copiar uma peça grava as edições dela no disco", async ({ page }) => {
   await page.goto("/");
-  await tab(page, "3D").click();
   await tab(page, "Montagem").click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(N);
+  await ribbon(page, "montagem");
   await page.getByRole("button", { name: "Cópia" }).click();
   await expect(page.locator("[data-part]")).toHaveCount(2);
   await page.waitForTimeout(800);

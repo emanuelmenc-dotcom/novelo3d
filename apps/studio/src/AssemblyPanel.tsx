@@ -57,7 +57,6 @@ export function AssemblyPanel() {
   const st = useSyncExternalStore(subscribeParts, partsSnapshot);
   const { yarns } = useSyncExternalStore(subscribePaint, paintSnapshot);
   const [error, setError] = useState<string | null>(null);
-  const [plane, setPlane] = useState<"x" | "y" | "z">("x");
   const [reverse, setReverse] = useState(false);
   const [ratio, setRatio] = useState<[number, number]>([1, 1]);
   const [type, setType] = useState<string>(settingsSnapshot().yarns.seam.type);
@@ -130,27 +129,6 @@ export function AssemblyPanel() {
           </li>
         ))}
       </ul>
-      <div className="row">
-        <button type="button" onClick={() => run("parts.add", {})}>
-          Nova peça
-        </button>
-        <button type="button" onClick={() => run("parts.instance", { id: st.active })}>
-          Instância
-        </button>
-        <button type="button" onClick={() => run("parts.mirror", { id: st.active, plane })}>
-          Espelhada
-        </button>
-        <select aria-label="Plano do espelho" value={plane} onChange={(e) => setPlane(e.target.value as "x")}>
-          {AXES.map((a) => (
-            <option key={a} value={a}>
-              plano {a.toUpperCase()}
-            </option>
-          ))}
-        </select>
-        <button type="button" onClick={() => run("parts.copy", { id: st.active })}>
-          Cópia
-        </button>
-      </div>
       <p className="hint">
         Instância e espelhada acompanham a original; cópia é uma peça nova e independente.
       </p>

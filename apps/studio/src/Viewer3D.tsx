@@ -2,6 +2,7 @@
 // Componente React da vista 3D: monta o three.js uma vez e repassa dados, grafo e destaque.
 import { useEffect, useRef } from "react";
 import { setLastCamera } from "./cameraStore.ts";
+import { ViewMenu } from "./ViewMenu.tsx";
 import {
   type Handlers,
   type LayoutData,
@@ -27,6 +28,10 @@ export function Viewer3D(props: {
   wire?: boolean;
   /** Passo do tutorial a destacar no 3D, ou null. */
   tutorial?: TutorialView | null;
+  /** Opções de exibição do menu de vista, ao lado do cubo. */
+  onWire: (v: boolean) => void;
+  onGraph: (v: boolean) => void;
+  showWireOption: boolean;
   rows: number[] | null;
   /** Peça cujas voltas/seleção aparecem destacadas (montagem). */
   activePart?: string;
@@ -38,6 +43,7 @@ export function Viewer3D(props: {
   onSelect: (node: NodeMeta | null) => void;
 }) {
   const box = useRef<HTMLDivElement>(null);
+  const wrap = useRef<HTMLDivElement>(null);
   const view = useRef<View3D | null>(null);
   const cb = useRef(props.onSelect);
   cb.current = props.onSelect;
@@ -85,5 +91,18 @@ export function Viewer3D(props: {
     view.current?.setViewCube(props.cube);
   }, [props.cube]);
 
-  return <div ref={box} className="view3d" data-testid="scene" />;
+  return (
+    <div className="view3d-wrap" ref={wrap}>
+      <div ref={box} className="view3d" data-testid="scene" />
+      <ViewMenu
+        cube={props.cube}
+        wire={props.wire ?? false}
+        showGraph={props.showGraph}
+        showWireOption={props.showWireOption}
+        onWire={props.onWire}
+        onGraph={props.onGraph}
+        fullscreenTarget={() => wrap.current}
+      />
+    </div>
+  );
 }

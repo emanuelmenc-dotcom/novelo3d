@@ -4,6 +4,7 @@ import { mkdirSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, test } from "@playwright/test";
+import { showTab } from "./ribbon.ts";
 
 const PORT = 47898;
 
@@ -20,33 +21,48 @@ test("P1: fluxo completo na tela única e comandos via MCP", async ({ page }) =>
     await page.goto(`/?bridge=${PORT}`);
 
     // 1. receita de exemplo fecha: 17 voltas, 432 pontos
+    await showTab(page, "Verificação de contagem");
     await expect(page.getByTestId("verify-summary")).toContainText("Receita fecha");
+    await showTab(page, "Verificação de contagem");
     await expect(page.getByTestId("verify-summary")).toContainText("432 pontos");
+    await showTab(page, "Verificação de contagem");
     await expect(page.getByTestId("verify-table").locator("tbody tr")).toHaveCount(12);
 
     // 2. gráfico circular em SVG e texto CrochetPARADE
+    await showTab(page, "Gráfico circular");
     await expect(page.getByTestId("chart").locator("svg")).toBeVisible();
     await expect(page.getByRole("button", { name: "voltas 13–17" })).toBeVisible();
+    await showTab(page, "Texto CrochetPARADE");
     await expect(page.getByLabel("Texto CrochetPARADE", { exact: true })).toHaveValue(
       /^ring\nsc6inc\n6sc2inc\n6\*\[sc,sc2inc\]/,
     );
 
     // 3. total declarado errado é apanhado
+    await showTab(page, "Receita");
     const receita = page.getByLabel("Receita", { exact: true });
+    await showTab(page, "Receita");
     const original = await receita.inputValue();
+    await showTab(page, "Receita");
     await receita.fill(original.replace("(18)", "(19)"));
+    await showTab(page, "Verificação de contagem");
     await expect(page.getByTestId("verify-summary")).toContainText("Receita com problemas");
+    await showTab(page, "Verificação de contagem");
     await expect(page.getByTestId("verify-table")).toContainText("Total declarado errado");
 
     // 4. dc sem dialeto é ambíguo; escolher o dialeto resolve
+    await showTab(page, "Receita");
     await receita.fill("Rnd 1: 6 dc in magic ring (6)");
     await expect(page.getByText("mudam de significado entre US e UK")).toBeVisible();
+    await showTab(page, "Receita");
     await page.getByLabel("Dialeto").selectOption("en-UK");
     await expect(page.getByText("mudam de significado entre US e UK")).toHaveCount(0);
 
     // 5. PDF A4 com as duas páginas do gráfico
+    await showTab(page, "Receita");
     await receita.fill(original);
+    await showTab(page, "Receita");
     await page.getByLabel("Dialeto").selectOption("auto");
+    await showTab(page, "Verificação de contagem");
     await expect(page.getByTestId("verify-summary")).toContainText("Receita fecha");
     await page.emulateMedia({ media: "print" });
     mkdirSync("test-results", { recursive: true });
@@ -81,12 +97,18 @@ test("XVA: escolher o dialeto XVA na tela e a receita de letras fecha (detecçã
   page,
 }) => {
   await page.goto("/");
+  await showTab(page, "Receita");
   const receita = page.getByLabel("Receita", { exact: true });
+  await showTab(page, "Receita");
   await receita.fill(
     ["R0: MR", "R1: 6X", "R2: 6V", "R3: 6 (X, V)", "R4: 18X", "R5: 6 (X, A)", "R6: 6A"].join("\n"),
   );
+  await showTab(page, "Receita");
   await page.getByLabel("Dialeto").selectOption("xva");
+  await showTab(page, "Verificação de contagem");
   await expect(page.getByTestId("verify-summary")).toContainText("Receita fecha");
+  await showTab(page, "Receita");
   await page.getByLabel("Dialeto").selectOption("auto");
+  await showTab(page, "Verificação de contagem");
   await expect(page.getByTestId("verify-summary")).toContainText("Receita fecha");
 });

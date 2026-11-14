@@ -12,6 +12,27 @@ export interface Preset {
 
 export const PRESET_SPECS: Preset[] = [
   {
+    id: "edit",
+    name: "Edição (3D grande)",
+    description:
+      "Receita, verificação, gráfico e ferramentas na coluna da esquerda; o 3D ocupa o resto da tela.",
+    spec: {
+      dir: "row",
+      sizes: [0.27, 0.73],
+      children: [
+        {
+          dir: "column",
+          sizes: [0.55, 0.45],
+          children: [
+            { leaf: ["recipe", "verify", "chart", "cp"] },
+            { leaf: ["points", "yarns", "assembly", "materials", "tutorial"] },
+          ],
+        },
+        { leaf: ["view3d"] },
+      ],
+    },
+  },
+  {
     id: "classic",
     name: "Clássico (3 colunas)",
     description: "Receita, verificação e, à direita, gráfico/3D em abas sobre o texto do CrochetPARADE.",
@@ -111,7 +132,7 @@ export const PRESET_SPECS: Preset[] = [
   },
 ];
 
-export const DEFAULT_PRESET_ID = "classic";
+export const DEFAULT_PRESET_ID = "edit";
 
 export interface PresetInfo {
   id: string;

@@ -5,6 +5,7 @@ import {
   buildLayout,
   compactLayout,
   dispatch,
+  enabledPanels,
   findLeaf,
   fits,
   hidePanel,
@@ -42,7 +43,7 @@ afterAll(() => {
 });
 afterEach(() => resetWorkspace());
 
-const classic = (): Layout => buildLayout(PRESET_SPECS[0]?.spec as never);
+const classic = (): Layout => buildLayout(PRESET_SPECS.find((p) => p.id === "classic")?.spec as never);
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
 describe("presets", () => {
@@ -147,11 +148,16 @@ describe("mover painéis", () => {
 });
 
 describe("validação", () => {
-  test("recusa painel desconhecido, repetido e divisão com tamanhos errados", () => {
+  test("painel desconhecido é ignorado; painel repetido e divisão com tamanhos errados", () => {
     const base = JSON.parse(JSON.stringify(classic()));
     const bad1 = JSON.parse(JSON.stringify(base));
     bad1.root.children[0].tabs = ["xyz"];
-    expect(() => validateLayout(bad1)).toThrow(/desconhecido/);
+    // uma janela só com painéis que não existem mais não tem o que mostrar
+    expect(() => validateLayout(bad1)).toThrow(/sem painéis/);
+    // painel desconhecido junto de outros é ignorado, sem perder o layout inteiro
+    const old = JSON.parse(JSON.stringify(base));
+    old.root.children[0].tabs = ["recipe", "xyz"];
+    expect(leaves(validateLayout(old)).flatMap((l) => l.tabs)).not.toContain("xyz");
     const bad2 = JSON.parse(JSON.stringify(base));
     bad2.root.children[1].tabs = ["recipe"];
     expect(() => validateLayout(bad2)).toThrow(/duas vezes/);
@@ -208,7 +214,7 @@ describe("comandos workspace.*", () => {
   });
 
   test("mover, ativar aba, redimensionar e ocultar/mostrar pelos comandos", () => {
-    dispatch("workspace.reset", {});
+    dispatch("workspace.applyPreset", { id: "classic" });
     const moved = dispatch("workspace.movePanel", { panel: "cp", toPanel: "chart", zone: "center" }) as {
       visible: string[];
     };
@@ -240,11 +246,11 @@ describe("comandos workspace.*", () => {
         { id: "ruim", name: "Ruim", layout: {} },
       ],
     });
-    expect(s.presetId).toBe("classic");
+    expect(s.presetId).toBe("edit");
     expect(s.customs.map((c) => c.id)).toEqual(["ok"]);
     const t = loadWorkspace(JSON.parse(JSON.stringify(workspaceSnapshot())));
-    expect(t.presetId).toBe("classic");
-    expect(loadWorkspace(undefined).presetId).toBe("classic");
+    expect(t.presetId).toBe("edit");
+    expect(loadWorkspace(undefined).presetId).toBe("edit");
   });
 });
 
@@ -286,5 +292,51 @@ describe("tamanhos mínimos e modo compacto", () => {
     expect(JSON.stringify(l)).toBe(before);
     // a única janela compacta cabe onde cabe o maior painel
     expect(fits(c, panelMins(320), 340, 330)).toBe(true);
+  });
+});
+
+describe("janelas independentes dos layouts predefinidos (menu Janelas)", () => {
+  const windows = () =>
+    (dispatch("workspace.get") as { windows: { panel: string; visible: boolean }[] }).windows;
+
+  test("o menu lista todas as janelas existentes, ligadas", () => {
+    // os painéis dos recursos pausados (Render, Criador) estão ligados nos testes mas fora do layout padrão
+    const base = windows().filter((w) => w.panel !== "render" && w.panel !== "stitchEditor");
+    expect(base.every((w) => w.visible)).toBe(true);
+    expect(windows().map((w) => w.panel)).toEqual(enabledPanels());
+  });
+
+  test("janela desligada continua desligada ao aplicar outro layout; religar a põe perto das vizinhas", () => {
+    dispatch("workspace.setPanelVisible", { panel: "verify", visible: false });
+    expect(windows().find((w) => w.panel === "verify")?.visible).toBe(false);
+    for (const id of ["classic", "focus3d", "stack", "tabs", "edit"]) {
+      dispatch("workspace.applyPreset", { id });
+      expect(leaves(workspaceSnapshot().layout).flatMap((l) => l.tabs)).not.toContain("verify");
+    }
+    dispatch("workspace.applyPreset", { id: "classic" });
+    dispatch("workspace.setPanelVisible", { panel: "verify", visible: true });
+    // no clássico a verificação fica em janela própria, ao lado da receita: religada, volta como aba, não some
+    expect(leaves(workspaceSnapshot().layout).flatMap((l) => l.tabs)).toContain("verify");
+    expect(windows().find((w) => w.panel === "verify")?.visible).toBe(true);
+  });
+
+  test("o estado ligado/desligado é gravado e recarregado; restaurar padrão religa tudo", () => {
+    dispatch("workspace.setPanelVisible", { panel: "cp", visible: false });
+    const back = loadWorkspace(JSON.parse(JSON.stringify(workspaceSnapshot())));
+    expect(back.off).toEqual(["cp"]);
+    dispatch("workspace.reset");
+    expect(workspaceSnapshot().off).toEqual([]);
+    expect(
+      windows()
+        .filter((w) => w.panel !== "render" && w.panel !== "stitchEditor")
+        .every((w) => w.visible),
+    ).toBe(true);
+  });
+
+  test("não deixa desligar a última janela e recusa janela que não existe", () => {
+    expect(() => dispatch("workspace.setPanelVisible", { panel: "nada", visible: false })).toThrow(
+      /inválido|existe/,
+    );
+    expect(() => dispatch("workspace.setPanelVisible", { panel: "cp" })).toThrow(/visible/);
   });
 });

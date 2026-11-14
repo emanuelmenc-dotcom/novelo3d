@@ -11,45 +11,9 @@ import {
   subscribeParts,
 } from "@novelo/commands";
 import { useState, useSyncExternalStore } from "react";
-import {
-  type BrushTool,
-  type Mode,
-  type SelOp,
-  type SelTool,
-  setTools,
-  subscribeTools,
-  toolSnapshot,
-} from "./pointtools.ts";
+import { setTools, subscribeTools, toolSnapshot } from "./pointtools.ts";
 import type { NodeMeta } from "./view3d.ts";
 
-const MODES: [Mode, string][] = [
-  ["orbit", "Girar"],
-  ["select", "Selecionar"],
-  ["yarn", "Pintar fio"],
-  ["tension", "Tensão"],
-];
-const SEL_TOOLS: [SelTool, string][] = [
-  ["point", "Ponto"],
-  ["group", "Volta"],
-  ["column", "Coluna"],
-  ["hood", "Vizinhança"],
-  ["path", "Caminho A→B"],
-  ["rect", "Retângulo"],
-  ["ellipse", "Elipse"],
-  ["lasso", "Laço"],
-];
-const OPS: [SelOp, string][] = [
-  ["replace", "Substituir"],
-  ["add", "Somar"],
-  ["remove", "Tirar"],
-  ["intersect", "Interseção"],
-];
-const BRUSHES: [BrushTool, string][] = [
-  ["brush", "Pincel"],
-  ["bucket", "Balde"],
-  ["dropper", "Conta-gotas"],
-  ["erase", "Borracha"],
-];
 const CODES = ["CH", "SL", "SC", "HDC", "DC", "TR"];
 
 export function PointsPanel(props: { text: string; dialect: string; selNode: NodeMeta | null }) {
@@ -57,7 +21,6 @@ export function PointsPanel(props: { text: string; dialect: string; selNode: Nod
   const edit = useSyncExternalStore(subscribeEdit, editSnapshot);
   // peças e costuras também entram no desfazer
   useSyncExternalStore(subscribeParts, partsSnapshot);
-  const hist = dispatch("history.get", {}) as { canUndo: boolean; canRedo: boolean };
   const { yarns } = useSyncExternalStore(subscribePaint, paintSnapshot);
   const [error, setError] = useState<string | null>(null);
   const [fYarn, setFYarn] = useState("");
@@ -105,21 +68,6 @@ export function PointsPanel(props: { text: string; dialect: string; selNode: Nod
 
   return (
     <div className="panel-col points" data-testid="points-panel">
-      <div className="row" role="radiogroup" aria-label="Ferramenta do botão esquerdo">
-        {MODES.map(([m, label]) => (
-          <button
-            key={m}
-            type="button"
-            aria-pressed={tools.mode === m}
-            data-testid={`mode-${m}`}
-            className={tools.mode === m ? "on" : ""}
-            onClick={() => setTools({ mode: m, pathA: null })}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
       <p className="hint" data-testid="points-info">
         Selecionados: <strong data-testid="sel-count">{edit.selected}</strong>
         {props.selNode?.uid !== undefined && <> · último clique: #{props.selNode.uid}</>}
@@ -130,34 +78,6 @@ export function PointsPanel(props: { text: string; dialect: string; selNode: Nod
       {tools.mode === "select" && (
         <>
           <div className="row">
-            {SEL_TOOLS.map(([t, label]) => (
-              <button
-                key={t}
-                type="button"
-                aria-pressed={tools.selTool === t}
-                data-testid={`sel-${t}`}
-                className={tools.selTool === t ? "on" : ""}
-                onClick={() => setTools({ selTool: t, pathA: null })}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="row">
-            <label>
-              Operação{" "}
-              <select
-                aria-label="Operação"
-                value={tools.op}
-                onChange={(e) => setTools({ op: e.target.value as SelOp })}
-              >
-                {OPS.map(([o, label]) => (
-                  <option key={o} value={o}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
             {tools.selTool === "hood" && (
               <label>
                 Saltos{" "}
@@ -187,38 +107,7 @@ export function PointsPanel(props: { text: string; dialect: string; selNode: Nod
               {tools.pathA === null ? "Clique no ponto A." : `A = #${tools.pathA}. Clique no ponto B.`}
             </p>
           )}
-          <label className="block">
-            <input
-              type="checkbox"
-              data-testid="visible-only"
-              checked={tools.visibleOnly}
-              onChange={(e) => setTools({ visibleOnly: e.target.checked })}
-            />{" "}
-            Só pontos visíveis (desligado: atravessa a peça)
-          </label>
           <p className="hint">Shift + clique soma · Ctrl + clique tira · Alt + arrasto gira a câmera.</p>
-          <div className="row">
-            <button type="button" onClick={() => run("selection.clear")}>
-              Limpar
-            </button>
-            <button type="button" onClick={() => run("selection.invert")}>
-              Inverter
-            </button>
-            <button
-              type="button"
-              onClick={() => run("selection.select", { by: { kind: "all" }, op: tools.op })}
-            >
-              Tudo
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                run("selection.select", { by: { kind: "group", from: 1, to: 9999 }, op: "replace" })
-              }
-            >
-              Todas as voltas
-            </button>
-          </div>
           <fieldset>
             <legend>Filtro por propriedade</legend>
             <div className="row">
@@ -292,20 +181,6 @@ export function PointsPanel(props: { text: string; dialect: string; selNode: Nod
 
       {(tools.mode === "yarn" || tools.mode === "tension") && (
         <>
-          <div className="row">
-            {BRUSHES.map(([b, label]) => (
-              <button
-                key={b}
-                type="button"
-                aria-pressed={tools.brushTool === b}
-                data-testid={`brush-${b}`}
-                className={tools.brushTool === b ? "on" : ""}
-                onClick={() => setTools({ brushTool: b })}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
           <div className="row">
             {tools.mode === "yarn" ? (
               <label>
@@ -439,17 +314,6 @@ export function PointsPanel(props: { text: string; dialect: string; selNode: Nod
         </>
       )}
 
-      <div className="row">
-        <button type="button" disabled={!hist.canUndo} data-testid="undo" onClick={() => run("history.undo")}>
-          Desfazer
-        </button>
-        <button type="button" disabled={!hist.canRedo} data-testid="redo" onClick={() => run("history.redo")}>
-          Refazer
-        </button>
-        <button type="button" onClick={() => run("edit.clear")}>
-          Apagar edições por ponto
-        </button>
-      </div>
       {msg && (
         <p className="warn" role="alert" data-testid="points-error">
           {msg}

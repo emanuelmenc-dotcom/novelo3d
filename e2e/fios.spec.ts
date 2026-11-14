@@ -44,7 +44,6 @@ test("fio com listras por comprimento, material e espessura: prévia, 3D e consu
   await expect(page.locator('[data-usage="A"]')).toContainText(/\d+/);
 
   // 3D: os pontos têm várias cores ao longo do fio (degradê), na ordem do trabalho
-  await tab(page, "3D").click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(433);
   const colors = await page.evaluate(() =>
     Array.from({ length: 433 }, (_, i) => window.__view3d?.nodeColor(i)),

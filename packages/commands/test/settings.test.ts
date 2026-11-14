@@ -4,8 +4,8 @@ import { dispatch, getSettings, resetSettings, subscribeSettings } from "../src/
 
 afterEach(() => resetSettings());
 
-test("padrão: cubo chanfrado, canto inferior direito, 112 px", () => {
-  expect(getSettings().interface.viewCube).toEqual({ position: "bottom-right", chamfered: true, size: 112 });
+test("padrão: cubo chanfrado, canto inferior esquerdo, 112 px", () => {
+  expect(getSettings().interface.viewCube).toEqual({ position: "bottom-left", chamfered: true, size: 112 });
 });
 
 test("settings.set altera só o que foi pedido e devolve o resultado", () => {
@@ -31,7 +31,7 @@ test("tamanho fora da faixa é limitado e valores inválidos dão erro claro", (
   expect(() => dispatch("settings.set", { interface: { viewCube: { chamfered: "sim" } } })).toThrow(
     /verdadeiro/,
   );
-  expect(getSettings().interface.viewCube.position).toBe("bottom-right"); // erro não altera nada
+  expect(getSettings().interface.viewCube.position).toBe("bottom-left"); // erro não altera nada
 });
 
 test("quem assina é avisado a cada mudança, inclusive pelo reset", () => {
@@ -41,7 +41,7 @@ test("quem assina é avisado a cada mudança, inclusive pelo reset", () => {
   dispatch("settings.reset");
   off();
   dispatch("settings.set", { interface: { viewCube: { position: "top-left" } } });
-  expect(seen).toEqual(["top-right", "bottom-right"]);
+  expect(seen).toEqual(["top-right", "bottom-left"]);
 });
 
 test("escala da interface, do texto, mínimo do 3D e modo compacto: padrões, limites e erros", () => {

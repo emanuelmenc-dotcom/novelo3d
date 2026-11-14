@@ -4,6 +4,7 @@ import { mkdirSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, type Page, test } from "@playwright/test";
+import { openViewMenu, ribbon, showTab } from "./ribbon.ts";
 
 const PORT = 47899;
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
@@ -11,7 +12,6 @@ const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: t
 /** Abre o 3D e o painel Pontos (clássico: 3D em cima, Pontos embaixo). */
 async function open(page: Page, url = "/") {
   await page.goto(url);
-  await tab(page, "3D").click();
   await tab(page, "Pontos").click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(433);
 }
@@ -51,7 +51,9 @@ test("selecionar por volta e por retângulo, pintar fio, tensão, desfazer e per
   await expect(count).toHaveText("0");
 
   // Selecionar > Volta: clique num ponto da região cilíndrica (voltas 8 a 11 têm 36 pontos)
+  await ribbon(page, "selecionar");
   await page.getByTestId("mode-select").click();
+  await ribbon(page, "selecionar");
   await page.getByTestId("sel-group").click();
   const p = await centerPoint(page, 163, 306);
   await page.mouse.click(box.x + p.x, box.y + p.y);
@@ -66,6 +68,7 @@ test("selecionar por volta e por retângulo, pintar fio, tensão, desfazer e per
   await expect(count).toHaveText("0");
 
   // Retângulo no meio da peça
+  await ribbon(page, "selecionar");
   await page.getByTestId("sel-rect").click();
   await page.mouse.move(box.x + box.width * 0.35, box.y + box.height * 0.3);
   await page.mouse.down();
@@ -79,9 +82,11 @@ test("selecionar por volta e por retângulo, pintar fio, tensão, desfazer e per
   await page.screenshot({ path: "test-results/pontos-selecao-retangulo.png" });
 
   // Pintar fio: seleciona uma volta inteira e aplica o fio B
+  await ribbon(page, "selecionar");
   await page.getByTestId("sel-group").click();
   await page.mouse.click(box.x + p.x, box.y + p.y);
   await expect(count).toHaveText("36");
+  await ribbon(page, "selecionar");
   await page.getByTestId("mode-yarn").click();
   await page.getByLabel("Fio da pintura").selectOption("B");
   await page.getByTestId("apply-selection").click();
@@ -89,12 +94,15 @@ test("selecionar por volta e por retângulo, pintar fio, tensão, desfazer e per
   await page.screenshot({ path: "test-results/pontos-fio.png" });
 
   // desfazer volta ao verde musgo; refazer volta ao off white
+  await ribbon(page, "historico");
   await page.getByTestId("undo").click();
   await expect.poll(() => page.evaluate((i) => window.__view3d?.nodeColor(i), p.id)).toBe("#5d6b3a");
+  await ribbon(page, "historico");
   await page.getByTestId("redo").click();
   await expect.poll(() => page.evaluate((i) => window.__view3d?.nodeColor(i), p.id)).toBe("#f4f1e8");
 
   // Tensão: aplica -1 na mesma seleção; o painel conta os pontos editados
+  await ribbon(page, "selecionar");
   await page.getByTestId("mode-tension").click();
   await page.getByLabel("Valor da tensão").fill("-1");
   await page.getByTestId("apply-selection").click();
@@ -104,7 +112,6 @@ test("selecionar por volta e por retângulo, pintar fio, tensão, desfazer e per
   // persiste ao recarregar: a edição por ponto continua
   await page.waitForTimeout(600);
   await page.reload();
-  await tab(page, "3D").click();
   await tab(page, "Pontos").click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(433);
   await expect(page.getByTestId("points-info")).toContainText("72 pontos editados");
@@ -116,7 +123,9 @@ test("pincel arrastado pinta pontos vizinhos; Alt + arrasto gira a câmera", asy
   const canvas = page.getByTestId("scene").locator("canvas");
   const box = await canvas.boundingBox();
   if (!box) throw new Error("sem canvas");
+  await ribbon(page, "selecionar");
   await page.getByTestId("mode-yarn").click();
+  await ribbon(page, "pintar");
   await page.getByTestId("brush-brush").click();
   await page.getByLabel("Fio da pintura").selectOption("B");
   const a = await centerPoint(page, 163, 306);
@@ -159,6 +168,7 @@ test("o MCP seleciona, valida cadeia, edita tensão e a interface acompanha", as
       const text = (r.content as { text: string }[])[0]?.text ?? "";
       return { isError: r.isError === true, text, json: r.isError ? null : JSON.parse(text) };
     };
+    await showTab(page, "Receita");
     const text = await page.getByLabel("Receita", { exact: true }).inputValue();
 
     const info = await call("points.info", { text });
@@ -166,6 +176,7 @@ test("o MCP seleciona, valida cadeia, edita tensão e a interface acompanha", as
 
     const sel = await call("selection.select", { text, by: { kind: "group", from: 7, to: 9 } });
     expect(sel.json.count).toBe(108);
+    await ribbon(page, "selecionar");
     await expect(page.getByTestId("sel-count")).toHaveText("108");
     await expect.poll(() => page.evaluate(() => window.__view3d?.state().selectionCount)).toBe(108);
 
@@ -209,7 +220,9 @@ test("retângulo atravessando pega mais pontos que só os visíveis", async ({ p
   const canvas = page.getByTestId("scene").locator("canvas");
   const box = await canvas.boundingBox();
   if (!box) throw new Error("sem canvas");
+  await ribbon(page, "selecionar");
   await page.getByTestId("mode-select").click();
+  await ribbon(page, "selecionar");
   await page.getByTestId("sel-rect").click();
   const drag = async () => {
     await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.2);
@@ -219,10 +232,12 @@ test("retângulo atravessando pega mais pontos que só os visíveis", async ({ p
     return Number(await page.getByTestId("sel-count").textContent());
   };
   const through = await drag();
+  await ribbon(page, "selecionar");
   await page.getByTestId("visible-only").check();
   const visible = await drag();
   expect(visible).toBeGreaterThan(10);
   expect(visible).toBeLessThan(through);
+  await ribbon(page, "selecionar");
   await page.getByTestId("visible-only").uncheck();
   expect(await drag()).toBe(through);
 });
@@ -252,11 +267,15 @@ test("R0: pintar não recria as malhas e, parado, o 3D não desenha quadros", as
   const canvas = page.getByTestId("scene").locator("canvas");
   const box = await canvas.boundingBox();
   if (!box) throw new Error("sem canvas");
+  await ribbon(page, "selecionar");
   await page.getByTestId("mode-select").click();
+  await ribbon(page, "selecionar");
   await page.getByTestId("sel-group").click();
   const p = await centerPoint(page, 163, 306);
   await page.mouse.click(box.x + p.x, box.y + p.y);
+  await ribbon(page, "selecionar");
   await expect(page.getByTestId("sel-count")).toHaveText("36");
+  await ribbon(page, "selecionar");
   await page.getByTestId("mode-yarn").click();
   await page.getByLabel("Fio da pintura").selectOption("B");
   await page.getByTestId("apply-selection").click();
@@ -279,7 +298,9 @@ test("R1: nível tubo troca a malha mas a seleção por forma continua", async (
   const canvas = page.getByTestId("scene").locator("canvas");
   const box = await canvas.boundingBox();
   if (!box) throw new Error("sem canvas");
+  await ribbon(page, "selecionar");
   await page.getByTestId("mode-select").click();
+  await ribbon(page, "selecionar");
   await page.getByTestId("sel-rect").click();
   await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.2);
   await page.mouse.down();
@@ -337,9 +358,11 @@ test("D-57: 3D no estilo CrochetPARADE: fio por ligação, clique acha o ponto e
   await page.mouse.click(box.x + mx, box.y + my);
   expect([pair, pair + 1]).toContain((await st())?.selected);
   await page.mouse.click(box.x + (xy[target * 2] as number), box.y + (xy[target * 2 + 1] as number));
+  await openViewMenu(page);
   await page.getByTestId("wire-toggle").check();
   expect((await st())?.selected).toBe(target);
   await page.screenshot({ path: "test-results/cp-so-linhas.png" });
+  await openViewMenu(page);
   await page.getByTestId("wire-toggle").uncheck();
   await page.screenshot({ path: "test-results/cp-fio.png" });
 });

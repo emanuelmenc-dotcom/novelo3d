@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Painel "Tutorial" (P4): mostra o passo atual da receita e anda pelos passos (anterior, próximo, ir à volta). O 3D destaca
 // o ponto e as bases na hora. Tudo passa pelos comandos `tutorial.*` (D-21), o mesmo caminho da ponte MCP.
-import { dispatch, paintSnapshot } from "@novelo/commands";
+import { paintSnapshot } from "@novelo/commands";
 
 export interface TutorialData {
   total: number;
@@ -23,20 +23,8 @@ export function TutorialPanel(props: {
   error: string | null;
   /** A contagem da receita não fecha: o tutorial segue a receita como está e avisa. */
   countWarning: boolean;
-  text: string;
-  dialect: string;
-  part: string;
-  /** Leva a câmera do 3D ao ponto atual (ausente sem 3D à vista). */
-  onShow?: () => void;
 }) {
-  const { data, error, countWarning, text, dialect, part, onShow } = props;
-  const run = (method: string, extra: Record<string, unknown> = {}): void => {
-    try {
-      dispatch(method, { text, ...(dialect !== "auto" ? { dialect } : {}), part, ...extra });
-    } catch (e) {
-      console.warn((e as Error).message);
-    }
-  };
+  const { data, error, countWarning } = props;
   if (error) {
     return (
       <div className="panel-col" data-testid="tutorial">
@@ -54,7 +42,6 @@ export function TutorialPanel(props: {
     );
   }
   const s = data.step;
-  const rounds = Array.from({ length: data.rounds }, (_, i) => i + 1);
   const yarn = paintSnapshot().yarns.find((y) => y.id === s.yarnId);
   return (
     <div className="panel-col" data-testid="tutorial">
@@ -79,44 +66,10 @@ export function TutorialPanel(props: {
           A contagem da receita não fecha: o passo a passo segue a receita como está escrita.
         </p>
       )}
-      <div className="row">
-        <button
-          type="button"
-          data-testid="tutorial-prev"
-          disabled={data.index <= 0}
-          onClick={() => run("tutorial.prev")}
-        >
-          Anterior
-        </button>
-        <button
-          type="button"
-          data-testid="tutorial-next"
-          disabled={data.index >= data.total - 1}
-          onClick={() => run("tutorial.next")}
-        >
-          Próximo
-        </button>
-        {onShow && (
-          <button type="button" data-testid="tutorial-show" onClick={onShow}>
-            Mostrar ponto
-          </button>
-        )}
-        <label>
-          Ir para a volta{" "}
-          <select
-            data-testid="tutorial-round"
-            value={s.round}
-            onChange={(e) => run("tutorial.goto", { round: Number(e.target.value) })}
-          >
-            {rounds.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <p className="hint">Setas esquerda e direita também andam os passos.</p>
+      <p className="hint">
+        Anterior, Próximo e Ir à volta ficam na aba Tutorial do ribbon; as setas esquerda e direita também
+        andam os passos.
+      </p>
     </div>
   );
 }

@@ -4,6 +4,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, type Page, test } from "@playwright/test";
+import { ribbon, showTab } from "./ribbon.ts";
 
 const PORT = 47905;
 
@@ -12,10 +13,10 @@ const state = (page: Page) => page.evaluate(() => window.__view3d?.state());
 
 async function open(page: Page) {
   await page.goto("/");
-  await tab(page, "3D").click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count ?? 0)).toBe(433);
   await tab(page, "Tutorial").click();
   await expect(page.getByTestId("tutorial-text")).toBeVisible();
+  await ribbon(page, "tutorial");
 }
 
 test("avançar até o fim da volta 2: 12 passos, 18 pontos feitos e o aviso de fim de volta", async ({
@@ -36,12 +37,14 @@ test("avançar até o fim da volta 2: 12 passos, 18 pontos feitos e o aviso de f
   expect(t?.faded).toBe(433 - 1 - 16 - 2);
   await page.screenshot({ path: "test-results/tutorial-passo12.png" });
   // "Mostrar ponto" leva a câmera ao ponto atual: de longe e de perto os pontos ficam alcançáveis
+  await ribbon(page, "tutorial");
   await page.getByTestId("tutorial-show").click();
   await page.screenshot({ path: "test-results/tutorial-mostrar-ponto.png" });
 });
 
 test("ir à volta, voltar e as setas do teclado andam os passos", async ({ page }) => {
   await open(page);
+  await ribbon(page, "tutorial");
   await page.getByTestId("tutorial-round").selectOption("5");
   await expect(page.getByTestId("tutorial-text")).toContainText("Volta 5, ponto 1 de");
   await expect(page.getByTestId("tutorial-alerts")).toContainText("Começa a volta 5");
@@ -56,8 +59,11 @@ test("ir à volta, voltar e as setas do teclado andam os passos", async ({ page 
 
 test("recarregar a página volta ao mesmo passo", async ({ page }) => {
   await open(page);
+  await ribbon(page, "tutorial");
   await page.getByTestId("tutorial-round").selectOption("9");
+  await ribbon(page, "tutorial");
   await page.getByTestId("tutorial-next").click();
+  await ribbon(page, "tutorial");
   await page.getByTestId("tutorial-show").click();
   await page.screenshot({ path: "test-results/tutorial-volta9.png" });
   await expect(page.getByTestId("tutorial-text")).toContainText("Volta 9, ponto 2");
@@ -71,17 +77,21 @@ test("receita que não fecha avisa; receita acima do limite mostra a mensagem e 
   page,
 }) => {
   await open(page);
+  await showTab(page, "Receita");
   await page.getByLabel("Receita", { exact: true }).fill("V1: 6 pb no anel mágico (6)\nV2: 6 aum (13)");
   await expect(page.getByTestId("tutorial-count-warning")).toBeVisible();
+  await showTab(page, "Receita");
   await page.getByLabel("Receita", { exact: true }).fill("V1: 6 pb no anel mágico (6)\nV2-40: aum @each");
   await expect(page.getByTestId("tutorial-error")).toContainText("passa de");
+  await showTab(page, "Receita");
   await expect(page.getByLabel("Receita", { exact: true })).toBeVisible();
 });
 
 test("numa montagem com peça espelhada o destaque cai nos pontos da peça ativa", async ({ page }) => {
   await open(page);
   await tab(page, "Montagem").click();
-  await page.getByRole("button", { name: "Espelhada" }).click();
+  await ribbon(page, "montagem");
+  await page.getByTestId("tool-montagem.mirror-x").click();
   await expect(page.locator("[data-part]")).toHaveCount(2);
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(866);
   await page.locator("[data-part]").nth(1).click();
@@ -95,6 +105,7 @@ test("setas andam o passo logo depois de clicar em Próximo, sem precisar tirar 
   page,
 }) => {
   await open(page);
+  await ribbon(page, "tutorial");
   await page.getByTestId("tutorial-next").click();
   await expect(page.getByTestId("tutorial-text")).toContainText("ponto 2 de");
   await page.keyboard.press("ArrowRight");
@@ -110,9 +121,7 @@ test("com um divisor em foco as setas movem o divisor, não o tutorial", async (
   await expect(page.getByTestId("tutorial-text")).toContainText("Volta 1, ponto 1 de");
 });
 
-test("quem tem um layout salvo sem a janela Tutorial a encontra em Layout > Mostrar Tutorial", async ({
-  page,
-}) => {
+test("quem tem um layout salvo sem a janela Tutorial a encontra em Janelas > Tutorial", async ({ page }) => {
   const leaf = (id: string, tabs: string[]) => ({ type: "leaf", id, tabs, active: 0, collapsed: false });
   const antigo = {
     root: {
@@ -137,16 +146,19 @@ test("quem tem um layout salvo sem a janela Tutorial a encontra em Layout > Most
   };
   await page.addInitScript(
     (w) => {
-      if (!localStorage.getItem("novelo3d.workspace"))
+      if (!localStorage.getItem("novelo3d.workspace")) {
         localStorage.setItem("novelo3d.workspace", JSON.stringify(w));
+        localStorage.setItem("novelo3d.ui", JSON.stringify({ version: 2 }));
+      }
     },
     { layout: antigo, presetId: null, customs: [] },
   );
   await page.goto("/");
   await expect(tab(page, "Tutorial")).toHaveCount(0);
-  await page.getByRole("button", { name: "Layout" }).click();
-  await page.getByRole("menuitem", { name: /Mostrar Tutorial/ }).click();
-  await tab(page, "3D").click();
+  await page.getByTestId("windows-menu").click();
+  await page.getByTestId("window-tutorial").click();
+  await page.keyboard.press("Escape");
+  await tab(page, "3D").click(); // neste layout antigo o 3D é aba junto do gráfico
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count ?? 0)).toBe(433);
   await tab(page, "Tutorial").click();
   await expect(page.getByTestId("tutorial-text")).toContainText("Volta 1, ponto 1 de 6");
@@ -156,9 +168,12 @@ test("quem tem um layout salvo sem a janela Tutorial a encontra em Layout > Most
 
 test('"Mostrar ponto" funciona nos polos da peça (voltas 1 e 17)', async ({ page }) => {
   await open(page);
+  await ribbon(page, "tutorial");
   await page.getByTestId("tutorial-show").click();
   await page.screenshot({ path: "test-results/tutorial-polo-volta1.png" });
+  await ribbon(page, "tutorial");
   await page.getByTestId("tutorial-round").selectOption("17");
+  await ribbon(page, "tutorial");
   await page.getByTestId("tutorial-show").click();
   await page.screenshot({ path: "test-results/tutorial-polo-volta17.png" });
   const pos = await page.evaluate(() => window.__view3d?.cameraState().position ?? [0, 0, 0]);
@@ -190,8 +205,8 @@ test("o MCP anda o tutorial pelos mesmos comandos tutorial.* e o projeto leva a 
   try {
     await page.goto(`/?bridge=${PORT}`);
     await expect(page.getByTestId("bridge-state")).toContainText("conectada", { timeout: 15_000 });
-    await tab(page, "3D").click();
     await tab(page, "Tutorial").click();
+    await showTab(page, "Receita");
     const text = await page.getByLabel("Receita", { exact: true }).inputValue();
     const r = await call("tutorial.goto", { text, round: 2 });
     expect(r.isError, r.text).toBe(false);

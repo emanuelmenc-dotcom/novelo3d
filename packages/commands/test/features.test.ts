@@ -48,13 +48,17 @@ describe("com o render e o criador de pontos desligados (padrão)", () => {
   });
 
   test("não entram na lista de painéis ocultos", () => {
-    expect(hiddenPanels(buildLayout(PRESET_SPECS[0]?.spec as never))).toEqual([]);
+    expect(hiddenPanels(buildLayout(PRESET_SPECS.find((p) => p.id === "classic")?.spec as never))).toEqual(
+      [],
+    );
   });
 
   test("um layout salvo com esses painéis continua abrindo: eles são tirados e o resto fica", () => {
     setFeature("render", true);
     setFeature("stitchEditor", true);
-    const saved = JSON.parse(JSON.stringify(buildLayout(PRESET_SPECS[0]?.spec as never)));
+    const saved = JSON.parse(
+      JSON.stringify(buildLayout(PRESET_SPECS.find((p) => p.id === "classic")?.spec as never)),
+    );
     expect(leaves(saved).flatMap((l) => l.tabs)).toContain("render");
     setFeature("render", false);
     setFeature("stitchEditor", false);
@@ -85,7 +89,9 @@ describe("religando os recursos", () => {
     setFeature("render", true);
     expect(enabledPanels()).toContain("render");
     expect(refused(() => dispatch("render.status"))).toBe("ok");
-    const tabs = leaves(buildLayout(PRESET_SPECS[0]?.spec as never)).flatMap((l) => l.tabs);
+    const tabs = leaves(buildLayout(PRESET_SPECS.find((p) => p.id === "classic")?.spec as never)).flatMap(
+      (l) => l.tabs,
+    );
     expect(tabs).toContain("render");
     expect(tabs).not.toContain("stitchEditor");
     setFeature("render", false);

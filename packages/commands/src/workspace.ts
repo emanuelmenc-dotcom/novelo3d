@@ -223,10 +223,12 @@ export function validateLayout(input: unknown): Layout {
     seenIds.add(o.id);
     if (o.type === "leaf") {
       if (!Array.isArray(o.tabs) || o.tabs.length === 0) throw new Error(`${path}: janela sem painéis`);
-      for (const t of o.tabs) {
-        if (!(PANEL_IDS as readonly string[]).includes(t as string)) {
-          throw new Error(`${path}: painel '${String(t)}' desconhecido`);
-        }
+      // painel que não existe mais (uma versão antiga do app) é ignorado, para não perder o layout salvo inteiro
+      const known = (o.tabs as unknown[]).filter((t) =>
+        (PANEL_IDS as readonly string[]).includes(t as string),
+      );
+      if (known.length === 0) throw new Error(`${path}: janela sem painéis`);
+      for (const t of known) {
         if (seenPanels.has(t as string)) throw new Error(`${path}: painel '${String(t)}' aparece duas vezes`);
         seenPanels.add(t as string);
       }
@@ -234,7 +236,7 @@ export function validateLayout(input: unknown): Layout {
       return {
         type: "leaf",
         id: o.id,
-        tabs: [...(o.tabs as PanelId[])],
+        tabs: known as PanelId[],
         active,
         collapsed: o.collapsed === true,
       };
@@ -392,6 +394,28 @@ export function hidePanel(layout: Layout, panel: PanelId): Layout {
       return n;
     }),
   });
+}
+
+/** Tira do layout todos os painéis de `off` (os que o usuário desligou), sem nunca deixar o layout vazio. */
+export function pruneOff(layout: Layout, off: readonly PanelId[]): Layout {
+  let out = layout;
+  for (const p of off) if (leafOfPanel(out, p) && panelsIn(out).length > 1) out = hidePanel(out, p);
+  return out;
+}
+
+/** Traz de volta um painel desligado para perto dos seus vizinhos no layout `base` (um preset ou layout do usuário). */
+export function showPanelNear(layout: Layout, panel: PanelId, base: Layout | undefined): Layout {
+  if (leafOfPanel(layout, panel)) return layout;
+  const baseLeaf = base ? leafOfPanel(base, panel) : undefined;
+  const neighbour = baseLeaf?.tabs.find((t) => t !== panel && leafOfPanel(layout, t));
+  const target = (neighbour ? leafOfPanel(layout, neighbour) : undefined) ?? (leaves(layout)[0] as Leaf);
+  return {
+    root: mapNode(layout.root, (n) =>
+      n.type === "leaf" && n.id === target.id
+        ? { ...n, tabs: [...n.tabs, panel], active: n.tabs.length, collapsed: false }
+        : n,
+    ),
+  };
 }
 
 /** Traz de volta um painel oculto, como aba da primeira janela. */

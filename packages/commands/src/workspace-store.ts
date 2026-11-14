@@ -2,7 +2,16 @@
 // Estado do espaço de trabalho: layout atual, layouts customizados do usuário e qual preset está aplicado.
 // Mesmo padrão das configurações: estado na camada de comandos (D-21), persistência no studio.
 import { DEFAULT_PRESET_ID, presetLayout } from "./presets.ts";
-import { type Layout, validateLayout } from "./workspace.ts";
+import {
+  enabledPanels,
+  hidePanel,
+  type Layout,
+  type PanelId,
+  panelsIn,
+  pruneOff,
+  showPanelNear,
+  validateLayout,
+} from "./workspace.ts";
 
 export interface CustomLayout {
   id: string;
@@ -15,11 +24,21 @@ export interface WorkspaceState {
   /** "classic", "custom:<id>" ou null quando o layout foi alterado depois de aplicado. */
   presetId: string | null;
   customs: CustomLayout[];
+  /** Janelas que o usuário desligou no menu Janelas: continuam desligadas ao trocar de layout predefinido. */
+  off: PanelId[];
+  /** Último layout predefinido ou do usuário aplicado: é onde uma janela religada volta a ficar. */
+  base: string | null;
 }
 
 const initialLayout = (): Layout => presetLayout(DEFAULT_PRESET_ID) as Layout;
 
-let current: WorkspaceState = { layout: initialLayout(), presetId: DEFAULT_PRESET_ID, customs: [] };
+let current: WorkspaceState = {
+  layout: initialLayout(),
+  presetId: DEFAULT_PRESET_ID,
+  customs: [],
+  off: [],
+  base: DEFAULT_PRESET_ID,
+};
 const listeners = new Set<(s: WorkspaceState) => void>();
 
 export const workspaceSnapshot = (): WorkspaceState => current;
@@ -40,18 +59,45 @@ export function mutateLayout(fn: (l: Layout) => Layout): WorkspaceState {
   return commit({ ...current, layout: fn(current.layout), presetId: null });
 }
 
-export function applyLayoutId(id: string): WorkspaceState {
+/** Layout de um preset ou de um layout do usuário (`custom:<id>`), sem aplicar. */
+function layoutOfId(id: string | null): Layout | undefined {
+  if (id === null) return undefined;
   if (id.startsWith("custom:")) {
     const c = current.customs.find((x) => `custom:${x.id}` === id);
-    if (!c) throw new Error(`layout customizado '${id}' não existe`);
-    return commit({ ...current, layout: structuredClone(c.layout), presetId: id });
+    return c ? structuredClone(c.layout) : undefined;
   }
-  const layout = presetLayout(id);
-  if (!layout) throw new Error(`preset '${id}' não existe`);
-  return commit({ ...current, layout, presetId: id });
+  return presetLayout(id);
+}
+
+export function applyLayoutId(id: string): WorkspaceState {
+  const layout = layoutOfId(id);
+  if (!layout) {
+    throw new Error(
+      id.startsWith("custom:") ? `layout customizado '${id}' não existe` : `preset '${id}' não existe`,
+    );
+  }
+  // o layout só reposiciona: janela desligada no menu Janelas continua desligada
+  return commit({ ...current, layout: pruneOff(layout, current.off), presetId: id, base: id });
+}
+
+/** Liga ou desliga uma janela, sem depender do layout predefinido aplicado. */
+export function setPanelOff(panel: PanelId, off: boolean): WorkspaceState {
+  if (!enabledPanels().includes(panel)) throw new Error(`o painel '${panel}' não existe`);
+  const set = new Set(current.off);
+  if (off) {
+    set.add(panel);
+    const layout = panelsIn(current.layout).includes(panel)
+      ? hidePanel(current.layout, panel)
+      : current.layout;
+    return commit({ ...current, layout, off: [...set], presetId: null });
+  }
+  set.delete(panel);
+  const layout = showPanelNear(current.layout, panel, layoutOfId(current.base));
+  return commit({ ...current, layout, off: [...set], presetId: null });
 }
 
 export function resetWorkspace(): WorkspaceState {
+  current = { ...current, off: [] };
   return applyLayoutId(DEFAULT_PRESET_ID);
 }
 
@@ -109,7 +155,13 @@ export function renameCustom(id: string, name: string): WorkspaceState {
 
 /** Carrega o que foi gravado (localStorage). Valores inválidos são ignorados, sem lançar erro. */
 export function loadWorkspace(raw: unknown): WorkspaceState {
-  const o = (raw ?? {}) as { layout?: unknown; presetId?: unknown; customs?: unknown };
+  const o = (raw ?? {}) as {
+    layout?: unknown;
+    presetId?: unknown;
+    customs?: unknown;
+    off?: unknown;
+    base?: unknown;
+  };
   const customs: CustomLayout[] = [];
   if (Array.isArray(o.customs)) {
     for (const c of o.customs as { id?: unknown; name?: unknown; layout?: unknown }[]) {
@@ -122,13 +174,22 @@ export function loadWorkspace(raw: unknown): WorkspaceState {
       }
     }
   }
+  const known = enabledPanels();
+  const off = Array.isArray(o.off) ? (o.off.filter((p) => known.includes(p as PanelId)) as PanelId[]) : [];
+  const base = typeof o.base === "string" ? o.base : DEFAULT_PRESET_ID;
   let layout: Layout;
   try {
     layout = validateLayout(o.layout);
   } catch {
     layout = initialLayout();
-    return commit({ layout, presetId: DEFAULT_PRESET_ID, customs });
+    return commit({
+      layout: pruneOff(layout, off),
+      presetId: DEFAULT_PRESET_ID,
+      customs,
+      off,
+      base: DEFAULT_PRESET_ID,
+    });
   }
   const presetId = typeof o.presetId === "string" ? o.presetId : null;
-  return commit({ layout, presetId, customs });
+  return commit({ layout, presetId, customs, off, base });
 }

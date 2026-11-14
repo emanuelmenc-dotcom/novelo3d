@@ -34,17 +34,22 @@ import { StrictMode, useEffect, useMemo, useRef, useState, useSyncExternalStore 
 import { createRoot } from "react-dom/client";
 import { AssemblyPanel } from "./AssemblyPanel.tsx";
 import { type BridgeState, startBridge } from "./bridge.ts";
+import { CommandPalette } from "./CommandPalette.tsx";
 import { lastCamera } from "./cameraStore.ts";
 import { FloatingWindow } from "./FloatingWindow.tsx";
-import { LayoutMenu } from "./LayoutMenu.tsx";
 import { MaterialsPanel } from "./MaterialsPanel.tsx";
 import { PointsPanel } from "./PointsPanel.tsx";
 import { makeHandlers, subscribeTools, toolSnapshot, viewerTool } from "./pointtools.ts";
+import { Ribbon } from "./Ribbon.tsx";
 import { RenderPanel } from "./render/RenderPanel.tsx";
 import { installRenderJob, renderGeomChanged, setRenderSource } from "./render/renderJob.ts";
+import { buildRibbonTabs } from "./ribbonTabs.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
 import { StitchEditorPanel } from "./StitchEditorPanel.tsx";
+import { TitleBar } from "./TitleBar.tsx";
+import { ToolOptionsBar } from "./ToolOptionsBar.tsx";
 import { type TutorialData, TutorialPanel } from "./TutorialPanel.tsx";
+import { VIEWS } from "./views.ts";
 import "./styles.css";
 import { Viewer3D } from "./Viewer3D.tsx";
 import type { LayoutData, NodeMeta, TutorialView } from "./view3d.ts";
@@ -93,17 +98,6 @@ interface LayoutOut extends LayoutData {
   rows: { label: string }[];
 }
 
-/** Vistas padrão, com as teclas do FreeCAD. Eixo Z para cima; "frente" olha de -Y para +Y. */
-const VIEWS = {
-  "1": { name: "Frente", dir: [0, -1, 0] },
-  "2": { name: "Topo", dir: [0, 0, 1] },
-  "3": { name: "Direita", dir: [1, 0, 0] },
-  "4": { name: "Trás", dir: [0, 1, 0] },
-  "5": { name: "Base", dir: [0, 0, -1] },
-  "6": { name: "Esquerda", dir: [-1, 0, 0] },
-  "0": { name: "Isométrica", dir: [1, -1, 1] },
-} as const satisfies Record<string, { name: string; dir: [number, number, number] }>;
-
 // Configurações e layouts: carregados do navegador ao iniciar e gravados a cada mudança
 // (sem erro se o navegador bloquear o armazenamento).
 const SETTINGS_KEY = "novelo3d.settings";
@@ -132,6 +126,7 @@ function applyScale(s: { interface: { scale: number; textScale: number } }) {
 applyScale(settingsSnapshot());
 const EDIT_KEY = "novelo3d.edit"; // fio e tensão por ponto, de cada peça
 const PARTS_KEY = "novelo3d.parts"; // peças, receitas e costuras
+const UI_KEY = "novelo3d.ui"; // versão da interface (migração única do layout e do cubo) e preferências do ribbon
 const TUTORIAL_KEY = "novelo3d.tutorial"; // onde o usuário parou no tutorial, por peça
 function readJson(key: string): unknown {
   try {
@@ -210,6 +205,20 @@ subscribeWorkspace((w) => {
   put(WORKSPACE_KEY, JSON.stringify(w));
 });
 
+// interface 2 (ribbon, janelas independentes, cubo embaixo à esquerda): na primeira abertura troca o layout salvo pelo
+// novo padrão e move o cubo; os layouts nomeados do usuário continuam na lista. Fica depois dos assinantes acima de propósito:
+// a mudança tem de ser gravada, senão a próxima abertura traria o layout antigo de volta
+try {
+  const ui = (readJson(UI_KEY) ?? {}) as { version?: number; tab?: string; collapsed?: boolean };
+  if (ui.version !== 2) {
+    dispatch("workspace.applyPreset", { id: "edit" });
+    dispatch("settings.set", { interface: { viewCube: { position: "bottom-left" } } });
+    localStorage.setItem(UI_KEY, JSON.stringify({ ...ui, version: 2 }));
+  }
+} catch {
+  // armazenamento indisponível: segue com o padrão
+}
+
 const call = <T,>(method: string, params: Record<string, unknown>): T => dispatch(method, params) as T;
 
 function App() {
@@ -269,7 +278,25 @@ function App() {
   const visible = useSyncExternalStore(subscribeVisible, visibleSnapshot);
   const show3d = visible.has("view3d");
   const rstate = useSyncExternalStore(subscribeRender, renderSnapshot).state;
-  const showTutorial = visible.has("tutorial");
+  const [ribbonTab, setRibbonTab] = useState(() => {
+    const ui = readJson(UI_KEY) as { tab?: string } | undefined;
+    return typeof ui?.tab === "string" ? ui.tab : "receita";
+  });
+  const [ribbonCollapsed, setRibbonCollapsed] = useState(
+    () => (readJson(UI_KEY) as { collapsed?: boolean } | undefined)?.collapsed === true,
+  );
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const saveUi = (patch: { tab?: string; collapsed?: boolean }) => {
+    try {
+      localStorage.setItem(
+        UI_KEY,
+        JSON.stringify({ ...((readJson(UI_KEY) as object) ?? {}), version: 2, ...patch }),
+      );
+    } catch {
+      // preferência de tela: sem armazenamento, vale só nesta sessão
+    }
+  };
+  const showTutorial = visible.has("tutorial") || ribbonTab === "tutorial";
   const tutVersion = useSyncExternalStore(subscribeTutorial, tutorialVersion);
   const showRender = visible.has("render") || rstate === "running" || rstate === "paused";
   const edit = useSyncExternalStore(subscribeEdit, editSnapshot);
@@ -515,6 +542,65 @@ function App() {
     }
   };
 
+  // ribbon: todas as ferramentas (botões) do app; as abas e a busca de comandos leem a mesma lista
+  const hist = dispatch("history.get", {}) as { canUndo: boolean; canRedo: boolean };
+  const runTool = (method: string, params: Record<string, unknown> = {}, withText = false) => {
+    try {
+      // o tutorial usa a mesma receita (adiada em receita grande) que o gráfico e o 3D
+      const tutor = method.startsWith("tutorial.");
+      dispatch(
+        method,
+        withText ? { text: tutor ? ct : text, dialect: tutor ? cd : dialect, ...params } : params,
+      );
+    } catch (e) {
+      setProjectMsg((e as Error).message);
+    }
+  };
+  const ribbonTabs = buildRibbonTabs({
+    run: (m, p) => runTool(m, p),
+    runText: (m, p) => runTool(m, p, true),
+    save: saveProject,
+    openFile: (f) => void openProject(f),
+    settings: () => setShowSettings(true),
+    materials: () => setShowMaterials((v) => !v),
+    materialsOn: showMaterials,
+    print: () => window.print(),
+    copyCp: () => void navigator.clipboard?.writeText(view.cp?.text ?? ""),
+    downloadCp: () => download("receita.cp.txt", view.cp?.text ?? ""),
+    tools,
+    canUndo: hist.canUndo,
+    canRedo: hist.canRedo,
+    activePart: partsState.active,
+    wire,
+    showGraph,
+    showWireOption: !features().realistic3d,
+    setWire,
+    setShowGraph,
+    tutorial: tut?.data
+      ? {
+          index: tut.data.index,
+          total: tut.data.total,
+          round: tut.data.step?.round ?? 1,
+          rounds: tut.data.rounds,
+          ...(tutorialView && show3d
+            ? { onShow: () => window.__view3d?.focusOn(tutorialView.current[0] ?? tutorialView.start) }
+            : {}),
+        }
+      : null,
+  });
+
+  // Ctrl+K abre a busca de comandos, em qualquer lugar da tela
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const panels: PanelRenderers = {
     recipe: () => (
       <div className="panel-col">
@@ -641,9 +727,6 @@ function App() {
                   {p.label}
                 </button>
               ))}
-              <button type="button" onClick={() => window.print()}>
-                Imprimir / PDF
-              </button>
             </div>
             {current && (
               <div
@@ -659,44 +742,16 @@ function App() {
     ),
 
     view3d: () => (
-      <div className="panel-col">
-        <div className="row">
-          <label>
-            <input type="checkbox" checked={showGraph} onChange={(e) => setShowGraph(e.target.checked)} />{" "}
-            Mostrar grafo (ligações)
-          </label>
-          {!features().realistic3d && (
-            <label>
-              <input
-                type="checkbox"
-                data-testid="wire-toggle"
-                checked={wire}
-                onChange={(e) => setWire(e.target.checked)}
-              />{" "}
-              Só linhas (vermelho/azul)
-            </label>
-          )}
-          {layout && (
-            <span className="hint">
-              {layout.stats.nodes} nós · aresta média {layout.stats.meanEdge.toFixed(2)} · {layout.stats.mode}
-            </span>
-          )}
-        </div>
-        <div className="row views" data-testid="views">
-          <button type="button" onClick={() => window.__view3d?.fit()} title="Ajustar à peça (F)">
-            Ajustar
-          </button>
-          {Object.entries(VIEWS).map(([key, v]) => (
-            <button
-              key={key}
-              type="button"
-              title={`${v.name} (${key})`}
-              onClick={() => window.__view3d?.snapView([...v.dir] as [number, number, number])}
-            >
-              {v.name}
-            </button>
-          ))}
-        </div>
+      <div className="panel-col view3d-col">
+        <ToolOptionsBar
+          tools={tools}
+          selected={edit.selected}
+          stats={
+            layout
+              ? `${layout.stats.nodes} nós · aresta média ${layout.stats.meanEdge.toFixed(2)} · ${layout.stats.mode}`
+              : null
+          }
+        />
         <Viewer3D
           layout={layout}
           showGraph={showGraph}
@@ -709,12 +764,11 @@ function App() {
           handlers={handlers}
           selection={selection}
           onSelect={onSelect3D}
+          onWire={setWire}
+          onGraph={setShowGraph}
+          showWireOption={!features().realistic3d}
         />
-        <p className="hint">
-          Girar: botão esquerdo · Deslocar: botão do meio ou direito · Zoom: roda · Cubo no canto: clique numa
-          face, aresta ou canto.
-        </p>
-        <p data-testid="node-info" className="hint">
+        <p data-testid="node-info" className="hint node-info">
           {selNode
             ? `#${selNode.uid} · Volta ${selNode.row >= 0 && layout ? layout.rows[selNode.row]?.label : "anel"}, ponto ${selNode.index + 1} · ${selNode.code}${selNode.parents.length > 0 ? ` · sai de ${selNode.parents.length} ponto(s) da volta anterior` : ""}`
             : "Clique num ponto para ver a volta na receita. Clique numa linha da tabela para destacar a volta."}
@@ -735,12 +789,6 @@ function App() {
         data={tut?.data ?? null}
         error={tut?.error ?? null}
         countWarning={view.verify ? !view.verify.ok : false}
-        text={ct}
-        dialect={cd}
-        part={partsState.active}
-        {...(tutorialView && show3d
-          ? { onShow: () => window.__view3d?.focusOn(tutorialView.current[0] ?? tutorialView.start) }
-          : {})}
       />
     ),
 
@@ -751,14 +799,6 @@ function App() {
     cp: () => (
       <div className="panel-col">
         <textarea aria-label="Texto CrochetPARADE" readOnly value={view.cp?.text ?? ""} className="cp" />
-        <div className="row">
-          <button type="button" onClick={() => navigator.clipboard?.writeText(view.cp?.text ?? "")}>
-            Copiar
-          </button>
-          <button type="button" onClick={() => download("receita.cp.txt", view.cp?.text ?? "")}>
-            Baixar .txt
-          </button>
-        </div>
         {view.cp?.issues.map((i) => (
           <p key={i.message} className="warn">
             {i.message}
@@ -770,46 +810,26 @@ function App() {
 
   return (
     <div className="app">
-      <header>
-        <strong>Novelo3D</strong>
-        <LayoutMenu />
-        <button
-          type="button"
-          aria-pressed={showMaterials}
-          onClick={() => setShowMaterials((v) => !v)}
-          aria-label="Lista de materiais"
-        >
-          ▤ Lista de materiais
-        </button>
-        <button type="button" onClick={() => setShowSettings(true)} aria-label="Configurações">
-          ⚙ Configurações
-        </button>
-        <button type="button" data-testid="project-save" onClick={saveProject}>
-          Salvar projeto
-        </button>
-        <label className="btn">
-          Abrir projeto
-          <input
-            type="file"
-            accept=".json,application/json"
-            data-testid="project-open"
-            hidden
-            onChange={(e) => {
-              void openProject(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
-        </label>
-        {saveBad && (
-          <span role="alert" data-testid="save-warning" className="warn">
-            Não foi possível guardar no navegador: use "Salvar projeto".
-          </span>
-        )}
-        {projectMsg && <span data-testid="project-msg">{projectMsg}</span>}
-        <span data-testid="bridge-state">
-          ponte MCP: {bridge === "connected" ? "conectada" : "desconectada"}
-        </span>
-      </header>
+      <TitleBar
+        bridge={bridge}
+        saveBad={saveBad}
+        projectMsg={projectMsg}
+        onSearch={() => setPaletteOpen(true)}
+      />
+      <Ribbon
+        tabs={ribbonTabs}
+        active={ribbonTab}
+        onTab={(id) => {
+          setRibbonTab(id);
+          saveUi({ tab: id });
+        }}
+        collapsed={ribbonCollapsed}
+        onCollapse={(v) => {
+          setRibbonCollapsed(v);
+          saveUi({ collapsed: v });
+        }}
+      />
+      {paletteOpen && <CommandPalette tabs={ribbonTabs} onClose={() => setPaletteOpen(false)} />}
 
       <Workspace render={panels} />
 

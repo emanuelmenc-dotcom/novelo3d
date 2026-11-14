@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Menu "Layout" do cabeçalho: trocar de preset ou de layout do usuário, mostrar painéis ocultos e salvar o atual.
+// Menu "Janelas" da barra de título: liga e desliga cada janela de forma independente (o layout predefinido só muda as
+// posições, não religa o que você desligou), troca de layout predefinido ou do usuário e salva o layout atual.
 import {
   dispatch,
-  hiddenPanels,
+  enabledPanels,
   PANEL_TITLES,
+  panelsIn,
   presetList,
   subscribeWorkspace,
   workspaceSnapshot,
 } from "@novelo/commands";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Icon } from "./icons.tsx";
 
-export function LayoutMenu() {
+export function WindowsMenu() {
   const ws = useSyncExternalStore(subscribeWorkspace, workspaceSnapshot);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -42,16 +45,40 @@ export function LayoutMenu() {
       setError((e as Error).message);
     }
   };
-  const hidden = hiddenPanels(ws.layout);
 
   return (
     <div className="menu" ref={ref}>
-      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
-        ▦ Layout
+      <button
+        type="button"
+        className="title-btn"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        data-testid="windows-menu"
+        onClick={() => setOpen(!open)}
+      >
+        <Icon name="menu" size={16} /> Janelas
       </button>
       {open && (
-        <div role="menu" aria-label="Layout" className="menu-pop">
-          <div className="menu-title">Layouts padrão</div>
+        <div role="menu" aria-label="Janelas" className="menu-pop">
+          <div className="menu-title">Janelas (cada uma liga e desliga sozinha)</div>
+          {enabledPanels().map((p) => {
+            const on = panelsIn(ws.layout).includes(p);
+            return (
+              <button
+                key={p}
+                type="button"
+                role="menuitemcheckbox"
+                aria-checked={on}
+                data-testid={`window-${p}`}
+                onClick={() => run("workspace.setPanelVisible", { panel: p, visible: !on }, false)}
+              >
+                {on ? "✓ " : " "}
+                {PANEL_TITLES[p]}
+              </button>
+            );
+          })}
+
+          <div className="menu-title">Layouts padrão (só mudam as posições)</div>
           {presetList().map((p) => (
             <button
               key={p.id}
@@ -77,18 +104,6 @@ export function LayoutMenu() {
             >
               {ws.presetId === `custom:${c.id}` ? "✓ " : ""}
               {c.name}
-            </button>
-          ))}
-
-          {hidden.length > 0 && <div className="menu-title">Painéis ocultos</div>}
-          {hidden.map((p) => (
-            <button
-              key={p}
-              type="button"
-              role="menuitem"
-              onClick={() => run("workspace.showPanel", { panel: p }, false)}
-            >
-              Mostrar {PANEL_TITLES[p]}
             </button>
           ))}
 

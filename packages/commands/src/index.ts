@@ -113,8 +113,10 @@ import {
   leafOfPanel,
   movePanel,
   PANEL_IDS,
+  PANEL_TITLES,
   type PanelId,
   panelEnabled,
+  panelsIn,
   resizeSplit,
   setActive,
   setSizes,
@@ -130,6 +132,7 @@ import {
   renameCustom,
   resetWorkspace,
   saveCustom,
+  setPanelOff,
   workspaceSnapshot,
 } from "./workspace-store.ts";
 
@@ -221,6 +224,7 @@ export {
   type PanelMin,
   type PanelMins,
   panelMins,
+  panelsIn,
   resizeSplit,
   SPLITTER_PX,
   type Spec,
@@ -242,6 +246,7 @@ export {
   renameCustom,
   resetWorkspace,
   saveCustom,
+  setPanelOff,
   subscribeWorkspace,
   type WorkspaceState,
   workspaceSnapshot,
@@ -291,6 +296,13 @@ function workspaceView() {
     layout: s.layout,
     visible: [...visiblePanels(s.layout)],
     hidden: hiddenPanels(s.layout),
+    /** Uma linha por janela do menu Janelas: ligada ou desligada, independente do layout predefinido. */
+    windows: enabledPanels().map((panel) => ({
+      panel,
+      title: PANEL_TITLES[panel],
+      // ligada = está no layout (um layout salvo antigo pode não ter uma janela nova: aparece desligada, e ligar a traz)
+      visible: panelsIn(s.layout).includes(panel),
+    })),
     presets: presetList(),
     customs: s.customs.map(({ id, name }) => ({ id, name })),
   };
@@ -518,14 +530,20 @@ export const commands: Record<string, Command> = {
     mutateLayout((l) => setSizes(l, String(p.split), p.sizes as number[]));
     return workspaceView();
   },
+  /** Desliga a janela (continua desligada ao trocar de layout predefinido). */
   "workspace.hidePanel": (p) => {
-    const panel = panelOf(p);
-    mutateLayout((l) => hidePanel(l, panel));
+    setPanelOff(panelOf(p), true);
     return workspaceView();
   },
+  /** Liga a janela de novo, perto das suas vizinhas no layout aplicado. */
   "workspace.showPanel": (p) => {
-    const panel = panelOf(p);
-    mutateLayout((l) => showPanel(l, panel));
+    setPanelOff(panelOf(p), false);
+    return workspaceView();
+  },
+  /** `panel` e `visible` (true liga, false desliga): o que o menu Janelas usa. */
+  "workspace.setPanelVisible": (p) => {
+    if (typeof p.visible !== "boolean") throw new Error("parâmetro 'visible' deve ser verdadeiro ou falso");
+    setPanelOff(panelOf(p), !p.visible);
     return workspaceView();
   },
   "workspace.reset": () => {

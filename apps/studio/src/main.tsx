@@ -49,6 +49,7 @@ import { RenderPanel } from "./render/RenderPanel.tsx";
 import { installRenderJob, renderGeomChanged, setRenderSource } from "./render/renderJob.ts";
 import { buildRibbonTabs } from "./ribbonTabs.tsx";
 import { SettingsDialog } from "./SettingsDialog.tsx";
+import { ShapeWindow } from "./ShapeWindow.tsx";
 import { StitchEditorPanel } from "./StitchEditorPanel.tsx";
 import { sectionSnapshot, sectionSpec, setSection, subscribeSection } from "./section.ts";
 import { TimelineStrip } from "./TimelineStrip.tsx";
@@ -903,6 +904,7 @@ function App() {
           <YarnsPanel text={text} dialect={dialect} selLabel={selLabel} selNode={selNode} />
         </FloatingWindow>
       )}
+      {!reading && <ShapeWindow />}
       {showMaterials && !reading && (
         <FloatingWindow
           title="Lista de materiais"

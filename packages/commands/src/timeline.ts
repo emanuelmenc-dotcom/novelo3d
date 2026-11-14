@@ -33,6 +33,7 @@ const group = (kind: Class, keys: string[]): [string, Class][] => keys.map((k) =
 export const CLASS: Record<string, Class> = Object.fromEntries([
   ...group("feature", [
     "parts.add",
+    "parts.fromShape",
     "parts.instance",
     "parts.mirror",
     "parts.copy",
@@ -385,6 +386,13 @@ function normalize(method: string, params: Params): Params | null {
     out.fromSelection = undefined;
     if (out.parts === undefined && sel && s.parts.some((q) => q.id === sel)) out.parts = [sel];
     if (out.parent === undefined && sel && s.assemblies.some((q) => q.id === sel)) out.parent = sel;
+  } else if (method === "parts.fromShape") {
+    // a amostra vem das configurações: fixa a de agora, para mudar a configuração depois não mudar a peça
+    const y = getSettings().yarns;
+    const g = (params.gauge ?? {}) as { w?: number; h?: number };
+    const w = typeof g.w === "number" ? g.w : y.stitchWidthMm;
+    out.gauge = { w, h: typeof g.h === "number" ? g.h : (y.rowHeightMm ?? w) };
+    out.beginner = params.beginner === true;
   } else if (method === "seam.add") {
     const d = partsSnapshot().draft;
     if (out.a === undefined && d.a) out.a = d.a;
@@ -538,6 +546,7 @@ export function removeFeature(id: number, run: (m: string, p: Params) => unknown
 /** Nome legível dos comandos que não têm parâmetros que mudem o texto. Um teste confere que toda feature tem nome. */
 const PLAIN: Record<string, string> = {
   "parts.add": "nova peça",
+  "parts.fromShape": "peça por forma",
   "parts.mirror": "peça espelhada",
   "parts.copy": "cópia da peça",
   "parts.detach": "soltar a peça da original",

@@ -3,6 +3,7 @@
 // ao vivo. Chamado no afterEach das suites; acha comando sem classificar e entrada que a reexecução não resolve.
 import { expect } from "vitest";
 import { dispatch, flushText, replayTimeline, timelineView } from "../src/index.ts";
+import { withPart } from "../src/parts-store.ts";
 
 /** O projeto inteiro, com o motor de pontos de cada peça já construído (os uids permanentes entram na comparação). */
 function snapshot(): string {
@@ -13,7 +14,9 @@ function snapshot(): string {
   for (const p of st.parts.parts) {
     if (!parts.some((q) => q.id === p.id && q.kind === "own")) continue;
     try {
-      dispatch("points.info", { text: p.text, ...(p.dialect ? { dialect: p.dialect } : {}) });
+      withPart(p.id, () =>
+        dispatch("points.info", { text: p.text, ...(p.dialect ? { dialect: p.dialect } : {}) }),
+      );
     } catch {
       // receita inválida: sem motor
     }

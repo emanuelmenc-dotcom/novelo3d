@@ -5,6 +5,7 @@
 import { Icon } from "./icons.tsx";
 import { setTools, type ToolState } from "./pointtools.ts";
 import type { RibbonItem, RibbonTab } from "./Ribbon.tsx";
+import { openShape } from "./ShapeWindow.tsx";
 import { sectionSnapshot, setSection } from "./section.ts";
 import { VIEWS } from "./views.ts";
 
@@ -262,6 +263,11 @@ export function buildRibbonTabs(c: RibbonCtx): RibbonTab[] {
           label: "Peça",
           items: [
             btn("montagem", "add", "Nova peça", "plus", () => c.run("parts.add", {})),
+            btn("montagem", "shape", "Por forma", "part", () => openShape(), {
+              testid: "shape-open",
+              title:
+                "Peça nova a partir de uma forma (esfera, ovo, cone, copo, composta ou perfil): a receita sai pronta",
+            }),
             btn("montagem", "instance", "Instância", "instance", () => c.run("parts.instance", part)),
             btn("montagem", "copy", "Cópia", "copy", () => c.run("parts.copy", part)),
           ],

@@ -105,10 +105,61 @@ test("F9: escalar o perfil e a amostra por 2 mantém as contagens de F1 a F5", (
         return { kind: "cup", radius: s.radius * 2, wall: s.wall * 2 };
       case "profile":
         return { kind: "profile", points: s.points.map(([r, z]) => [r * 2, z * 2] as ProfilePoint) };
+      case "stack":
+        return {
+          kind: "stack",
+          segments: s.segments.map((g) => ({ ...g, radius: g.radius * 2, height: g.height * 2 })),
+        };
     }
   };
   for (const f of Object.values(F))
     expect(counts(twice(f.shape), f.w * 2, f.h * 2)).toEqual(counts(f.shape, f.w, f.h));
+});
+
+describe("peça composta (P5b)", () => {
+  // corpo de três trechos: calota, cilindro e fecho arredondado
+  const body: Shape = {
+    kind: "stack",
+    segments: [
+      { radius: 15, height: 15, curve: "round" },
+      { radius: 15, height: 20, curve: "line" },
+      { radius: 0, height: 15, curve: "round" },
+    ],
+  };
+
+  test("três trechos geram receita válida que fecha, com a parte reta constante", () => {
+    const r = run({ shape: body, gauge: { w: 5, h: 5 } });
+    expect(validate(r.value.pattern).ok).toBe(true);
+    const c = r.value.counts;
+    expect(c[0]).toBe(6);
+    expect(c[c.length - 1]).toBeLessThanOrEqual(6);
+    const straight = Math.round((2 * Math.PI * 15) / 5); // 19 pontos no cilindro
+    expect(c.filter((n) => n === straight).length).toBeGreaterThanOrEqual(4);
+    expect(r.value.length).toBeCloseTo(2 * ((Math.PI * 15) / 2) + 20, 0);
+  });
+
+  test("calota redonda de raio igual à altura dá as mesmas contagens da meia esfera", () => {
+    const dome = counts(
+      {
+        kind: "stack",
+        segments: [
+          { radius: 30, height: 30, curve: "round" },
+          { radius: 0, height: 30, curve: "round" },
+        ],
+      },
+      5,
+      5,
+    );
+    expect(dome).toEqual(counts({ kind: "sphere", radius: 30 }, 5, 5));
+  });
+
+  test("trecho inválido é recusado", () => {
+    const r = revolve({
+      shape: { kind: "stack", segments: [{ radius: -2, height: 5, curve: "line" }] },
+      gauge: { w: 5, h: 5 },
+    });
+    expect(r.ok).toBe(false);
+  });
 });
 
 describe("avisos (docs/08 seção 4)", () => {

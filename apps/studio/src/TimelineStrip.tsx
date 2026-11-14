@@ -5,6 +5,7 @@
 import { dispatch, subscribeTimeline, timelineVersion } from "@novelo/commands";
 import { useState, useSyncExternalStore } from "react";
 import { Icon } from "./icons.tsx";
+import { openShape, type Shape } from "./ShapeWindow.tsx";
 
 interface Item {
   id: number;
@@ -113,6 +114,26 @@ function Editor(props: { item: Item; onDone: () => void; run: Run }) {
           }
         >
           Aplicar
+        </button>
+      </div>
+    );
+  }
+  if (item.method === "parts.fromShape") {
+    return (
+      <div className="tl-edit" data-testid="timeline-editor">
+        <button
+          type="button"
+          onClick={() => {
+            openShape({
+              featureId: item.id,
+              shape: p.shape as Shape,
+              ...(typeof p.name === "string" ? { name: p.name } : {}),
+              beginner: p.beginner === true,
+            });
+            onDone();
+          }}
+        >
+          Editar a forma
         </button>
       </div>
     );

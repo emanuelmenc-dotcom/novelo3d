@@ -59,7 +59,7 @@ import {
   setYarns,
 } from "./paint-store.ts";
 import { partsCommands } from "./parts-commands.ts";
-import { assemblyContents, partById } from "./parts-store.ts";
+import { assemblyContents, partById, withPart } from "./parts-store.ts";
 import { importProject, projectCommands } from "./project-commands.ts";
 import {
   completeRender,
@@ -810,7 +810,10 @@ function comparable(): unknown {
   for (const p of st.parts.parts) {
     if (p.kind !== "own" || p.text.trim() === "") continue;
     try {
-      dispatch("points.info", { text: p.text, ...(p.dialect ? { dialect: p.dialect } : {}) });
+      // cada peça no seu armazém (o 3D faz o mesmo); sem isso todas cairiam no da peça ativa
+      withPart(p.id, () =>
+        dispatch("points.info", { text: p.text, ...(p.dialect ? { dialect: p.dialect } : {}) }),
+      );
     } catch {
       // receita inválida: sem motor
     }
@@ -836,6 +839,7 @@ function firstDiff(a: unknown, b: unknown, path = "$"): string | null {
 type Lay = { positions: number[]; nodes: { part: string; uid: number }[] };
 const sw = (): number => getSettings().yarns.stitchWidthMm;
 const mmOf = (v: number[]): number[] => v.map((x) => Math.round(x * sw() * 10) / 10);
+const rd = (x: number): number => Math.round(x * 100) / 100;
 const r3 = (v: number[]): number[] => v.map((x) => Math.round(x * 1000) / 1000);
 
 Object.assign(commands, {
@@ -864,13 +868,38 @@ Object.assign(commands, {
       total: r.value.counts.reduce((a, b) => a + b, 0),
       lengthMm: Math.round(r.value.length * 10) / 10,
       gauge: { w, h },
-      rows: r.value.rows.map((x) => ({
-        s: Math.round(x.s * 100) / 100,
-        r: Math.round(x.r * 100) / 100,
-        n: x.n,
-      })),
+      rows: r.value.rows.map((x) => ({ s: rd(x.s), r: rd(x.r), z: rd(x.z), n: x.n })),
+      // perfil para desenhar (no máximo uns 200 pontos)
+      profile: r.value.profile
+        .filter((_, i, a) => i % Math.ceil(a.length / 200) === 0 || i === a.length - 1)
+        .map(([pr, pz]) => [rd(pr), rd(pz)]),
       issues: r.issues,
     };
+  },
+  /**
+   * Peça nova a partir de uma forma (P5b): gera a receita com `forward.revolve` (mesmos `shape`, `gauge`, `options`,
+   * `beginner`) e cria a peça com ela. Na linha do tempo é uma feature cujos parâmetros (a forma) podem ser editados.
+   */
+  "parts.fromShape": (p: Params) => {
+    const r = (commands["forward.revolve"] as Command)({
+      shape: p.shape,
+      ...(p.gauge === undefined ? {} : { gauge: p.gauge }),
+      ...(p.options === undefined ? {} : { options: p.options }),
+      beginner: p.beginner === true,
+    }) as { text: string };
+    const kind = (p.shape as { kind?: string }).kind ?? "";
+    const names: Record<string, string> = {
+      sphere: "Esfera",
+      ellipsoid: "Ovo",
+      cone: "Cone",
+      cup: "Copo",
+      profile: "Peça por perfil",
+      stack: "Peça composta",
+    };
+    return (commands["parts.add"] as Command)({
+      name: typeof p.name === "string" && p.name.trim() ? p.name : (names[kind] ?? "Peça por forma"),
+      text: r.text,
+    });
   },
   /**
    * Abre um projeto (`project`, o JSON de `project.export`; `check: true` só confere). A linha do tempo do arquivo só vale

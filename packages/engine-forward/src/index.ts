@@ -11,7 +11,43 @@ export type Shape =
   | { kind: "ellipsoid"; radius: number; halfHeight: number }
   | { kind: "cone"; halfAngleDeg: number; slant: number }
   | { kind: "cup"; radius: number; wall: number }
-  | { kind: "profile"; points: ProfilePoint[] };
+  | { kind: "profile"; points: ProfilePoint[] }
+  | { kind: "stack"; segments: Segment[] };
+
+/**
+ * Trecho de uma peça composta (P5b), encadeado a partir do polo: vai do raio atual até `radius` subindo `height` mm.
+ * `line` faz cone ou cilindro (raio igual); `round` faz um quarto de elipse bojudo (calota, ombro, fecho arredondado).
+ * O último trecho com `radius` 0 fecha a peça.
+ */
+export interface Segment {
+  radius: number;
+  height: number;
+  curve: "line" | "round";
+}
+
+const ROUND_STEPS = 400;
+
+/** Polilinha do perfil de uma peça composta. */
+export function stackProfile(segments: Segment[]): ProfilePoint[] {
+  const pts: ProfilePoint[] = [[0, 0]];
+  for (const g of segments) {
+    const [r0, z0] = pts[pts.length - 1] as ProfilePoint;
+    if (g.curve === "line") {
+      pts.push([g.radius, z0 + g.height]);
+      continue;
+    }
+    // bojudo nos dois sentidos: abrindo, cresce rápido no começo; fechando, cai rápido no fim
+    for (let i = 1; i <= ROUND_STEPS; i++) {
+      const t = (Math.PI / 2) * (i / ROUND_STEPS);
+      pts.push(
+        g.radius >= r0
+          ? [r0 + (g.radius - r0) * Math.sin(t), z0 + g.height * (1 - Math.cos(t))]
+          : [g.radius + (r0 - g.radius) * Math.cos(t), z0 + g.height * Math.sin(t)],
+      );
+    }
+  }
+  return pts;
+}
 
 export interface Gauge {
   /** Largura do ponto (mm). */
@@ -53,6 +89,8 @@ export interface ForwardRow {
   /** Comprimento de arco do polo até a volta (mm). */
   s: number;
   r: number;
+  /** Altura da volta no perfil (mm). */
+  z: number;
   ideal: number;
   n: number;
 }
@@ -63,6 +101,8 @@ export interface ForwardOutput {
   pattern: Pattern;
   /** Comprimento total do perfil (mm). */
   length: number;
+  /** O perfil usado (polilinha do polo para fora, mm). */
+  profile: ProfilePoint[];
 }
 
 const SAMPLES = 20_000;
@@ -122,6 +162,10 @@ export function profileOf(shape: Shape): { points: ProfilePoint[]; closedEnd: bo
       };
     case "profile": {
       const p = shape.points;
+      return { points: p, closedEnd: p.length > 1 && p[p.length - 1]?.[0] === 0 };
+    }
+    case "stack": {
+      const p = stackProfile(shape.segments);
       return { points: p, closedEnd: p.length > 1 && p[p.length - 1]?.[0] === 0 };
     }
   }
@@ -203,8 +247,8 @@ function cumulative(points: ProfilePoint[]): number[] {
   return acc;
 }
 
-/** Raio no comprimento de arco `s` (interpolação linear). */
-function radiusAt(points: ProfilePoint[], acc: number[], s: number): number {
+/** Raio e altura no comprimento de arco `s` (interpolação linear). */
+function pointAt(points: ProfilePoint[], acc: number[], s: number): ProfilePoint {
   let lo = 0;
   let hi = acc.length - 1;
   while (hi - lo > 1) {
@@ -214,10 +258,10 @@ function radiusAt(points: ProfilePoint[], acc: number[], s: number): number {
   }
   const a = acc[lo] as number;
   const b = acc[hi] as number;
-  const t = b > a ? (s - a) / (b - a) : 0;
-  const r0 = (points[lo] as ProfilePoint)[0];
-  const r1 = (points[hi] as ProfilePoint)[0];
-  return r0 + (r1 - r0) * Math.min(1, Math.max(0, t));
+  const t = Math.min(1, Math.max(0, b > a ? (s - a) / (b - a) : 0));
+  const [r0, z0] = points[lo] as ProfilePoint;
+  const [r1, z1] = points[hi] as ProfilePoint;
+  return [r0 + (r1 - r0) * t, z0 + (z1 - z0) * t];
 }
 
 /** Reentrância (tigela): o perfil volta a descer depois de subir, longe do eixo. O enchimento empurraria a parede. */
@@ -258,8 +302,27 @@ function checkInput(input: ForwardInput): string | null {
         return "o perfil deve começar no eixo (raio 0), onde fica o anel mágico";
       return null;
     }
+    case "stack": {
+      const g = s.segments;
+      if (!Array.isArray(g) || g.length === 0) return "a peça composta precisa de pelo menos um trecho";
+      if (
+        g.some(
+          (x) =>
+            !x ||
+            !Number.isFinite(x.radius) ||
+            !Number.isFinite(x.height) ||
+            x.radius < 0 ||
+            x.height < 0 ||
+            (x.curve !== "line" && x.curve !== "round"),
+        )
+      )
+        return "cada trecho tem raio e altura (mm, de zero para cima) e curva line ou round";
+      if (g.reduce((a, x) => a + x.height, 0) <= 0 && g.every((x) => x.radius === 0))
+        return "a peça composta não tem tamanho";
+      return null;
+    }
     default:
-      return "forma desconhecida: use sphere, ellipsoid, cone, cup ou profile";
+      return "forma desconhecida: use sphere, ellipsoid, cone, cup, profile ou stack";
   }
 }
 
@@ -279,7 +342,7 @@ export function revolve(input: ForwardInput): Result<ForwardOutput> {
   for (let i = 1; ; i++) {
     const s = (i - 1 + o.rowPhase) * h;
     if (s > S + 1e-9) break;
-    const r = radiusAt(points, acc, s);
+    const [r, z] = pointAt(points, acc, s);
     const ideal = (2 * Math.PI * r) / w;
     const prev = rows[rows.length - 1]?.n;
     let n: number;
@@ -314,7 +377,7 @@ export function revolve(input: ForwardInput): Result<ForwardOutput> {
         }
       }
     }
-    rows.push({ s, r, ideal, n });
+    rows.push({ s, r, z, ideal, n });
   }
 
   // peça que fecha: termina na primeira volta, depois do maior total, com até `closeAt` pontos
@@ -362,5 +425,9 @@ export function revolve(input: ForwardInput): Result<ForwardOutput> {
   const pattern: Pattern = { dialect: "pt-BR", rows: out };
   const v = validate(pattern);
   if (!v.ok) return { ok: false, issues: [...v.issues, ...own] }; // erro de programação: a receita gerada não fecha
-  return { ok: true, value: { counts: rows.map((r) => r.n), rows, pattern, length: S }, issues: own };
+  return {
+    ok: true,
+    value: { counts: rows.map((r) => r.n), rows, pattern, length: S, profile: points },
+    issues: own,
+  };
 }

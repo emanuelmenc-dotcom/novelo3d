@@ -1263,3 +1263,65 @@ input.num {
   gap: 0.5rem;
   align-items: center;
 }
+
+/* nova peça por forma (P5b) */
+.float-win[data-testid="shape-window"] {
+  width: 46rem;
+  height: 34rem;
+}
+.shape-win {
+  display: flex;
+  gap: 0.8rem;
+  align-items: flex-start;
+}
+.shape-form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.shape-seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  align-items: center;
+}
+.shape-field input.num {
+  width: 4.5rem;
+}
+.shape-issues {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--warn);
+  font-size: 0.85em;
+}
+.shape-preview {
+  flex: none;
+  width: 18rem;
+  height: 18rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  touch-action: none;
+}
+.shape-preview .axis {
+  stroke: var(--line);
+  stroke-dasharray: 3 3;
+}
+.shape-preview .row {
+  fill: none;
+  stroke: #8a9a5b;
+  stroke-width: 0.8;
+}
+.shape-preview .silhouette {
+  fill: none;
+  stroke: var(--fg);
+  stroke-width: 1.6;
+}
+.shape-preview .handle {
+  fill: #d6336c;
+  stroke: #fff;
+  stroke-width: 1.5;
+  cursor: grab;
+}

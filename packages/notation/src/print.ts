@@ -6,56 +6,14 @@ import {
   type Dialect,
   type ExpandedRow,
   expandPattern,
+  foldKeys,
   type Pattern,
+  runs,
+  type Seg,
 } from "@novelo/core";
 import { NAMES } from "./dictionary.ts";
 
-export type Seg = { t: "run"; key: string; count: number } | { t: "block"; keys: string[]; times: number };
-
-const distinct = (k: string[]): number => new Set(k).size;
-
-export function runs(keys: string[]): Seg[] {
-  const out: Seg[] = [];
-  for (const key of keys) {
-    const last = out[out.length - 1];
-    if (last && last.t === "run" && last.key === key) last.count++;
-    else out.push({ t: "run", key, count: 1 });
-  }
-  return out;
-}
-
-const same = (K: string[], a: number, b: number, len: number): boolean => {
-  for (let i = 0; i < len; i++) if (K[a + i] !== K[b + i]) return false;
-  return true;
-};
-
-/** Dobra a sequência: cobertura total por um bloco repetido (maior k), senão cobertura parcial. */
-export function foldKeys(K: string[]): Seg[] {
-  const n = K.length;
-  for (let p = 2; p <= n / 2; p++) {
-    if (n % p !== 0 || distinct(K.slice(0, p)) < 2) continue;
-    let ok = true;
-    for (let i = p; i < n && ok; i += p) ok = same(K, 0, i, p);
-    if (ok) return [{ t: "block", keys: K.slice(0, p), times: n / p }];
-  }
-  let best: { s: number; p: number; k: number; cov: number } | undefined;
-  for (let s = 0; s < n; s++) {
-    for (let p = 2; p <= (n - s) / 2; p++) {
-      if (distinct(K.slice(s, s + p)) < 2) continue;
-      let k = 1;
-      while (s + (k + 1) * p <= n && same(K, s, s + k * p, p)) k++;
-      if (k >= 2 && (!best || p * k > best.cov)) best = { s, p, k, cov: p * k };
-    }
-  }
-  if (best && best.cov >= Math.max(4, n / 2)) {
-    return [
-      ...runs(K.slice(0, best.s)),
-      { t: "block", keys: K.slice(best.s, best.s + best.p), times: best.k },
-      ...runs(K.slice(best.s + best.cov)),
-    ];
-  }
-  return runs(K);
-}
+export { foldKeys, type Seg };
 
 function names(key: string, d: Dialect): { name: string; plain: boolean } {
   const N = NAMES[d];

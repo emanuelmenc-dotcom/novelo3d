@@ -3,6 +3,7 @@
 
 export * from "./engine/index.ts";
 export { type ExpandedRow, expandPattern, expandRounds, type Round } from "./expand.ts";
+export { chainSegs, foldKeys, runs, type Seg } from "./fold.ts";
 export { buildGraph } from "./graph.ts";
 export * from "./paint.ts";
 export { type SimNode, type SimResult, simulateRow, type Top } from "./simulate.ts";

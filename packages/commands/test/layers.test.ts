@@ -9,9 +9,10 @@ const allowed: Record<string, string[]> = {
   charts: ["core"],
   layout: ["core"],
   stitch3d: ["core"],
+  "engine-forward": ["core"],
   interop: ["core", "notation"],
   tutorial: ["core", "notation"],
-  commands: ["core", "notation", "charts", "interop", "layout", "stitch3d", "tutorial"],
+  commands: ["core", "notation", "charts", "engine-forward", "interop", "layout", "stitch3d", "tutorial"],
   studio: ["commands", "stitch3d"],
 };
 const base = new URL("../../../", import.meta.url);

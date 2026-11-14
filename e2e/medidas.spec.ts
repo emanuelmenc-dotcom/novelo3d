@@ -234,7 +234,9 @@ test("com uma instância movida, o corte em X vale no mundo, o conjunto mede mai
   expect(b.size[0]).toBeGreaterThan((one.size[0] as number) * 1.5);
 });
 
-test("o MCP mede: measure.bounds e measure.distance são consultas", async ({ page }) => {
+test("o MCP mede e gera receita por forma: measure.bounds, measure.distance e forward.revolve são consultas", async ({
+  page,
+}) => {
   const client = new Client({ name: "e2e", version: "0" });
   await client.connect(
     new StdioClientTransport({
@@ -259,6 +261,9 @@ test("o MCP mede: measure.bounds e measure.distance são consultas", async ({ pa
     expect(d.json.distanceMm).toBeGreaterThan(0);
     const bad = await call("measure.distance", { a: { part: "p1", uid: 3 }, b: { part: "p1", uid: 99999 } });
     expect(bad.isError).toBe(true);
+    // receita a partir de forma (P5a), também só consulta
+    const f = await call("forward.revolve", { shape: { kind: "sphere", radius: 30 } });
+    expect(f.json.total).toBe(452); // caso F2 de docs/08
     const t = await call("timeline.get");
     expect(t.json.features).toEqual([]);
   } finally {

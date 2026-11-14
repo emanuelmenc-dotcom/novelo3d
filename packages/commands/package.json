@@ -10,6 +10,7 @@
   "dependencies": {
     "@novelo/charts": "*",
     "@novelo/core": "*",
+    "@novelo/engine-forward": "*",
     "@novelo/interop": "*",
     "@novelo/layout": "*",
     "@novelo/notation": "*",

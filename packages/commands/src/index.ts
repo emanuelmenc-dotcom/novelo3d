@@ -33,6 +33,7 @@ import {
   yarnCursor,
   yarnUsage,
 } from "@novelo/core";
+import { type ForwardOptions, revolve, type Shape } from "@novelo/engine-forward";
 import { fromCp, parseCpDot, toCp } from "@novelo/interop";
 import { parsePattern, printPattern, printPatternWithYarns, splitLines } from "@novelo/notation";
 import { bandOf, MAX_LEGS, modelKey, tensionLevel } from "@novelo/stitch3d";
@@ -838,6 +839,39 @@ const mmOf = (v: number[]): number[] => v.map((x) => Math.round(x * sw() * 10) /
 const r3 = (v: number[]): number[] => v.map((x) => Math.round(x * 1000) / 1000);
 
 Object.assign(commands, {
+  /**
+   * Receita de uma peça de revolução a partir da forma (P5a, docs/08 seção 1). `shape`: {kind: "sphere", radius} |
+   * {kind: "ellipsoid", radius, halfHeight} | {kind: "cone", halfAngleDeg, slant} | {kind: "cup", radius, wall} |
+   * {kind: "profile", points: [[raio, altura], ...]} em mm, começando no eixo. `gauge` {w, h} em mm (padrão: largura do
+   * ponto e altura da volta das configurações), `options` do motor, `beginner` liga as contagens amigáveis (múltiplo de 6)
+   * e `dialect` escolhe a língua do texto. Só consulta: não muda o projeto.
+   */
+  "forward.revolve": (p: Params) => {
+    const s = getSettings().yarns;
+    const g = (p.gauge ?? {}) as { w?: unknown; h?: unknown };
+    const w = typeof g.w === "number" ? g.w : s.stitchWidthMm;
+    const h = typeof g.h === "number" ? g.h : (s.rowHeightMm ?? w);
+    const options = {
+      ...(p.beginner === true ? { friendlyMultiple: 6, friendlyTolerance: 1 } : {}),
+      ...((p.options ?? {}) as Partial<ForwardOptions>),
+    };
+    const r = revolve({ shape: p.shape as Shape, gauge: { w, h }, options });
+    if (!r.ok) throw new Error(r.issues.map((i) => i.message).join("; "));
+    const dialect = (typeof p.dialect === "string" ? p.dialect : "pt-BR") as Dialect;
+    return {
+      text: printPattern(r.value.pattern, dialect),
+      counts: r.value.counts,
+      total: r.value.counts.reduce((a, b) => a + b, 0),
+      lengthMm: Math.round(r.value.length * 10) / 10,
+      gauge: { w, h },
+      rows: r.value.rows.map((x) => ({
+        s: Math.round(x.s * 100) / 100,
+        r: Math.round(x.r * 100) / 100,
+        n: x.n,
+      })),
+      issues: r.issues,
+    };
+  },
   /**
    * Abre um projeto (`project`, o JSON de `project.export`; `check: true` só confere). A linha do tempo do arquivo só vale
    * se reexecutá-la dá o projeto do arquivo (outra versão do app ou arquivo editado à mão): senão o projeto fica como está

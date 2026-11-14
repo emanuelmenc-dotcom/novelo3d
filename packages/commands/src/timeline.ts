@@ -143,6 +143,7 @@ export const CLASS: Record<string, Class> = Object.fromEntries([
     "interop.parseDot",
     "materials.list",
     "math.round",
+    "forward.revolve",
     "measure.bounds",
     "measure.distance",
     "notation.splitLines",

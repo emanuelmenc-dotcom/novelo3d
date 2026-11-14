@@ -31,6 +31,8 @@ export interface SeamDefaults {
 export interface YarnSettings {
   /** Largura do ponto usada nas estimativas de consumo, em mm. */
   stitchWidthMm: number;
+  /** Altura da volta (mm) para gerar receita a partir de forma (P5); null = igual à largura do ponto. */
+  rowHeightMm: number | null;
   standard: YarnDefaults;
   seam: SeamDefaults;
 }
@@ -86,6 +88,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   yarns: {
     stitchWidthMm: 5,
+    rowHeightMm: null,
     standard: { colorKind: "solid" },
     seam: { colorHex: "#d6336c", type: "mattress" },
   },
@@ -94,13 +97,19 @@ export const DEFAULT_SETTINGS: Settings = {
 type Nullable<T> = { [K in keyof T]?: T[K] | null };
 export type SettingsPatch = {
   interface?: Partial<Omit<InterfaceSettings, "viewCube">> & { viewCube?: Partial<ViewCubeSettings> };
-  yarns?: { stitchWidthMm?: number; standard?: Nullable<YarnDefaults>; seam?: Nullable<SeamDefaults> };
+  yarns?: {
+    stitchWidthMm?: number;
+    rowHeightMm?: number | null;
+    standard?: Nullable<YarnDefaults>;
+    seam?: Nullable<SeamDefaults>;
+  };
 };
 
 const clone = (s: Settings): Settings => ({
   interface: { ...s.interface, viewCube: { ...s.interface.viewCube } },
   yarns: {
     stitchWidthMm: s.yarns.stitchWidthMm,
+    rowHeightMm: s.yarns.rowHeightMm,
     standard: {
       ...s.yarns.standard,
       ...(s.yarns.standard.thickness ? { thickness: { ...s.yarns.standard.thickness } } : {}),
@@ -138,6 +147,15 @@ function applyYarns(out: Settings, y: SettingsPatch["yarns"]): void {
       throw new Error("a largura do ponto deve ficar entre 1 e 30 mm");
     }
     out.yarns.stitchWidthMm = y.stitchWidthMm;
+  }
+  if (y.rowHeightMm !== undefined) {
+    if (
+      y.rowHeightMm !== null &&
+      (typeof y.rowHeightMm !== "number" || !(y.rowHeightMm >= 1 && y.rowHeightMm <= 30))
+    ) {
+      throw new Error("a altura da volta deve ficar entre 1 e 30 mm (ou vazia: igual à largura do ponto)");
+    }
+    out.yarns.rowHeightMm = y.rowHeightMm;
   }
   const st = y.standard;
   if (st) {

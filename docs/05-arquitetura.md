@@ -205,3 +205,7 @@ Toda função do aplicativo é um **comando** nomeado (`pattern.verify`, `chart.
 ## Versão para Windows (D-70)
 
 `apps/desktop` embrulha o build do studio numa janela Electron e gera `Novelo3D.exe`. Não tem lógica própria: toda regra continua em `packages/*` e `apps/studio`.
+
+## Motor direto (D-71)
+
+`packages/engine-forward` (puro, só depende de `core`): forma de revolução → `Pattern` validado. `commands` o usa no comando `forward.revolve` e escreve o texto com `notation`.

@@ -63,7 +63,7 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
   if (!box) throw new Error("sem canvas");
   await goTree(page);
   await page.getByLabel("Editar Peça 1", { exact: true }).check();
-  await tab(page, "Pontos").click();
+  await tab(page, "Propriedades").click();
   await ribbon(page, "selecionar");
   await page.getByTestId("mode-select").click();
   await ribbon(page, "selecionar");
@@ -77,7 +77,7 @@ test("espelhar, selecionar uma volta em cada peça e costurar; confere contagem 
   await expect(page.getByTestId("seam-draft-a")).toContainText("Peça 1 · 36 pontos");
 
   // lado B: clicar num ponto da espelhada ativa essa peça e seleciona a volta dela
-  await tab(page, "Pontos").click();
+  await tab(page, "Propriedades").click();
   const b = await partPoint(page, N);
   await page.mouse.click(box.x + b.x, box.y + b.y);
   await ribbon(page, "selecionar");

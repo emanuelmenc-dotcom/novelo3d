@@ -12,7 +12,7 @@ const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: t
 /** Abre o 3D e o painel Pontos (clássico: 3D em cima, Pontos embaixo). */
 async function open(page: Page, url = "/") {
   await page.goto(url);
-  await tab(page, "Pontos").click();
+  await tab(page, "Propriedades").click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(433);
 }
 
@@ -112,7 +112,7 @@ test("selecionar por volta e por retângulo, pintar fio, tensão, desfazer e per
   // persiste ao recarregar: a edição por ponto continua
   await page.waitForTimeout(600);
   await page.reload();
-  await tab(page, "Pontos").click();
+  await tab(page, "Propriedades").click();
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(433);
   await expect(page.getByTestId("points-info")).toContainText("72 pontos editados");
   await expect.poll(() => page.evaluate((i) => window.__view3d?.nodeColor(i), p.id)).toBe("#f4f1e8");

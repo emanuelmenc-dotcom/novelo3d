@@ -160,8 +160,20 @@ function migratePanels(node: unknown): unknown {
   if (node && typeof node === "object") {
     return Object.fromEntries(
       Object.entries(node).map(([k, v]) => {
-        if ((k === "tabs" || k === "off") && Array.isArray(v) && v.includes("assembly")) {
-          return [k, [...new Set(v.flatMap((p) => (p === "assembly" ? ["tree", "props"] : [p])))]];
+        // Montagem virou Árvore e Propriedades (G4); Pontos virou uma seção de Propriedades
+        if (
+          (k === "tabs" || k === "off") &&
+          Array.isArray(v) &&
+          v.some((p) => p === "assembly" || p === "points")
+        ) {
+          return [
+            k,
+            [
+              ...new Set(
+                v.flatMap((p) => (p === "assembly" ? ["tree", "props"] : p === "points" ? ["props"] : [p])),
+              ),
+            ],
+          ];
         }
         return [k, migratePanels(v)];
       }),

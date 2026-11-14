@@ -121,7 +121,7 @@ test("fechar a montagem leva as bordas costuradas a se encontrarem", async ({ pa
     );
   await goTree(page);
   await page.getByLabel("Editar Peça 1", { exact: true }).check();
-  await tab(page, "Pontos").click();
+  await tab(page, "Propriedades").click();
   await ribbon(page, "selecionar");
   await page.getByTestId("mode-select").click();
   await ribbon(page, "selecionar");
@@ -130,7 +130,7 @@ test("fechar a montagem leva as bordas costuradas a se encontrarem", async ({ pa
   await page.mouse.click(box.x + a.x, box.y + a.y);
   await goProps(page, "root");
   await page.getByTestId("seam-side-a").click();
-  await tab(page, "Pontos").click();
+  await tab(page, "Propriedades").click();
   const b = await pick(N);
   await page.mouse.click(box.x + b.x, box.y + b.y);
   await goProps(page, "root");

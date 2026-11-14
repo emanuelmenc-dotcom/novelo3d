@@ -145,3 +145,5 @@ Nada some e todo `data-testid` e todo nome acessível continua existindo; o que 
 | Materiais | `materials-panel`, tabelas, "Trocar pelo fio", costuras                                                          | só a janela flutuante (ribbon Arquivo › Lista de materiais) |
 
 Ordem de execução: comandos (`tree.get`, `tree.select`, `parts.setVisible`, `parts.isolate`, `parts.showAll`; feitos), janelas Árvore e Propriedades com migração do layout salvo, depois mover uma janela por vez (Materiais, Fios, Montagem, Pontos), com e2e verde e commit em cada uma. Clique direito: um menu só, na árvore (no 3D o botão direito já desloca a câmera; pergunta guardada 11 em `docs/12`).
+
+**Como ficou (2026-11-14).** Árvore: lista de peças (com esconder e isolar), costuras e a linha "Projeto"; menu de contexto por clique direito ou Shift+F10. Propriedades: no topo a seção Pontos (a antiga janela, mesmos controles) e abaixo o item escolhido na árvore: peça (nome, posição, rotação, espelho, troca de fios), Projeto (nova costura, fechar montagem) ou costura. Pontos escolhidos e item da árvore aparecem juntos, nessa ordem.

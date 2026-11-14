@@ -3,7 +3,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, type Page, test } from "@playwright/test";
-import { ribbon } from "./ribbon.ts";
+import { ribbon, showTab } from "./ribbon.ts";
 
 const PORT = 47925;
 const count = (page: Page) => page.evaluate(() => window.__view3d?.state().count ?? 0);
@@ -88,4 +88,27 @@ test("projeto de uma peça só: esconder a peça esvazia o 3D e mostrar a traz d
     await call("parts.showAll");
     await expect.poll(() => count(page)).toBe(433);
   });
+});
+
+test("menu de contexto da árvore: clique direito e teclado chamam os mesmos comandos", async ({ page }) => {
+  await page.goto("/");
+  await expect.poll(() => count(page)).toBe(433);
+  await showTab(page, "Árvore");
+  await ribbon(page, "montagem");
+  await page.getByRole("button", { name: "Instância" }).click();
+  await expect(page.locator("[data-part]")).toHaveCount(2);
+  await showTab(page, "Árvore");
+  // clique direito na segunda peça: isola
+  await page.locator("[data-part]").nth(1).locator("input[type=radio]").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Isolar" }).click();
+  await expect.poll(() => count(page)).toBe(433);
+  await expect(page.getByRole("button", { name: /^Mostrar Peça 1$/ })).toBeVisible();
+  // pelo teclado: Shift+F10 na primeira peça abre o menu, Esc fecha
+  await page.locator("[data-part]").first().locator("input[type=radio]").focus();
+  await page.keyboard.press("Shift+F10");
+  await expect(page.getByRole("menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await page.getByRole("button", { name: "Mostrar todas" }).click();
+  await expect.poll(() => count(page)).toBe(866);
 });

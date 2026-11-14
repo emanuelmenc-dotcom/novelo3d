@@ -1166,3 +1166,29 @@ input.num {
   font-family: inherit;
   font-weight: 700;
 }
+
+/* Propriedades: as seções empilham e a janela rola, sem uma esmagar a outra */
+.props-col > .panel-col {
+  flex: none;
+  overflow: visible;
+  min-height: auto;
+}
+
+/* menu de contexto da árvore */
+.tree-menu {
+  position: fixed;
+  z-index: 40;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.375rem;
+  box-shadow: 0 0.25rem 0.75rem rgb(0 0 0 / 0.2);
+}
+.tree-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  min-height: 2rem;
+}

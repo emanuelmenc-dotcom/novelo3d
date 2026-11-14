@@ -54,6 +54,52 @@ const SEAM_TYPES: [string, string][] = [
 ];
 const AXES = ["x", "y", "z"] as const;
 
+/** Menu de contexto da árvore: os mesmos comandos do ribbon e da árvore, para a peça em que se clicou. */
+function TreeMenu(props: {
+  menu: { id: string; x: number; y: number };
+  onClose: () => void;
+  run: (method: string, params?: Record<string, unknown>) => unknown;
+}) {
+  const { menu, onClose, run } = props;
+  const part = partsSnapshot().parts.find((q) => q.id === menu.id);
+  const items: [string, string, Record<string, unknown>][] = [
+    [part?.hidden ? "Mostrar" : "Esconder", "parts.setVisible", { id: menu.id, visible: !!part?.hidden }],
+    ["Isolar", "parts.isolate", { id: menu.id }],
+    ["Mostrar todas", "parts.showAll", {}],
+    ["Nova instância", "parts.instance", { id: menu.id }],
+    ["Espelhar (plano X)", "parts.mirror", { id: menu.id, plane: "x" }],
+    ["Copiar", "parts.copy", { id: menu.id }],
+    ["Remover", "parts.remove", { id: menu.id }],
+  ];
+  return (
+    <div
+      role="menu"
+      aria-label={`Menu de ${part?.name ?? menu.id}`}
+      className="tree-menu"
+      style={{ left: menu.x, top: menu.y }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+    >
+      {items.map(([label, method, params], i) => (
+        <button
+          key={label}
+          type="button"
+          role="menuitem"
+          // biome-ignore lint/a11y/noAutofocus: o menu acabou de abrir por teclado ou mouse e o foco precisa entrar nele
+          autoFocus={i === 0}
+          onClick={() => {
+            run(method, params);
+            onClose();
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export type AssemblySection = "tree" | "part" | "seam" | "close";
 
 /** Cada seção mora numa janela: a árvore (peças e costuras), e as propriedades (peça, costura nova e fechar montagem). */
@@ -74,6 +120,8 @@ export function AssemblyPanel(props: { sections: AssemblySection[] }) {
     setClosedState(r);
   };
   const [name, setName] = useState("");
+  // menu de contexto da árvore: clique direito ou a tecla de menu / Shift+F10 na peça
+  const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
 
   const run = (method: string, params: Record<string, unknown> = {}) => {
     try {
@@ -134,6 +182,17 @@ export function AssemblyPanel(props: { sections: AssemblySection[] }) {
                     checked={p.id === st.active}
                     onChange={() => run("tree.select", { id: p.id })}
                     onClick={() => run("tree.select", { id: p.id })}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setMenu({ id: p.id, x: e.clientX, y: e.clientY });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+                        e.preventDefault();
+                        const r = e.currentTarget.getBoundingClientRect();
+                        setMenu({ id: p.id, x: r.left, y: r.bottom });
+                      }
+                    }}
                   />{" "}
                   <strong>{p.name}</strong>{" "}
                   <span className="hint">
@@ -166,6 +225,7 @@ export function AssemblyPanel(props: { sections: AssemblySection[] }) {
           <button type="button" onClick={() => run("parts.showAll")}>
             Mostrar todas
           </button>
+          {menu && <TreeMenu menu={menu} onClose={() => setMenu(null)} run={run} />}
         </>
       )}
 

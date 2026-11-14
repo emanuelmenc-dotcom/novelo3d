@@ -224,7 +224,7 @@ test("no modo de leitura nada edita: o mesmo arrasto que pinta na edição não 
 }) => {
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count ?? 0)).toBe(433);
-  await page.getByRole("tab", { name: "Pontos", exact: true }).click();
+  await page.getByRole("tab", { name: "Propriedades", exact: true }).click();
   await ribbon(page, "selecionar");
   await page.getByTestId("mode-yarn").click();
   await ribbon(page, "pintar");

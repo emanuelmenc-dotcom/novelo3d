@@ -39,7 +39,6 @@ import { CommandPalette } from "./CommandPalette.tsx";
 import { lastCamera } from "./cameraStore.ts";
 import { FloatingWindow } from "./FloatingWindow.tsx";
 import { MaterialsPanel } from "./MaterialsPanel.tsx";
-import { PointsPanel } from "./PointsPanel.tsx";
 import { PropsPanel } from "./PropsPanel.tsx";
 import { makeHandlers, subscribeTools, toolSnapshot, viewerTool } from "./pointtools.ts";
 import { type ReadingData, ReadingMode } from "./ReadingMode.tsx";
@@ -763,13 +762,11 @@ function App() {
 
     tree: () => <AssemblyPanel sections={["tree"]} />,
 
-    props: () => <PropsPanel />,
+    props: () => <PropsPanel text={text} dialect={dialect} selNode={selNode} />,
 
     render: () => <RenderPanel />,
 
     stitchEditor: () => <StitchEditorPanel />,
-
-    points: () => <PointsPanel text={text} dialect={dialect} selNode={selNode} />,
 
     cp: () => (
       <div className="panel-col">

@@ -278,6 +278,7 @@ function App() {
   const [selNode, setSelNode] = useState<NodeMeta | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showMaterials, setShowMaterials] = useState(false);
+  const [showPalette, setShowPalette] = useState(false);
   const settings = useSyncExternalStore(subscribeSettings, settingsSnapshot);
   const visible = useSyncExternalStore(subscribeVisible, visibleSnapshot);
   const reading = useSyncExternalStore(subscribeTutorial, readingOn);
@@ -548,6 +549,8 @@ function App() {
     settings: () => setShowSettings(true),
     materials: () => setShowMaterials((v) => !v),
     materialsOn: showMaterials,
+    palette: () => setShowPalette((v) => !v),
+    paletteOn: showPalette,
     print: () => window.print(),
     copyCp: () => void navigator.clipboard?.writeText(view.cp?.text ?? ""),
     downloadCp: () => download("receita.cp.txt", view.cp?.text ?? ""),
@@ -768,8 +771,6 @@ function App() {
 
     points: () => <PointsPanel text={text} dialect={dialect} selNode={selNode} />,
 
-    yarns: () => <YarnsPanel text={text} dialect={dialect} selLabel={selLabel} selNode={selNode} />,
-
     cp: () => (
       <div className="panel-col">
         <textarea aria-label="Texto CrochetPARADE" readOnly value={view.cp?.text ?? ""} className="cp" />
@@ -840,6 +841,11 @@ function App() {
         ))}
       </div>
       {showSettings && <SettingsDialog onClose={() => setShowSettings(false)} />}
+      {showPalette && !reading && (
+        <FloatingWindow title="Paleta de fios" onClose={() => setShowPalette(false)} testId="yarns-window">
+          <YarnsPanel text={text} dialect={dialect} selLabel={selLabel} selNode={selNode} />
+        </FloatingWindow>
+      )}
       {showMaterials && !reading && (
         <FloatingWindow
           title="Lista de materiais"

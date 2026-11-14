@@ -77,22 +77,22 @@ test("janelas: desligar uma janela vale mesmo ao trocar de layout predefinido; l
   page,
 }) => {
   await page.goto("/");
-  await expect(page.getByRole("tab", { name: "Fios", exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Pontos", exact: true })).toBeVisible();
   await page.getByTestId("windows-menu").click();
-  await expect(page.getByTestId("window-yarns")).toHaveAttribute("aria-checked", "true");
-  await page.getByTestId("window-yarns").click();
-  await expect(page.getByTestId("window-yarns")).toHaveAttribute("aria-checked", "false");
-  await expect(page.getByRole("tab", { name: "Fios", exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("window-points")).toHaveAttribute("aria-checked", "true");
+  await page.getByTestId("window-points").click();
+  await expect(page.getByTestId("window-points")).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByRole("tab", { name: "Pontos", exact: true })).toHaveCount(0);
   // trocar de layout só reposiciona: a janela continua desligada
   for (const preset of [/Clássico/, /Foco no 3D/, /Tudo em abas/, /Edição/]) {
     await page.getByRole("menuitemradio", { name: preset }).click();
     await page.getByTestId("windows-menu").click();
-    await expect(page.getByTestId("window-yarns")).toHaveAttribute("aria-checked", "false");
-    await expect(page.getByRole("tab", { name: "Fios", exact: true })).toHaveCount(0);
+    await expect(page.getByTestId("window-points")).toHaveAttribute("aria-checked", "false");
+    await expect(page.getByRole("tab", { name: "Pontos", exact: true })).toHaveCount(0);
   }
-  await page.getByTestId("window-yarns").click();
+  await page.getByTestId("window-points").click();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("tab", { name: "Fios", exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Pontos", exact: true })).toBeVisible();
 });
 
 test("cubo embaixo à esquerda por padrão, com o menu de vista ao lado dele", async ({ page }) => {

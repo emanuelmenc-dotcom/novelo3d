@@ -3,7 +3,7 @@
 // em todo o projeto, e fechar a montagem.
 import { mkdirSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
-import { goProps, goTree, openViewMenu, ribbon } from "./ribbon.ts";
+import { closePalette, goProps, goTree, openPalette, openViewMenu, ribbon } from "./ribbon.ts";
 
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
 const N = 433;
@@ -24,7 +24,7 @@ test("padrão dos fios novos vem das configurações e a lista de materiais troc
   await page.getByRole("button", { name: "Fechar configurações" }).click();
 
   // fio novo nasce no padrão, com outra cor
-  await tab(page, "Fios").click();
+  await openPalette(page);
   await page.getByRole("button", { name: "Adicionar fio" }).click();
   await page.getByRole("button", { name: "Editar fio C" }).click();
   await expect(page.getByLabel("Tipo de cor do fio C")).toHaveValue("stripes");
@@ -39,6 +39,7 @@ test("padrão dos fios novos vem das configurações e a lista de materiais troc
   await page.getByRole("button", { name: "Pintar voltas" }).click();
   await expect(page.locator('[data-paint="0"]')).toContainText("fio B");
 
+  await closePalette(page);
   // janela flutuante: selecionar B, trocar por C e remover B
   await ribbon(page, "arquivo");
   await page.getByRole("button", { name: "Lista de materiais" }).click();
@@ -74,7 +75,7 @@ test("padrão dos fios novos vem das configurações e a lista de materiais troc
 
   // a pintura trocada aparece no painel Fios e persiste
   await page.reload();
-  await tab(page, "Fios").click();
+  await openPalette(page);
   await expect(page.locator('[data-paint="0"]')).toContainText("fio C");
 });
 

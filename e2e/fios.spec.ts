@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Aceite do P3.5 (fios): cor por comprimento (listras, degradê), material e espessura por padrão, efeito no 3D e consumo.
 import { mkdirSync } from "node:fs";
-import { expect, type Page, test } from "@playwright/test";
-
-const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
+import { expect, test } from "@playwright/test";
+import { openPalette } from "./ribbon.ts";
 
 test("fio com listras por comprimento, material e espessura: prévia, 3D e consumo", async ({ page }) => {
   mkdirSync("test-results", { recursive: true });
   await page.goto("/");
-  await tab(page, "Fios").click();
+  await openPalette(page);
   await page.getByRole("button", { name: "Editar fio A" }).click();
   const editor = page.getByTestId("yarn-editor-A");
   await expect(editor).toBeVisible();
@@ -54,7 +53,7 @@ test("fio com listras por comprimento, material e espessura: prévia, 3D e consu
 
   // persiste ao recarregar
   await page.reload();
-  await tab(page, "Fios").click();
+  await openPalette(page);
   await page.getByRole("button", { name: "Editar fio A" }).click();
   await expect(page.getByLabel("Tipo de cor do fio A")).toHaveValue("gradient");
   await expect(page.getByLabel("Material do fio A")).toHaveValue("mohair");

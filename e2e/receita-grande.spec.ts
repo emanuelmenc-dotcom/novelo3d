@@ -17,7 +17,7 @@ test("receita que dobra a cada volta vira aviso, não tela em branco, e o app re
   await showTab(page, "Receita");
   await page.getByLabel("Receita", { exact: true }).fill("V1: 6 pb no anel mágico (6)\nV2-40: aum @each");
   await page.waitForTimeout(1500);
-  for (const aba of ["3D", "Pontos", "Fios"]) await page.getByRole("tab", { name: aba, exact: true }).click();
+  for (const aba of ["3D", "Pontos"]) await page.getByRole("tab", { name: aba, exact: true }).click();
   await showTab(page, "Receita");
   await expect(page.getByLabel("Receita", { exact: true })).toBeVisible();
   await expect(page.getByText(/passa de .* pontos/).first()).toBeVisible();

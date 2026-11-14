@@ -5,7 +5,7 @@ import { mkdirSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, type Page, test } from "@playwright/test";
-import { showTab } from "./ribbon.ts";
+import { closePalette, openPalette, showTab } from "./ribbon.ts";
 
 const PORT = 47893;
 
@@ -20,7 +20,7 @@ test("pintar 3 voltas: trocas nas linhas certas, consumo, gráfico, 3D e persist
   mkdirSync("test-results", { recursive: true });
   await page.goto("/");
   await allTabs(page);
-  await tab(page, "Fios").click();
+  await openPalette(page);
 
   // pincel B (off white), voltas 7 a 9
   await expect(page.getByLabel("Pincel do fio B")).toBeChecked();
@@ -43,6 +43,7 @@ test("pintar 3 voltas: trocas nas linhas certas, consumo, gráfico, 3D e persist
   await expect(b).toContainText("25%");
   await page.screenshot({ path: "test-results/pintura-fios.png" });
 
+  await closePalette(page);
   // gráfico: dois cartões de fio e as voltas lisas por fio
   await tab(page, "Gráfico circular").click();
   const svg = page.getByTestId("chart").locator("svg");
@@ -63,7 +64,7 @@ test("pintar 3 voltas: trocas nas linhas certas, consumo, gráfico, 3D e persist
   // persiste ao recarregar
   await page.reload();
   await allTabs(page);
-  await tab(page, "Fios").click();
+  await openPalette(page);
   await expect(page.locator('[data-paint="0"]')).toContainText("Voltas 7–9");
   await expect(page.getByTestId("recipe-yarns")).toHaveValue(/V7–9: trocar para o fio B/);
 });
@@ -75,14 +76,14 @@ test("pintar a partir da seleção (volta da tabela e ponto do 3D) e trocar a co
   // classic: tabela de verificação visível; escolhe a volta 13 e pinta com o fio B pelo painel Fios (aba junto ao texto CP)
   await showTab(page, "Verificação de contagem");
   await page.getByTestId("verify-table").getByRole("cell", { name: "13", exact: true }).click();
-  await tab(page, "Fios").click();
+  await openPalette(page);
   await page.getByRole("button", { name: /Pintar volta selecionada \(13\)/ }).click();
   await expect(page.locator('[data-paint="0"]')).toContainText("Voltas 13");
 
   // ponto do 3D: seleciona o nó 200 (volta 9) e pinta só ele
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().count)).toBe(433);
   await page.evaluate(() => window.__view3d?.select(200));
-  await tab(page, "Fios").click();
+  await openPalette(page);
   await page.getByRole("button", { name: /Pintar ponto selecionado/ }).click();
   await expect(page.locator("[data-paint]")).toHaveCount(2);
   await expect(page.locator('[data-paint="1"]')).toContainText("1 ponto(s)");
@@ -92,7 +93,7 @@ test("pintar a partir da seleção (volta da tabela e ponto do 3D) e trocar a co
   await expect.poll(() => page.evaluate(() => window.__view3d?.nodeColor(200))).toBe("#ff0000");
 
   // remover pintura e limpar
-  await tab(page, "Fios").click();
+  await openPalette(page);
   await page.getByRole("button", { name: "Remover pintura 2" }).click();
   await expect(page.locator("[data-paint]")).toHaveCount(1);
   await page.getByRole("button", { name: "Limpar pintura" }).click();
@@ -102,7 +103,7 @@ test("pintar a partir da seleção (volta da tabela e ponto do 3D) e trocar a co
 
 test("paleta: adicionar e remover fios", async ({ page }) => {
   await page.goto("/");
-  await tab(page, "Fios").click();
+  await openPalette(page);
   await page.getByRole("button", { name: "Adicionar fio" }).click();
   await expect(page.locator('[data-yarn="C"]')).toBeVisible();
   await page.getByLabel("Nome do fio C").fill("laranja");
@@ -146,7 +147,7 @@ test("o MCP pinta, lê o relatório de fios e limpa pelos mesmos comandos", asyn
     expect(rep.json.usage.find((u: { yarn: string }) => u.yarn === "B").stitches).toBe(108);
 
     // a interface refletiu a pintura feita pelo MCP
-    await tab(page, "Fios").click();
+    await openPalette(page);
     await expect(page.locator('[data-paint="0"]')).toContainText("Voltas 7–9");
 
     expect((await call("paint.rows", { yarn: "Z", from: 1, to: 2 })).isError).toBe(true);

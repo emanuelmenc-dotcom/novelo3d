@@ -47,3 +47,17 @@ export async function goProps(page: Page, what: "part" | "root" = "part"): Promi
   else await page.locator("[data-part].on input[type=radio]").click(); // escolhe a peça ativa na árvore
   await showTab(page, "Propriedades");
 }
+
+/** Abre a janela flutuante da paleta de fios (ribbon Pintar), se ainda não estiver aberta. */
+export async function openPalette(page: Page): Promise<void> {
+  if (await page.getByTestId("yarns-window").count()) return;
+  await ribbon(page, "pintar");
+  await page.getByTestId("palette-open").click();
+  await page.getByTestId("yarns-window").waitFor();
+}
+
+/** Fecha a janela da paleta (ela flutua sobre a tela e cobre outros controles). */
+export async function closePalette(page: Page): Promise<void> {
+  if (await page.getByTestId("yarns-window").count())
+    await page.getByRole("button", { name: "Fechar Paleta de fios" }).click();
+}

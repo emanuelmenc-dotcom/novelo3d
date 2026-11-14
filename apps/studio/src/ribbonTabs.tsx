@@ -17,6 +17,8 @@ export interface RibbonCtx {
   settings: () => void;
   materials: () => void;
   materialsOn: boolean;
+  palette: () => void;
+  paletteOn: boolean;
   print: () => void;
   copyCp: () => void;
   downloadCp: () => void;
@@ -224,6 +226,11 @@ export function buildRibbonTabs(c: RibbonCtx): RibbonTab[] {
           items: [
             modeBtn("pintar", "yarn", "Pintar fio", "brush"),
             modeBtn("pintar", "tension", "Tensão", "tension"),
+            btn("pintar", "palette", "Paleta de fios", "recipe", () => c.palette(), {
+              pressed: c.paletteOn,
+              testid: "palette-open",
+              title: "Abre a janela da paleta: fios, pinturas por volta, consumo e receita com trocas",
+            }),
           ],
         },
         {

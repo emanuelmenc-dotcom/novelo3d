@@ -23,10 +23,7 @@ export const PRESET_SPECS: Preset[] = [
         {
           dir: "column",
           sizes: [0.55, 0.45],
-          children: [
-            { leaf: ["recipe", "verify", "chart", "cp"] },
-            { leaf: ["tree", "props", "points", "yarns"] },
-          ],
+          children: [{ leaf: ["recipe", "verify", "chart", "cp"] }, { leaf: ["tree", "props", "points"] }],
         },
         { leaf: ["view3d"] },
       ],
@@ -47,7 +44,7 @@ export const PRESET_SPECS: Preset[] = [
           sizes: [0.7, 0.3],
           children: [
             { leaf: ["chart", "view3d", "stitchEditor"] },
-            { leaf: ["cp", "yarns", "points", "tree", "props", "render"] },
+            { leaf: ["cp", "points", "tree", "props", "render"] },
           ],
         },
       ],
@@ -67,7 +64,7 @@ export const PRESET_SPECS: Preset[] = [
           sizes: [0.74, 0.26],
           children: [
             { leaf: ["view3d", "stitchEditor"] },
-            { leaf: ["chart", "cp", "yarns", "points", "tree", "props", "render"] },
+            { leaf: ["chart", "cp", "points", "tree", "props", "render"] },
           ],
         },
       ],
@@ -88,7 +85,7 @@ export const PRESET_SPECS: Preset[] = [
           children: [
             { leaf: ["recipe"] },
             { leaf: ["verify"] },
-            { leaf: ["view3d", "cp", "yarns", "points", "tree", "props", "render"] },
+            { leaf: ["view3d", "cp", "points", "tree", "props", "render"] },
           ],
         },
       ],
@@ -105,7 +102,7 @@ export const PRESET_SPECS: Preset[] = [
         { leaf: ["recipe"] },
         { leaf: ["verify"] },
         { dir: "row", sizes: [0.5, 0.5], children: [{ leaf: ["chart"] }, { leaf: ["view3d"] }] },
-        { leaf: ["cp", "yarns", "points", "tree", "props", "render", "stitchEditor"] },
+        { leaf: ["cp", "points", "tree", "props", "render", "stitchEditor"] },
       ],
     },
   },
@@ -120,7 +117,6 @@ export const PRESET_SPECS: Preset[] = [
         "verify",
         "chart",
         "cp",
-        "yarns",
         "points",
         "tree",
         "props",

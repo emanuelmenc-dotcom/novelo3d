@@ -285,6 +285,41 @@ export function transformFn(part: Placed): (x: number, y: number, z: number) => 
   };
 }
 
+/** O inverso de `transformFn`: do espaço de fora de volta ao espaço da peça (ou montagem). */
+export function invTransformFn(part: Placed): (x: number, y: number, z: number) => [number, number, number] {
+  const [ax, ay, az] = part.rot.map(rad) as [number, number, number];
+  const cx = Math.cos(ax);
+  const sx = Math.sin(ax);
+  const cy = Math.cos(ay);
+  const sy = Math.sin(ay);
+  const cz = Math.cos(az);
+  const sz = Math.sin(az);
+  const mx = part.mirror === "x" ? -1 : 1;
+  const my = part.mirror === "y" ? -1 : 1;
+  const mz = part.mirror === "z" ? -1 : 1;
+  return (x0, y0, z0) => {
+    const x3 = x0 - part.pos[0];
+    const y3 = y0 - part.pos[1];
+    const z2 = z0 - part.pos[2];
+    // desfaz Rz, depois Ry, depois Rx (a ordem contrária de transformFn)
+    const x2 = x3 * cz + y3 * sz;
+    const y1 = -x3 * sz + y3 * cz;
+    const x = x2 * cy - z2 * sy;
+    const z1 = x2 * sy + z2 * cy;
+    const y = y1 * cx + z1 * sx;
+    const z = -y1 * sx + z1 * cx;
+    return [x * mx, y * my, z * mz];
+  };
+}
+
+/** Do espaço do mundo para o espaço da montagem onde a peça está (desfaz as montagens, de fora para dentro). */
+function toAssemblySpace(part: Part): (p: [number, number, number]) => [number, number, number] {
+  const inv = assemblyChain(part.assembly)
+    .map((a) => invTransformFn(a))
+    .reverse();
+  return (p) => inv.reduce<[number, number, number]>((q, f) => f(q[0], q[1], q[2]), p);
+}
+
 /** Posição final de um ponto da peça: a da peça e, por fora dela, a de cada montagem que a contém. */
 export function worldFn(part: Part): (x: number, y: number, z: number) => [number, number, number] {
   const own = transformFn(part);
@@ -668,7 +703,8 @@ export function partsCommands(
             visited.add(next.id);
             continue;
           }
-          const fit = fitRigid(L, W);
+          // a pose da peça é dentro da montagem dela: os alvos saem do mundo para o espaço da montagem (pergunta 14)
+          const fit = fitRigid(L, W.map(toAssemblySpace(next)));
           before[next.id] = { pos: [...next.pos], rot: [...next.rot] };
           patchPart(next.id, { pos: fit.t, rot: eulerOf(fit.R) });
           void targetCentroid;

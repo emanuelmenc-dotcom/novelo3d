@@ -169,6 +169,14 @@ function maskFromSpec(eng: Engine, spec: unknown): Mask {
   }
 }
 
+/** Limite do pincel e do balde: `onlySelection` true usa a seleção atual; uma descrição (a linha do tempo grava os uids
+ *  da seleção de quando o traço foi feito) usa essa. */
+function onlyMask(eng: Engine, p: Params): Mask | undefined {
+  if (p.onlySelection === true) return selectionMask(eng);
+  if (p.onlySelection && typeof p.onlySelection === "object") return maskFromSpec(eng, p.onlySelection);
+  return undefined;
+}
+
 /** Alvo de uma ferramenta: a seleção atual (padrão) ou o que `target` descrever. */
 function targetOf(eng: Engine, p: Params): Mask {
   return p.target === undefined || p.target === "selection"
@@ -322,24 +330,14 @@ export const editCommands: Record<string, Cmd> = {
   "tool.brush": (p) => {
     const eng = engine(p, false, true);
     const prop = propOf(p);
-    const mask = brushMask(
-      eng.store,
-      uidIndex(eng, p.uid),
-      num(p, "hops"),
-      p.onlySelection === true ? selectionMask(eng) : undefined,
-    );
+    const mask = brushMask(eng.store, uidIndex(eng, p.uid), num(p, "hops"), onlyMask(eng, p));
     return { changed: maskCount(mask), edit: writeProp(eng, prop, mask, valueFor(prop, p.value)) };
   },
   /** Balde: região contígua do ponto `uid` com o mesmo valor de `prop`. */
   "tool.bucket": (p) => {
     const eng = engine(p, false, true);
     const prop = propOf(p);
-    const mask = bucketMask(
-      eng.store,
-      uidIndex(eng, p.uid),
-      prop,
-      p.onlySelection === true ? selectionMask(eng) : undefined,
-    );
+    const mask = bucketMask(eng.store, uidIndex(eng, p.uid), prop, onlyMask(eng, p));
     return { changed: maskCount(mask), edit: writeProp(eng, prop, mask, valueFor(prop, p.value)) };
   },
   /** Listras repetidas por volta sobre o alvo: pattern = [["A",2],["B",1]] (2 voltas A, 1 volta B, repete). */

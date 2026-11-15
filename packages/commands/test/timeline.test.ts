@@ -446,3 +446,18 @@ test("toda feature tem nome legível na faixa, diferente do nome do comando", ()
     expect(labelOf(f), m).not.toBe(m);
   }
 });
+
+test("pincel 'só na seleção' grava a seleção de quando foi feito: reexecutar com outra seleção pinta os mesmos pontos", () => {
+  const edits = () =>
+    JSON.stringify((dispatch("project.export") as { edit: { p1: { tension: unknown } } }).edit.p1.tension);
+  // seleciona a volta 2 e passa o pincel com alcance grande, limitado à seleção
+  dispatch("selection.select", { text: TEXT, by: { kind: "group", from: 2, to: 2 } });
+  dispatch("tool.brush", { text: TEXT, uid: 8, hops: 5, prop: "tension", value: 0.5, onlySelection: true });
+  const live = edits();
+  // muda a seleção para a volta 3 e reexecuta: a pintura continua na volta 2
+  dispatch("selection.select", { text: TEXT, by: { kind: "group", from: 3, to: 3 } });
+  replayTimeline();
+  expect(edits()).toBe(live);
+  const f = timelineView().features.find((x) => x.method === "tool.brush");
+  expect((f?.params.onlySelection as { kind: string }).kind).toBe("uidRanges");
+});

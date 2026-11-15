@@ -369,6 +369,9 @@ function normalize(method: string, params: Params): Params | null {
     if (SELECTION_TARGET.has(method) && (out.target === undefined || out.target === "selection")) {
       out.target = { kind: "uidRanges", ranges: toRanges(selectedUids()) };
     }
+    // pincel e balde "só na seleção": grava a seleção de agora (pergunta 17 em docs/12)
+    if ((method === "tool.brush" || method === "tool.bucket") && params.onlySelection === true)
+      out.onlySelection = { kind: "uidRanges", ranges: toRanges(selectedUids()) };
   } else if (method === "parts.commitText") {
     const id = typeof params.id === "string" ? params.id : active;
     const root = rootOf(id);
@@ -427,6 +430,9 @@ function runFeature(f: Feature, run: (m: string, p: Params) => unknown): void {
   const tg = rest.target as { kind?: string; ranges?: [number, number][] } | undefined;
   if (tg?.kind === "uidRanges" && Array.isArray(tg.ranges))
     rest.target = { kind: "uids", uids: fromRanges(tg.ranges) };
+  const os = rest.onlySelection as { kind?: string; ranges?: [number, number][] } | undefined;
+  if (os?.kind === "uidRanges" && Array.isArray(os.ranges))
+    rest.onlySelection = { kind: "uids", uids: fromRanges(os.ranges) };
   if (f.method === "parts.commitText") {
     ensureEngine(String(rest.id), rest.prev, run);
     run("parts.setText", {

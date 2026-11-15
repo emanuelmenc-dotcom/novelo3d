@@ -87,6 +87,14 @@ describe("fechar a montagem", () => {
     });
   }
 
+  test("peça dentro de uma montagem fora da origem e girada também encosta (pergunta 14 em docs/12)", () => {
+    setup([0, 0, 0]);
+    dispatch("assembly.add", { parts: ["p2"] });
+    dispatch("assembly.set", { id: "a1", pos: [30, -12, 7], rot: [20, 45, -60] });
+    const r = dispatch("assembly.close", {}) as { gaps: { maxGap: number }[] };
+    expect(r.gaps[0]?.maxGap).toBeLessThan(0.05);
+  });
+
   test("devolve as poses de antes; peça sem costura fica onde estava; âncora inexistente é erro", () => {
     setup([0, 0, 0]);
     dispatch("parts.add", { name: "Solta", text: TEXT });

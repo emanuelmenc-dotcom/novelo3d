@@ -2,9 +2,9 @@
 
 > Revisado em 2026-11-11. Substitui o roteiro M0–M11 do handoff. Um marco por vez; cada um termina com algo que o usuário abre e avalia. Não iniciar um marco antes de o anterior ser aprovado.
 
-## Estado em 2026-11-13: pausas e próxima etapa
+## Estado em 2026-11-15: P0 a P5 entregues; próxima etapa P6
 
-Pausados (D-57, interruptores em `packages/commands/src/features.ts`): série R (render 3D realista, R3b a R3d), R4 (path tracing), 3D realista dos pontos (R1), criador de pontos (B a E, `docs/16`) e Plano D (Electron). A etapa H (fio relaxado) foi encerrada sem sucesso (D-54). **P4 (tutorial) feito em 2026-11-13 (D-59); aguardando o usuário experimentar.** Próxima: P5 (modelagem além da revolução), só depois da aprovação.
+Feitos: P0 a P5 (P5 em 2026-11-14: forma → receita, peça composta, seção não circular, STL → peças com onde costurar; D-71 a D-76), marco G (interface 2, aprovado), exe para Windows (D-70). A galinha (receita comprada, privada) roda em toda revisão com `npm run galinha`: o modelo por formas reproduz bico, crista e asas volta a volta e o corpo com as mesmas 33 voltas e 1,3% de diferença no total (só a distribuição do pescoço). Pausados (D-57): série R (render realista), criador de pontos (etapa E). Abertas: perguntas guardadas 1 a 25 (abaixo). **Próxima pelo roteiro: P6 (tricô), cujo portão da F0 pedia só que P3 estivesse pronto** (D-19: grafo neutro com campos reservados; conversão só por geometria compartilhada, nunca ponto a ponto).
 
 ## Visão geral
 

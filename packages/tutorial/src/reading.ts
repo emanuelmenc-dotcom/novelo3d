@@ -140,16 +140,18 @@ export function readingScript(pattern: Pattern, graph: StitchGraph): ReadingScri
       for (const id of nodeIds) sinceNodes.push(id);
     });
 
-    // fim de marco: última repetição da linha da receita (a marcação `#marco` cai na mesma linha)
+    // fim de marco: só nas linhas com `#marco`, no fim de um grupo de voltas ("V7–12") e no fim da peça; voltas
+    // soltas seguem sem parar (decisão do usuário em 2026-11-15, pergunta 8 em docs/12)
     const next = rounds[ri + 1];
-    if (!next || next.row !== r.row) {
+    const rowEnds = !next || next.row !== r.row;
+    if (rowEnds && (r.row.milestone !== undefined || (r.row.repeatRows ?? 1) > 1 || !next)) {
       milestones.push({
         index: milestone,
         title:
           r.row.milestone ??
-          ((r.row.repeatRows ?? 1) > 1
-            ? `Voltas ${r.row.label} concluídas`
-            : `Volta ${r.row.label} concluída`),
+          (sinceFromRound === r.round
+            ? `Volta ${r.round} concluída`
+            : `Voltas ${sinceFromRound}–${r.round} concluídas`),
         manual: r.row.milestone !== undefined,
         fromRound: sinceFromRound,
         toRound: r.round,

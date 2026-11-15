@@ -55,16 +55,16 @@ describe("faixa de pb seguidos e etiqueta Nx", () => {
     const at = [0, 1, 2, 3, 4, 5].map((index) => ({ row: 7, index }));
     const r = renderChart(pBola(), { paint: [{ kind: "stitches", yarn: "B", at }] });
     const svg = r.pages[0]?.svg ?? "";
-    expect(count(svg, BANDS)).toBe(2); // a volta 1 (6 pb) e a volta 7 (36 pb)
+    expect(count(svg, BANDS)).toBe(3); // a volta 1 (6 pb), a volta 7 (36 pb) e o anel liso das voltas 8–12
     expect(count(svg, />36x</g)).toBeGreaterThanOrEqual(2); // a etiqueta no 1º ponto e o item 36x pb da tabela
     expect(r.pages[0]?.overlaps).toBe(0);
   });
 
-  test("G10b: o anel tracejado das voltas 7–12 não desenha símbolos: só o item 36x pb da tabela", () => {
-    // faixa e etiqueta valem para símbolos desenhados (pergunta guardada 9 em docs/12)
+  test("G10b: o anel tracejado das voltas 7–12 não desenha símbolos, mas ganha faixa e a etiqueta 36x", () => {
+    // decisão do usuário em 2026-11-15 (pergunta 9 em docs/12): o anel liso também tem faixa e etiqueta Nx
     const svg = svg0(pBola());
-    expect(count(svg, BANDS)).toBe(1); // só a volta 1
-    expect(svg).toContain(">36x<");
+    expect(count(svg, BANDS)).toBe(2); // a volta 1 e o anel liso
+    expect(count(svg, />36x</g)).toBe(2); // a etiqueta no anel e o item da tabela
   });
 
   test("G11: 2 pb, 1 aum, 6 pb, 1 aum, 2 pb tem uma faixa só sobre os 6 pb e a etiqueta 6x", () => {
@@ -110,8 +110,7 @@ describe("faixa de pb seguidos e etiqueta Nx", () => {
 
 describe("tabela Receita volta a volta", () => {
   test("G12: P-BOLA volta 3 agrupa em bloco x6 com total (18)", () => {
-    // o anexo escreve (1x aum; 1x pb) ×6; a receita do projeto escreve (1 pb, 1 aum) x6 e a ordem da receita vale
-    // (pergunta guardada 1 em docs/12)
+    // a tabela segue a ordem da receita: (1x pb; 1x aum) ×6 (pergunta 1 em docs/12, decidida em 2026-11-15)
     const svg = svg0(pBola());
     expect(svg).toContain(">) ×6<");
     expect(svg).toContain(">(18)<");

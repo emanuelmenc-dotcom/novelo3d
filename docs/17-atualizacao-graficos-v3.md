@@ -148,16 +148,16 @@ Antes de criar a página de continuação, tentar compactar o diagrama (passo en
 
 Usar as receitas de teste do projeto (P-BOLA, P-TUBO), nunca receita de terceiros.
 
-| Caso | Entrada                                                                                                               | Esperado                                                                 |
-| ---- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| G9   | P-BOLA, volta 13: `(4 pb, 1 dim) x6`                                                                                  | Nenhuma faixa (sequências de 4 pb)                                       |
-| G10  | P-BOLA, voltas 7–12 (36 pb) desenhadas como anel                                                                      | Uma faixa e etiqueta `36x` junto ao 1º ponto                             |
-| G11  | Volta `2 pb, 1 aum, 6 pb, 1 aum, 2 pb`                                                                                | Uma faixa só sobre os 6 pb; etiqueta `6x`                                |
-| G12  | Tabela de P-BOLA, volta 3                                                                                             | `(1x aum; 1x pb) ×6` com total `(18)`                                    |
-| G13  | Volta fechada `1 corr (não conta), (2 pb, pular 1, 1 corr) x9, pbx, pbx` (linha escrita para o projeto)               | `1x corr*; (2x pb; 1x corr) ×9; 2x pbx`                                  |
-| G14  | Volta fechada com `2 corr (não conta), 4 pb, 3 pbx, 4 pb, 3 pbx` e o pbx de fechamento (linha escrita para o projeto) | `2x corr*; (4x pb; 3x pbx) ×2; 1x pbx` (o pbx de fechamento não se soma) |
-| G15  | Página com 18 voltas desenhadas e tabela longa                                                                        | Tabela em página de continuação com título "(receita)"                   |
-| G16  | Duas sequências em voltas vizinhas com o 1º ponto no mesmo ângulo                                                     | Etiquetas não se sobrepõem                                               |
+| Caso | Entrada                                                                                                               | Esperado                                                                                   |
+| ---- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| G9   | P-BOLA, volta 13: `(4 pb, 1 dim) x6`                                                                                  | Nenhuma faixa (sequências de 4 pb)                                                         |
+| G10  | P-BOLA, voltas 7–12 (36 pb) desenhadas como anel                                                                      | Uma faixa e etiqueta `36x` junto ao 1º ponto                                               |
+| G11  | Volta `2 pb, 1 aum, 6 pb, 1 aum, 2 pb`                                                                                | Uma faixa só sobre os 6 pb; etiqueta `6x`                                                  |
+| G12  | Tabela de P-BOLA, volta 3                                                                                             | `(1x pb; 1x aum) ×6` com total `(18)` (ordem da receita, decisão do usuário em 2026-11-15) |
+| G13  | Volta fechada `1 corr (não conta), (2 pb, pular 1, 1 corr) x9, pbx, pbx` (linha escrita para o projeto)               | `1x corr*; (2x pb; 1x corr) ×9; 2x pbx`                                                    |
+| G14  | Volta fechada com `2 corr (não conta), 4 pb, 3 pbx, 4 pb, 3 pbx` e o pbx de fechamento (linha escrita para o projeto) | `2x corr*; (4x pb; 3x pbx) ×2; 1x pbx` (o pbx de fechamento não se soma)                   |
+| G15  | Página com 18 voltas desenhadas e tabela longa                                                                        | Tabela em página de continuação com título "(receita)"                                     |
+| G16  | Duas sequências em voltas vizinhas com o 1º ponto no mesmo ângulo                                                     | Etiquetas não se sobrepõem                                                                 |
 
 Verificação comum: nenhuma etiqueta "Nx" sobrepõe símbolo ou outra etiqueta; a tabela não ultrapassa a margem direita; nenhuma linha da tabela tem item sem símbolo.
 

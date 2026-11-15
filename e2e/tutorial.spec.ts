@@ -48,27 +48,30 @@ test("modo de leitura esconde as ferramentas e Esc devolve a mesma tela, com a m
   expect(camAfter?.map((v) => Math.round(v))).toEqual(camBefore?.map((v) => Math.round(v)));
 });
 
-test("passo = cadeia de pontos iguais: 6 pb, depois a revisão e o estado do marco, depois 6 aum", async ({
+test("passo = cadeia de pontos iguais: 6 pb e logo 6 aum; a revisão e o estado vêm no fim do grupo V7–12", async ({
   page,
 }) => {
+  // marcos só em #marco, grupos de voltas e fim da peça (pergunta 8 em docs/12): a bola tem 2
   await open(page);
   await expect(text(page)).toContainText("Volta 1 · cadeia 1 de 1");
   await expect(text(page)).toContainText("6 pb");
-  await expect(page.getByTestId("tutorial-progress")).toContainText("Passo 1 de 129");
+  await expect(page.getByTestId("tutorial-progress")).toContainText("Passo 1 de 109");
   await expect.poll(async () => (await state(page))?.tutorial.current.length).toBe(6);
   await page.keyboard.press("Space");
-  await expect(text(page)).toContainText("Revisão · marco 1 de 12");
-  await expect(text(page)).toContainText("Volta 1 concluída");
-  await expect.poll(async () => (await state(page))?.tutorial.current.length).toBe(6);
-  await page.screenshot({ path: "test-results/leitura-revisao.png" });
-  await page.keyboard.press("Space");
-  await expect(text(page)).toContainText("Estado atual · marco 1 de 12");
-  await expect.poll(async () => (await state(page))?.tutorial.current.length).toBe(0);
-  await page.screenshot({ path: "test-results/leitura-estado.png" });
-  await page.keyboard.press("ArrowRight");
   await expect(text(page)).toContainText("Volta 2 · cadeia 1 de 1");
   await expect(text(page)).toContainText("6 aum");
   await expect(page.getByTestId("tutorial-alerts")).toContainText("Fim da volta 2");
+  await page.keyboard.press("r");
+  await expect(text(page)).toContainText("Revisão · marco 1 de 2");
+  await expect(text(page)).toContainText("Voltas 1–12 concluídas");
+  await expect
+    .poll(async () => (await state(page))?.tutorial.current.length)
+    .toBe(6 + 12 + 18 + 24 + 30 + 36 * 7);
+  await page.screenshot({ path: "test-results/leitura-revisao.png" });
+  await page.keyboard.press("r");
+  await expect(text(page)).toContainText("Estado atual · marco 1 de 2");
+  await expect.poll(async () => (await state(page))?.tutorial.current.length).toBe(0);
+  await page.screenshot({ path: "test-results/leitura-estado.png" });
 });
 
 test("a volta inteira aparece com os blocos dobrados e cada repetição é um passo", async ({ page }) => {
@@ -94,23 +97,23 @@ test("teclas: volta, marco, pontas, revisão e vistas", async ({ page }) => {
   await expect(text(page)).toContainText("Volta 3 · cadeia 1 de");
   await page.keyboard.press("ArrowDown"); // já no começo: vai à anterior
   await expect(text(page)).toContainText("Volta 2 ·");
-  await page.keyboard.press("PageUp"); // próximo marco
-  await expect(text(page)).toContainText("Volta 3 · cadeia 1 de");
+  await page.keyboard.press("PageUp"); // próximo marco: as voltas 13–17
+  await expect(text(page)).toContainText("Volta 13 · cadeia 1 de");
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("PageDown"); // no meio do marco, volta ao começo dele
-  await expect(text(page)).toContainText("Volta 3 · cadeia 1 de");
-  await page.keyboard.press("PageDown"); // marco anterior
-  await expect(text(page)).toContainText("Volta 2 ·");
+  await expect(text(page)).toContainText("Volta 13 · cadeia 1 de");
+  await page.keyboard.press("PageDown"); // marco anterior: as voltas 1–12
+  await expect(text(page)).toContainText("Volta 1 ·");
   await page.keyboard.press("r");
-  await expect(text(page)).toContainText("Revisão · marco 2 de 12");
+  await expect(text(page)).toContainText("Revisão · marco 1 de 2");
   await page.keyboard.press("r");
-  await expect(text(page)).toContainText("Estado atual · marco 2 de 12");
+  await expect(text(page)).toContainText("Estado atual · marco 1 de 2");
   await page.keyboard.press("End");
-  await expect(page.getByTestId("tutorial-progress")).toContainText("Passo 129 de 129");
+  await expect(page.getByTestId("tutorial-progress")).toContainText("Passo 109 de 109");
   await page.keyboard.press("Home");
-  await expect(page.getByTestId("tutorial-progress")).toContainText("Passo 1 de 129");
+  await expect(page.getByTestId("tutorial-progress")).toContainText("Passo 1 de 109");
   await page.keyboard.press("Backspace"); // no começo não passa
-  await expect(page.getByTestId("tutorial-progress")).toContainText("Passo 1 de 129");
+  await expect(page.getByTestId("tutorial-progress")).toContainText("Passo 1 de 109");
   await page.keyboard.press("2");
   await expect.poll(() => page.evaluate(() => window.__view3d?.state().viewDir[2])).toBeGreaterThan(0.9);
   await page.keyboard.press("f");
@@ -123,7 +126,7 @@ test("Espaço não aciona o botão que está com o foco", async ({ page }) => {
   await page.getByTestId("tutorial-prev").focus(); // desabilitado no começo
   await page.getByTestId("tutorial-next").focus();
   await page.keyboard.press("Space");
-  await expect(page.getByTestId("tutorial-progress")).toContainText("Passo 2 de 129");
+  await expect(page.getByTestId("tutorial-progress")).toContainText("Passo 2 de 109");
 });
 
 test("as teclas aparecem na faixa, da mais usada à menos usada", async ({ page }) => {
@@ -189,7 +192,7 @@ test("#marco na receita vira marco com o texto escrito e aparece no slide de rev
   await page.getByTestId("tutorial-round").selectOption("2");
   await page.getByTestId("reading-review").click();
   await expect(text(page)).toContainText("Fechar o corpo");
-  await expect(text(page)).toContainText("Volta 2: o que foi feito");
+  await expect(text(page)).toContainText("Voltas 1 a 2: o que foi feito");
 });
 
 test("numa montagem com peça espelhada o destaque cai nos pontos da peça ativa", async ({ page }) => {
@@ -371,10 +374,11 @@ test("o MCP anda o modo de leitura pelos mesmos comandos tutorial.* e o projeto 
     expect((await call("tutorial.nextRound", { text: recipe })).json.step.round).toBe(3);
     expect((await call("tutorial.prevRound", { text: recipe })).json.step.round).toBe(2);
     await call("tutorial.nextRound", { text: recipe });
-    expect((await call("tutorial.nextMilestone", { text: recipe })).json.step.milestone).toBe(3);
-    expect((await call("tutorial.prevMilestone", { text: recipe })).json.step.milestone).toBe(2);
+    // marcos da bola: voltas 1–12 e 13–17 (pergunta 8 em docs/12)
+    expect((await call("tutorial.nextMilestone", { text: recipe })).json.step.milestone).toBe(1);
+    expect((await call("tutorial.prevMilestone", { text: recipe })).json.step.milestone).toBe(0);
     expect((await call("tutorial.slide", { text: recipe, kind: "review" })).json.step.kind).toBe("review");
-    expect((await call("tutorial.last", { text: recipe })).json.index).toBe(128);
+    expect((await call("tutorial.last", { text: recipe })).json.index).toBe(108);
     expect((await call("tutorial.first", { text: recipe })).json.index).toBe(0);
     expect((await call("tutorial.goto", { text: recipe, round: 99 })).isError).toBe(true);
     const sl = await call("tutorial.script", { text: recipe, from: 0, count: 3 });
@@ -383,7 +387,7 @@ test("o MCP anda o modo de leitura pelos mesmos comandos tutorial.* e o projeto 
     const proj = await call("project.export");
     expect(proj.isError, proj.text).toBe(false);
     expect(proj.json.app).toBe("novelo3d");
-    expect(proj.json.tutorial.p1.index).toBe(3);
+    expect(proj.json.tutorial.p1.index).toBe(1); // a volta 2 é o 2º passo (sem slides depois da volta 1)
     expect((await call("tutorial.reading", { on: false })).json).toEqual({ reading: false });
     await expect(page.getByTestId("reading")).toHaveCount(0);
   } finally {

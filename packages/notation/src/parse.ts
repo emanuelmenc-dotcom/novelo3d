@@ -44,10 +44,10 @@ function prep(raw: string): string {
   );
   t = t.replace(/\bnao conta\b/g, " @nc ");
   t = t.replace(
-    /\b(?:na|in|into)\s+(?:the\s+)?(?:corrente|ch)\s+(?:inicial|first|starting)\b|\b(?:in|into)\s+(?:the\s+)?(?:first|starting|beginning)\s+ch\b/g,
+    /\b(?:na|in|into)\s+(?:the\s+)?(?:corrente|corr|ch)\s+(?:inicial|first|starting)\b|\b(?:in|into)\s+(?:the\s+)?(?:first|starting|beginning)\s+ch\b/g,
     " @joinch ",
   );
-  t = t.replace(/\b(?:na|in|into)\s+(?:a\s+|the\s+)?(?:corrente|ch)\b/g, " @inch ");
+  t = t.replace(/\b(?:na|in|into)\s+(?:a\s+|the\s+)?(?:corrente|corr|ch)\b/g, " @inch ");
   t = t.replace(
     /\b(?:no|in|into)\s+(?:the\s+)?(?:anel magico|magic ring|magic loop|mr|am)\b|\b(?:anel magico|magic ring|magic loop)\b/g,
     " @ring ",
@@ -280,6 +280,19 @@ function parseLine(body: string, dialect: Dialect, issues: Issue[], row: number,
   };
 
   const ops = parseOps();
+  // "pbx na corr" no fim de uma volta que começou com corrente que não conta é o fechamento na corrente inicial
+  // (pergunta 6 em docs/12), não um pbx dentro de um espaço de corrente
+  const first = ops[0];
+  const last = ops[ops.length - 1];
+  if (
+    ops.length > 1 &&
+    first?.kind === "stitch" &&
+    first.code === "CH" &&
+    first.counted === false &&
+    last?.kind === "slInto" &&
+    last.count === 1
+  )
+    ops[ops.length - 1] = { kind: "join" };
   if (sizeOf(ops) > MAX_ROW_STITCHES) {
     bad("ROW_TOO_LARGE", `Volta ${label}: mais de ${MAX_ROW_STITCHES} pontos numa volta.`);
     return { ops: [] as Op[], start: ctx.start };

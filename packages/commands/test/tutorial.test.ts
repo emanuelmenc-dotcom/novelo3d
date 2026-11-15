@@ -60,9 +60,10 @@ afterEach(() => dispatch("tutorial.reset"));
 describe("tutorial.*", () => {
   test("começa no primeiro passo e descreve o roteiro", () => {
     const v = get();
-    expect(v.total).toBe(129); // 105 cadeias e dois slides em cada um dos 12 marcos
+    // 105 cadeias e dois slides em cada um dos 2 marcos (fim do grupo V7–12 e fim da peça; pergunta 8 em docs/12)
+    expect(v.total).toBe(109);
     expect(v.rounds).toBe(17);
-    expect(v.milestones).toBe(12);
+    expect(v.milestones).toBe(2);
     expect(v.step).toMatchObject({ kind: "step", instruction: "6 pb", count: 6 });
     expect(v.index).toBe(0);
     expect(v.step?.round).toBe(1);
@@ -75,11 +76,11 @@ describe("tutorial.*", () => {
     dispatch("tutorial.next", { text: BOLA });
     const v = dispatch("tutorial.next", { text: BOLA }) as View;
     expect(v.index).toBe(2);
-    expect(v.step?.kind).toBe("state"); // depois da volta 1: slide de revisão e slide de estado
-    expect(v.doneThrough).toBe(6);
+    expect(v.step).toMatchObject({ kind: "step", round: 3 }); // voltas soltas não param: segue direto
+    expect(v.doneThrough).toBe(18);
     expect((dispatch("tutorial.prev", { text: BOLA }) as View).index).toBe(1);
-    dispatch("tutorial.goto", { text: BOLA, step: 129 });
-    expect((dispatch("tutorial.next", { text: BOLA }) as View).index).toBe(128);
+    dispatch("tutorial.goto", { text: BOLA, step: 109 });
+    expect((dispatch("tutorial.next", { text: BOLA }) as View).index).toBe(108);
   });
 
   test("goto por volta e por passo, com erros claros", () => {
@@ -88,7 +89,7 @@ describe("tutorial.*", () => {
     expect(v.step?.positionInRow).toBe(1);
     expect((dispatch("tutorial.goto", { text: BOLA, step: 7 }) as View).index).toBe(6);
     expect(refused(() => dispatch("tutorial.goto", { text: BOLA, round: 99 }))).toContain("não existe");
-    expect(refused(() => dispatch("tutorial.goto", { text: BOLA, step: 0 }))).toContain("entre 1 e 129");
+    expect(refused(() => dispatch("tutorial.goto", { text: BOLA, step: 0 }))).toContain("entre 1 e 109");
     expect(refused(() => dispatch("tutorial.goto", { text: BOLA }))).toContain("informe");
   });
 
@@ -135,10 +136,10 @@ describe("tutorial.*", () => {
       total: number;
       steps: unknown[];
     };
-    expect(r.total).toBe(129);
+    expect(r.total).toBe(109);
     expect(r.steps.length).toBe(5);
     const big = dispatch("tutorial.script", { text: BOLA, count: 5000 }) as { steps: unknown[] };
-    expect(big.steps.length).toBe(129); // o limite de 200 por chamada não corta este roteiro
+    expect(big.steps.length).toBe(109); // o limite de 200 por chamada não corta este roteiro
   });
 
   test("receita acima do limite dá a mensagem legível", () => {
@@ -184,23 +185,27 @@ describe("tutorial.*: modo de leitura (G2)", () => {
   });
 
   test("marcos: nextMilestone vai ao começo do marco seguinte; prevMilestone volta ao começo do atual e depois ao anterior", () => {
+    // marcos da bola: voltas 1–12 (fim do grupo V7–12) e voltas 13–17 (fim da peça)
     const m1 = dispatch("tutorial.nextMilestone", { text: BOLA }) as View;
-    expect(m1.step).toMatchObject({ kind: "step", milestone: 1, round: 2 });
-    dispatch("tutorial.nextMilestone", { text: BOLA });
-    const start = dispatch("tutorial.nextMilestone", { text: BOLA }) as View;
-    expect(start.step?.milestone).toBe(3);
+    expect(m1.step).toMatchObject({ kind: "step", milestone: 1, round: 13 });
     dispatch("tutorial.next", { text: BOLA });
-    expect((dispatch("tutorial.prevMilestone", { text: BOLA }) as View).step?.milestone).toBe(3);
-    expect((dispatch("tutorial.prevMilestone", { text: BOLA }) as View).step?.milestone).toBe(2);
+    expect((dispatch("tutorial.prevMilestone", { text: BOLA }) as View).step).toMatchObject({
+      milestone: 1,
+      round: 13,
+    });
+    expect((dispatch("tutorial.prevMilestone", { text: BOLA }) as View).step).toMatchObject({
+      milestone: 0,
+      round: 1,
+    });
   });
 
   test("slides e pontas: slide leva à revisão e ao estado do marco; first e last", () => {
     dispatch("tutorial.goto", { text: BOLA, round: 3 });
     const r = dispatch("tutorial.slide", { text: BOLA, kind: "review" }) as View;
-    expect(r.step).toMatchObject({ kind: "review", milestone: 2 });
+    expect(r.step).toMatchObject({ kind: "review", milestone: 0 });
     expect((dispatch("tutorial.slide", { text: BOLA, kind: "state" }) as View).step?.kind).toBe("state");
     expect(refused(() => dispatch("tutorial.slide", { text: BOLA, kind: "x" }))).toContain("review ou state");
-    expect((dispatch("tutorial.last", { text: BOLA }) as View).index).toBe(128);
+    expect((dispatch("tutorial.last", { text: BOLA }) as View).index).toBe(108);
     expect((dispatch("tutorial.first", { text: BOLA }) as View).index).toBe(0);
   });
 

@@ -38,8 +38,11 @@ describe("chainsOf com atomos reais", () => {
     // parecida (pergunta 6 em docs/12). A linha deste teste foi escrita para o projeto.
     expect(show(chainsOf(k))).toBe("1CH0 | (4SC 3SL0) x2 | 1JOIN");
   });
-  test("pbx na corr sozinho não é reconhecido como fechamento (pergunta 6 em docs/12)", () => {
+  test("pbx na corr no fim de volta que começou com corrente que não conta é o fechamento (pergunta 6)", () => {
     const k = keysOf("V1: 27 pb no anel mágico (27)\nV2: 1 corr (não conta), 4 pb, pbx na corr", 2);
-    expect(k.at(-1)).not.toBe("JOIN");
+    expect(k.at(-1)).toBe("JOIN");
+    // sem a corrente inicial que não conta, continua um pbx dentro de um espaço de corrente
+    const m = keysOf("V1: 27 pb no anel mágico (27)\nV2: 4 pb, pbx na corr", 2);
+    expect(m.at(-1)).not.toBe("JOIN");
   });
 });

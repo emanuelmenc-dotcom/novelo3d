@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Roteiro do modo de leitura (G2): passo = cadeia de pontos iguais, marco = fim de cada linha da receita ou `#marco`.
+// Roteiro do modo de leitura (G2): passo = cadeia de pontos iguais; marco = linha com `#marco`, fim de um grupo de voltas
+// ("V7–12") ou fim da peça (decisão do usuário em 2026-11-15, pergunta 8 em docs/12).
 import { applyPaint, buildGraph } from "@novelo/core";
 import { parsePattern, printPattern, printPatternWithYarns } from "@novelo/notation";
 import { describe, expect, test } from "vitest";
@@ -26,12 +27,13 @@ const read = (text: string) => {
 };
 
 describe("modo de leitura: roteiro", () => {
-  test("P-BOLA: um marco por linha da receita e dois slides depois de cada um", () => {
+  test("P-BOLA: marco no fim do grupo V7–12 e no fim da peça, com dois slides depois de cada um", () => {
     const { steps, milestones } = read(P_BOLA);
-    expect(milestones).toHaveLength(12); // V7–12 é uma linha só
-    expect(milestones[6]).toMatchObject({ fromRound: 7, toRound: 12, rowLabel: "12" });
-    expect(steps.filter((s) => s.kind === "review")).toHaveLength(12);
-    expect(steps.filter((s) => s.kind === "state")).toHaveLength(12);
+    expect(milestones).toHaveLength(2); // voltas soltas não param a leitura
+    expect(milestones[0]).toMatchObject({ fromRound: 1, toRound: 12, rowLabel: "12" });
+    expect(milestones[1]).toMatchObject({ fromRound: 13, toRound: 17 });
+    expect(steps.filter((s) => s.kind === "review")).toHaveLength(2);
+    expect(steps.filter((s) => s.kind === "state")).toHaveLength(2);
     // os dois slides vêm logo depois do último passo do marco, revisão primeiro
     const at = steps.findIndex((s) => s.kind === "review");
     expect(steps[at + 1]?.kind).toBe("state");
@@ -55,18 +57,17 @@ describe("modo de leitura: roteiro", () => {
     const { steps, milestones } = read(P_BOLA);
     const reviews = steps.filter((s) => s.kind === "review");
     const states = steps.filter((s) => s.kind === "state");
-    expect(reviews[0]?.nodeIds).toHaveLength(6);
-    expect(reviews[1]?.nodeIds).toHaveLength(12);
-    expect(reviews[6]?.nodeIds).toHaveLength(36 * 6); // V7–12: seis voltas de 36
+    expect(reviews[0]?.nodeIds).toHaveLength(6 + 12 + 18 + 24 + 30 + 36 * 7); // voltas 1 a 12
+    expect(reviews[1]?.nodeIds).toHaveLength(30 + 24 + 18 + 12 + 6); // voltas 13 a 17
     expect(states.every((s) => s.nodeIds.length === 0)).toBe(true); // o estado não destaca nada
-    expect(milestones[6]?.title).toBe("Voltas 7–12 concluídas");
+    expect(milestones.map((m) => m.title)).toEqual(["Voltas 1–12 concluídas", "Voltas 13–17 concluídas"]);
   });
 
   test("`#marco texto` marca o fim de uma volta, sobrevive a imprimir e ler de novo e não vira passo", () => {
     const text = `${P_BOLA.split("\n").slice(0, 2).join("\n")}\n#marco Fechar o anel\nV3: (1 pb, 1 aum) x6 (18)`;
     const { pattern, milestones } = read(text);
-    expect(milestones[1]).toMatchObject({ title: "Fechar o anel", manual: true });
-    expect(milestones[0]?.manual).toBe(false);
+    expect(milestones[0]).toMatchObject({ title: "Fechar o anel", manual: true, toRound: 2 });
+    expect(milestones[1]).toMatchObject({ title: "Volta 3 concluída", manual: false });
     const again = read(printPattern(pattern));
     expect(again.milestones.map((m) => m.title)).toEqual(milestones.map((m) => m.title));
   });

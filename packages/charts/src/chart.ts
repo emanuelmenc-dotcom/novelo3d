@@ -518,7 +518,11 @@ export function renderChart(pattern: Pattern, options: ChartOptions = {}): Chart
         // anéis lisos vizinhos alternam de lado para as etiquetas não se sobreporem
         const pa = Math.PI / 2 + (plainCount++ % 2) * 0.9;
         plainAngle[i] = pa;
+        // a volta lisa também é uma sequência de pb: ganha a faixa (o anel inteiro) e a etiqueta "Nx" (pergunta 9)
+        s.circle(C, r, `fill="none" stroke="${col}" stroke-opacity="0.17" stroke-width="5.0" stroke-linecap="round"`);
         plainRing(s, C, r, pa, `${num} · ${e.count} pb`, showYarns ? colorOf(e.yarn) : undefined);
+        extra.push({ ...pt(frame(C, r, pa).o), rad: 9 });
+        tags.push({ r, a: pa + Math.PI, txt: `${e.count}x`, col });
         if (e.yarn) pageYarns.add(e.yarn);
         return;
       }

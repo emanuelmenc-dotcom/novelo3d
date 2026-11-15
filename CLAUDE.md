@@ -65,6 +65,7 @@ npm run lint         # Biome
 npm run e2e          # testes de navegador (Playwright)
 npm run check        # typecheck + lint + test, nesta ordem
 npm run exe          # gera apps/desktop/release/Novelo3D.exe (Windows, portátil) e testa o exe novo
+npm run galinha      # testes privados da galinha (receita comprada, fora do git): rodar em toda revisão
 ```
 
 No Windows, use comandos que funcionem no PowerShell; evite scripts que dependam de bash.
@@ -72,7 +73,7 @@ No Windows, use comandos que funcionem no PowerShell; evite scripts que dependam
 ## Regras de trabalho
 
 1. **Um marco por vez.** Não comece o próximo antes de cumprir os critérios de aceite do atual e de o usuário aprovar.
-2. **Teste antes de declarar pronto.** Rode `npm run check`. Para o que é visual, gere a imagem e olhe. Relate o que foi verificado e o que não foi.
+2. **Teste antes de declarar pronto.** Rode `npm run check` e `npm run galinha` (pedido do usuário em 2026-11-15: a galinha entra em toda revisão e teste; os arquivos dela são privados e ficam fora do git). Para o que é visual, gere a imagem e olhe. Relate o que foi verificado e o que não foi.
 3. **A contagem manda.** Toda receita, gerada ou importada, passa por `core.validate()`. Nenhuma saída esconde divergência de contagem.
 4. **Motores puros.** `core`, `notation`, `engine-*`, `charts` e `tutorial` não usam DOM, relógio nem aleatoriedade sem semente. Mesma entrada, mesma saída.
 5. **Dependência entre pacotes só para baixo**, conforme `docs/05-arquitetura.md`.
@@ -89,6 +90,7 @@ No Windows, use comandos que funcionem no PowerShell; evite scripts que dependam
 - **Não copie** código do repositório AmiGo em Python (CC BY-NC-SA) nem de repositórios sem licença. Reimplemente a partir dos artigos.
 - **Não copie** código do CrochetBuilder (AGPL-3.0-only) sem aprovação explícita do usuário.
 - **Não inclua receitas de terceiros** no repositório. Casos de teste usam formas geométricas e receitas escritas para o projeto.
+- A galinha (receita comprada pelo usuário) vive só em arquivos ignorados pelo git: `referencia/sessao-galinha/`, `packages/commands/test/galinha*.local*` e `e2e/galinha.local.spec.ts`. O modelo por formas (`galinha-forma.local.test.ts`) é comparado volta a volta com a receita em `referencia/sessao-galinha/comparacao.md`.
 - `referencia/sessao-sapo/` contém material de uma receita comercial para uso pessoal do usuário. Está no `.gitignore`. Nunca publique nem copie o conteúdo dela para testes.
 
 ## Convenções de código

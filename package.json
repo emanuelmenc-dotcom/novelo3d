@@ -15,7 +15,8 @@
     "lint": "biome check .",
     "e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm test",
-    "exe": "npm run build -w @novelo/studio && npm run dist -w @novelo/desktop && node apps/desktop/verify.mjs"
+    "exe": "npm run build -w @novelo/studio && npm run dist -w @novelo/desktop && node apps/desktop/verify.mjs",
+    "galinha": "node tools/galinha.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",

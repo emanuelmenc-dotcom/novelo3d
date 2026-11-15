@@ -18,6 +18,7 @@ graphify-out/
 tsconfig.tsbuildinfo
 referencia/sessao-galinha/
 packages/commands/test/*.local.test.ts
+packages/commands/test/*.local.ts
 e2e/*.local.spec.ts
 
 # Novelo3D para Windows (D-70): saída do build

@@ -89,6 +89,7 @@ test("selecionar por volta e por retângulo, pintar fio, tensão, desfazer e per
   await ribbon(page, "selecionar");
   await page.getByTestId("mode-yarn").click();
   await page.getByLabel("Fio da pintura").selectOption("B");
+  await ribbon(page, "pintar");
   await page.getByTestId("apply-selection").click();
   await expect.poll(() => page.evaluate((i) => window.__view3d?.nodeColor(i), p.id)).toBe("#f4f1e8");
   await page.screenshot({ path: "test-results/pontos-fio.png" });
@@ -105,6 +106,7 @@ test("selecionar por volta e por retângulo, pintar fio, tensão, desfazer e per
   await ribbon(page, "selecionar");
   await page.getByTestId("mode-tension").click();
   await page.getByLabel("Valor da tensão").fill("-1");
+  await ribbon(page, "pintar");
   await page.getByTestId("apply-selection").click();
   await expect(page.getByTestId("points-info")).toContainText("72 pontos editados");
   await page.screenshot({ path: "test-results/pontos-tensao.png" });
@@ -280,6 +282,7 @@ test("R0: pintar não recria as malhas e, parado, o 3D não desenha quadros", as
   await ribbon(page, "selecionar");
   await page.getByTestId("mode-yarn").click();
   await page.getByLabel("Fio da pintura").selectOption("B");
+  await ribbon(page, "pintar");
   await page.getByTestId("apply-selection").click();
   await expect.poll(() => page.evaluate((i) => window.__view3d?.nodeColor(i), p.id)).toBe("#f4f1e8");
   expect(await page.evaluate(() => window.__view3d?.state().meshBuilds)).toBe(builds);

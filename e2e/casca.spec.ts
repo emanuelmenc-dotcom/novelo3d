@@ -26,8 +26,15 @@ test("ribbon: abas na ordem em que o trabalho é feito e botões do mais usado a
   await ribbon(page, "selecionar");
   // ferramenta primeiro (girar, selecionar), depois forma, operação e ações sobre a seleção
   const labels = await page.locator("#ribbon-panel .ribbon-group-label").allTextContents();
-  expect(labels).toEqual(["Ferramenta", "Forma da seleção", "Operação", "Seleção"]);
+  expect(labels).toEqual(["Ferramenta", "Forma da seleção", "Operação", "Seleção", "Filtro"]);
   await page.screenshot({ path: "test-results/casca-ribbon-selecionar.png" });
+  // controles longos ficam num painel que abre do botão; o ribbon não cresce
+  const h = (await page.locator("#ribbon-panel").boundingBox())?.height;
+  await page.getByTestId("pop-filtro").click();
+  await expect(page.getByTestId("apply-filter")).toBeVisible();
+  expect((await page.locator("#ribbon-panel").boundingBox())?.height).toBe(h);
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("apply-filter")).toHaveCount(0);
   await ribbon(page, "pintar");
   await expect(page.getByTestId("brush-brush")).toBeDisabled(); // pincel só vale em Pintar fio ou Tensão
   await page.getByTestId("mode-yarn").click();
@@ -70,6 +77,7 @@ test("busca de comandos: Ctrl+K acha uma ferramenta pelo nome e a executa", asyn
   await page.getByRole("textbox", { name: "Buscar comando" }).fill("zzzz");
   await expect(page.getByText("Nenhum comando com esse nome.")).toBeVisible();
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("apply-filter")).toHaveCount(0);
   await expect(page.getByTestId("command-palette")).toHaveCount(0);
 });
 
@@ -92,6 +100,7 @@ test("janelas: desligar uma janela vale mesmo ao trocar de layout predefinido; l
   }
   await page.getByTestId("window-props").click();
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("apply-filter")).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "Propriedades", exact: true })).toBeVisible();
 });
 
@@ -158,6 +167,7 @@ test("migração única: layout antigo e cubo à direita viram o padrão novo; d
   await page.getByTestId("windows-menu").click();
   await page.getByTestId("window-cp").click();
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("apply-filter")).toHaveCount(0);
   await page.waitForTimeout(500);
   await page.reload();
   await page.getByTestId("windows-menu").click();

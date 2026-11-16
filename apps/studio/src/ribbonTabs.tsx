@@ -3,6 +3,13 @@
 // seleção, pintura, montagem, tutorial) e, dentro de cada aba, os botões vão do mais usado primeiro (esquerda) ao menos usado
 // (direita). Toda ação passa pelos comandos (D-21): aqui só se decide o que cada botão dispara.
 import { Icon } from "./icons.tsx";
+import {
+  ApplySelection,
+  FilterControls,
+  RibbonPopover,
+  StripeControls,
+  TensionControls,
+} from "./PointControls.tsx";
 import { setTools, type ToolState } from "./pointtools.ts";
 import type { RibbonItem, RibbonTab } from "./Ribbon.tsx";
 import { openShape } from "./ShapeWindow.tsx";
@@ -218,6 +225,22 @@ export function buildRibbonTabs(c: RibbonCtx): RibbonTab[] {
             ),
           ],
         },
+        {
+          id: "filtro",
+          label: "Filtro",
+          items: [
+            {
+              kind: "custom",
+              id: "selecionar.filtro",
+              label: "Filtro",
+              node: (
+                <RibbonPopover id="filtro" label="Filtro" icon="list">
+                  <FilterControls runText={c.runText} op={t.op} />
+                </RibbonPopover>
+              ),
+            },
+          ],
+        },
       ],
     },
     {
@@ -245,6 +268,50 @@ export function buildRibbonTabs(c: RibbonCtx): RibbonTab[] {
             brushBtn("bucket", "Balde", "bucket"),
             brushBtn("dropper", "Conta-gotas", "dropper"),
             brushBtn("erase", "Borracha", "erase"),
+          ],
+        },
+        {
+          id: "aplicar",
+          label: "Seleção",
+          items: [
+            {
+              kind: "custom",
+              id: "pintar.aplicar",
+              label: "Aplicar à seleção",
+              node: <ApplySelection runText={c.runText} tools={t} />,
+            },
+          ],
+        },
+        {
+          id: "listras",
+          label: "Listras",
+          items: [
+            {
+              kind: "custom",
+              id: "pintar.listras",
+              label: "Listras",
+              node: (
+                <RibbonPopover id="listras" label="Listras" icon="round">
+                  <StripeControls runText={c.runText} />
+                </RibbonPopover>
+              ),
+            },
+          ],
+        },
+        {
+          id: "tensao",
+          label: "Tensão",
+          items: [
+            {
+              kind: "custom",
+              id: "pintar.tensao",
+              label: "Tensão",
+              node: (
+                <RibbonPopover id="tensao" label="Suavizar e gradiente" icon="tension">
+                  <TensionControls runText={c.runText} />
+                </RibbonPopover>
+              ),
+            },
           ],
         },
         {

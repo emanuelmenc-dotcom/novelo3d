@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Barra de opções da ferramenta, fina, sobre o 3D: mostra qual ferramenta está ativa, o que ela faz com o botão esquerdo, quantos
-// pontos estão selecionados e as estatísticas da peça. O resto fica no ribbon.
+// pontos estão selecionados, os valores da ferramenta (fio, tensão, raio, saltos) e as estatísticas da peça. As ações ficam
+// no ribbon.
+import { ToolValues } from "./PointControls.tsx";
 import type { ToolState } from "./pointtools.ts";
 
 const MODE_NAME: Record<ToolState["mode"], string> = {
@@ -49,6 +51,7 @@ export function ToolOptionsBar(props: { tools: ToolState; selected: number; stat
     <div className="optbar" data-testid="options-bar">
       <strong>{MODE_NAME[tools.mode]}</strong>
       <span>{detail}</span>
+      <ToolValues tools={tools} />
       <span className="optbar-spacer" />
       <span data-testid="options-selected">{selected} selecionados</span>
       {stats && <span className="hint">{stats}</span>}

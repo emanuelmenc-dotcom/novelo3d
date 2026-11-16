@@ -78,7 +78,79 @@ function Editor(props: { item: Item; onDone: () => void; run: Run }) {
       </div>
     );
   }
-  if (item.method === "parts.set") {
+  // costura: nome, tipo e sentido (pergunta 18)
+  if (item.method === "seam.add" || item.method === "seam.set") {
+    const types = [
+      ["mattress", "invisível (colchoeiro)"],
+      ["whip", "chuleado"],
+      ["slip", "pbx"],
+      ["sc", "pb"],
+    ];
+    return (
+      <div className="tl-edit" data-testid="timeline-editor">
+        {field("name", "Nome da costura", p.name)}
+        <label>
+          Tipo{" "}
+          <select
+            aria-label="Tipo de costura"
+            value={val("type", p.type ?? "mattress")}
+            onChange={(e) => setV({ ...v, type: e.target.value })}
+          >
+            {types.map(([id, label]) => (
+              <option key={id} value={id}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            aria-label="Sentido invertido"
+            checked={val("reverse", p.reverse === true) === "true"}
+            onChange={(e) => setV({ ...v, reverse: String(e.target.checked) })}
+          />{" "}
+          sentido invertido
+        </label>
+        <button
+          type="button"
+          onClick={() =>
+            save({
+              ...(val("name", p.name).trim() ? { name: val("name", p.name).trim() } : {}),
+              type: val("type", p.type ?? "mattress"),
+              reverse: val("reverse", p.reverse === true) === "true",
+            })
+          }
+        >
+          Aplicar
+        </button>
+      </div>
+    );
+  }
+  // nova montagem: o nome
+  if (item.method === "assembly.add") {
+    return (
+      <div className="tl-edit" data-testid="timeline-editor">
+        {field("name", "Nome da montagem", p.name)}
+        <button type="button" onClick={() => save({ name: val("name", p.name).trim() || null })}>
+          Aplicar
+        </button>
+      </div>
+    );
+  }
+  // trocar fio em todo o projeto: de qual fio para qual
+  if (item.method === "materials.replace") {
+    return (
+      <div className="tl-edit" data-testid="timeline-editor">
+        {field("from", "Trocar o fio", p.from)}
+        {field("to", "Pelo fio", p.to)}
+        <button type="button" onClick={() => save({ from: val("from", p.from), to: val("to", p.to) })}>
+          Aplicar
+        </button>
+      </div>
+    );
+  }
+  if (item.method === "parts.set" || item.method === "assembly.set") {
     const vec = (k: "pos" | "rot", label: string) =>
       [0, 1, 2].map((i) =>
         field(`${k}${i}`, `${label} ${"XYZ"[i]}`, (p[k] as number[] | undefined)?.[i] ?? 0),

@@ -3,7 +3,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { expect, type Page, test } from "@playwright/test";
-import { ribbon, showTab } from "./ribbon.ts";
+import { expectTimelineOk, goTree, ribbon, showTab } from "./ribbon.ts";
 
 const PORT = 47925;
 const count = (page: Page) => page.evaluate(() => window.__view3d?.state().count ?? 0);
@@ -212,4 +212,50 @@ test("o MCP anda a linha do tempo: lê, volta o marcador, suprime, edita, exclui
     expect(gone.json.features.map((f: { method: string }) => f.method)).toEqual(["parts.instance"]);
     expect((await call("timeline.remove", { id: 9999 })).isError).toBe(true);
   });
+});
+
+test("arrastar uma peça para uma montagem e de volta para o Projeto (pergunta 15)", async ({ page }) => {
+  await page.goto("/");
+  await expect.poll(() => page.evaluate(() => window.__view3d?.state().count ?? 0)).toBe(433);
+  await page.evaluate(() => window.__timeline?.run("assembly.add", { name: "Grupo" }));
+  await goTree(page);
+  const asmOf = () =>
+    page.evaluate(() => {
+      const t = window.__timeline;
+      if (!t) throw new Error("sem linha do tempo");
+      const r = t.run("parts.get") as { parts: { id: string; assembly?: string }[] };
+      return r.parts.find((q) => q.id === "p1")?.assembly ?? null;
+    });
+  await page.locator('[data-part="p1"]').dragTo(page.locator('[data-assembly="a1"]'));
+  await expect.poll(asmOf).toBe("a1");
+  await page.locator('[data-part="p1"]').dragTo(page.getByTestId("tree-root"));
+  await expect.poll(asmOf).toBe(null);
+  await expectTimelineOk(page);
+});
+
+test("linha do tempo edita a nova montagem (nome) e a posição dela (pergunta 18)", async ({ page }) => {
+  await page.goto("/");
+  await expect.poll(() => page.evaluate(() => window.__view3d?.state().count ?? 0)).toBe(433);
+  await page.evaluate(() => {
+    window.__timeline?.run("assembly.add", { name: "Grupo", parts: ["p1"] });
+    window.__timeline?.run("assembly.set", { id: "a1", pos: [10, 0, 0] });
+  });
+  await page.getByTestId("feature-0").click();
+  await page.getByRole("menuitem", { name: "Editar parâmetros" }).click();
+  await page.getByLabel("Nome da montagem").fill("Corpo");
+  await page.getByRole("button", { name: "Aplicar" }).click();
+  await goTree(page);
+  await expect(page.getByRole("button", { name: "Montagem Corpo", exact: true })).toBeVisible();
+  await page.getByTestId("feature-1").click();
+  await page.getByRole("menuitem", { name: "Editar parâmetros" }).click();
+  await page.getByLabel("Posição (mm) X").fill("25");
+  await page.getByRole("button", { name: "Aplicar" }).click();
+  const pos = await page.evaluate(() => {
+    const t = window.__timeline;
+    if (!t) throw new Error("sem linha do tempo");
+    return (t.run("project.export") as { parts: { assemblies: { pos: number[] }[] } }).parts.assemblies[0]
+      ?.pos;
+  });
+  expect(pos).toEqual([25, 0, 0]);
+  await expectTimelineOk(page);
 });

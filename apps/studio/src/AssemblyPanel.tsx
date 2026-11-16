@@ -199,12 +199,31 @@ export function AssemblyPanel(props: { sections: AssemblySection[] }) {
     run("parts.set", { id: active.id, [key]: next });
   };
 
+  // arrastar uma peça e soltar numa montagem (ou no Projeto, a raiz) muda a montagem dela (pergunta 15)
+  const DRAG = "application/x-novelo-part";
+  const dropTo = (assembly: string | null) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (e.dataTransfer.types.includes(DRAG)) e.preventDefault();
+    },
+    onDrop: (e: React.DragEvent) => {
+      const id = e.dataTransfer.getData(DRAG);
+      if (!id) return;
+      e.preventDefault();
+      run("parts.set", { id, assembly });
+    },
+  });
   const partRow = (p: (typeof st.parts)[number], depth: number) => (
     <li
       key={p.id}
       data-part={p.id}
       className={p.id === st.active ? "on" : ""}
       style={{ paddingLeft: `${depth * 1.25}rem` }}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DRAG, p.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      title="Arraste para uma montagem (ou para Projeto) para mudar onde a peça está"
     >
       <label>
         <input
@@ -251,7 +270,7 @@ export function AssemblyPanel(props: { sections: AssemblySection[] }) {
     </li>
   );
   const asmRow = (a: (typeof st.assemblies)[number], depth: number) => (
-    <li key={a.id} data-assembly={a.id} style={{ paddingLeft: `${depth * 1.25}rem` }}>
+    <li key={a.id} data-assembly={a.id} style={{ paddingLeft: `${depth * 1.25}rem` }} {...dropTo(a.id)}>
       <button
         type="button"
         className={selectedId === a.id ? "on" : ""}
@@ -300,6 +319,7 @@ export function AssemblyPanel(props: { sections: AssemblySection[] }) {
           <button
             type="button"
             data-testid="tree-root"
+            {...dropTo(null)}
             onClick={() => run("tree.select", { id: "root" })}
             onContextMenu={(e) => {
               e.preventDefault();

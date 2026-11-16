@@ -64,6 +64,8 @@ export interface Handlers {
   /** Pincel: cada ponto novo tocado durante o arrasto. */
   onStroke?(id: number, first: boolean): void;
   onStrokeEnd?(): void;
+  /** Clique direito parado (sem arrastar): menu de contexto do ponto (ou do vazio), na posição da página. */
+  onContext?(id: number | null, x: number, y: number): void;
 }
 
 export interface LayoutData {
@@ -138,6 +140,8 @@ export interface View3D {
   snapView(dir: [number, number, number]): void;
   /** Corte (seção) só da vista: some o que está de um lado do plano; clique, pincel e seleção por forma ignoram o cortado. */
   setSection(s: SectionSpec | null): void;
+  /** Medida de distância: marca os pontos (índices desta vista) e, com dois, a linha entre eles; null limpa. */
+  setMeasure(ids: number[] | null): void;
   dispose(): void;
   /** Para testes: quantos pontos há, o que está selecionado e a direção atual da câmera. */
   state(): {
@@ -167,6 +171,8 @@ export interface View3D {
     tutorial: { faded: number; current: number[]; parents: number[] };
     /** Corte ativo e quantos pontos ele esconde. */
     section: { spec: SectionSpec | null; clipped: number };
+    measure: number;
+    rowsHighlighted: number;
   };
 }
 
@@ -859,6 +865,40 @@ export function mountView3D(
     onSelect(id === null ? null : (nodes[id] as NodeMeta));
   };
 
+  // medida de distância: bolinhas nos pontos clicados e a linha entre eles (pergunta 22 em docs/12)
+  let measureIds: number[] | null = null;
+  const measureGroup = new THREE.Group();
+  scene.add(measureGroup);
+  const measureMat = new THREE.MeshBasicMaterial({ color: "#d6336c", depthTest: false });
+  const drawMeasure = () => {
+    measureGroup.clear();
+    const at = (measureIds ?? [])
+      .filter((i) => i * 3 + 2 < centers.length)
+      .map(
+        (i) =>
+          new THREE.Vector3(
+            centers[i * 3] as number,
+            centers[i * 3 + 1] as number,
+            centers[i * 3 + 2] as number,
+          ),
+      );
+    for (const p of at) {
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 8), measureMat);
+      dot.position.copy(p);
+      dot.renderOrder = 10;
+      measureGroup.add(dot);
+    }
+    if (at.length === 2) {
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(at),
+        new THREE.LineBasicMaterial({ color: "#d6336c", depthTest: false }),
+      );
+      line.renderOrder = 10;
+      measureGroup.add(line);
+    }
+    invalidate();
+  };
+
   // corte (seção): só da vista, fora do projeto e da linha do tempo
   let section: SectionSpec | null = null;
   let sectionT = 0;
@@ -1030,6 +1070,10 @@ export function mountView3D(
     }
     if (!mesh) return;
     const id = pickAt(ev.clientX, ev.clientY);
+    if (ev.button === 2) {
+      handlers.onContext?.(id, ev.clientX, ev.clientY);
+      return;
+    }
     choose(id);
     handlers.onClick?.(id, { shift: ev.shiftKey, ctrl: ev.ctrlKey || ev.metaKey });
   };
@@ -1090,8 +1134,18 @@ export function mountView3D(
     if (dirty || moved) {
       dirty = false;
       applySection();
+      const cut = renderer.clippingPlanes.length > 0;
+      // com corte, o piso fica inteiro (pergunta 21): some no desenho cortado e volta num segundo passe sem corte
+      grid.visible = !cut;
       renderer.render(scene, camera);
-      renderer.clippingPlanes = []; // o cubo de vistas não é cortado
+      renderer.clippingPlanes = []; // o cubo de vistas e o piso não são cortados
+      if (cut) {
+        grid.visible = true;
+        const ac = renderer.autoClear;
+        renderer.autoClear = false;
+        renderer.render(grid, camera);
+        renderer.autoClear = ac;
+      }
       cube.render(renderer, camera, controls.target);
       frames++;
     }
@@ -1129,6 +1183,10 @@ export function mountView3D(
       camera.position.copy(p).addScaledVector(dir, Math.max(fitRadius * 0.9, 4));
       controls.update();
       invalidate();
+    },
+    setMeasure(ids) {
+      measureIds = ids && ids.length > 0 ? ids.slice(0, 2) : null;
+      drawMeasure();
     },
     setSection(s) {
       section = s;
@@ -1246,6 +1304,8 @@ export function mountView3D(
           spec: section ? { ...section } : null,
           clipped: section ? Array.from({ length: nodes.length }, (_, i) => i).filter(isClipped).length : 0,
         },
+        measure: measureIds?.length ?? 0,
+        rowsHighlighted: rowSel?.size ?? 0,
       };
     },
   };

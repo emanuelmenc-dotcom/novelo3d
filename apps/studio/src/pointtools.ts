@@ -27,6 +27,8 @@ export interface ToolState {
   /** Medir distância: primeiro ponto, esperando o segundo clique, e o último resultado (estimativa). */
   measureA: { part: string; uid: number } | null;
   measureText: string | null;
+  /** Pontos marcados no 3D pela medida (índices da vista): o primeiro clique, depois os dois. */
+  measureIds: number[] | null;
   stroking: boolean;
   error: string | null;
 }
@@ -44,6 +46,7 @@ let st: ToolState = {
   pathA: null,
   measureA: null,
   measureText: null,
+  measureIds: null,
   stroking: false,
   error: null,
 };
@@ -115,7 +118,7 @@ export function makeHandlers(ctx: () => Ctx): Handlers {
         if (!hit) return;
         const here = { part: hit.part ?? partsSnapshot().active, uid: hit.uid };
         if (st.measureA === null) {
-          setTools({ measureA: here, measureText: "Clique no segundo ponto." });
+          setTools({ measureA: here, measureIds: [id as number], measureText: "Clique no segundo ponto." });
           return;
         }
         try {
@@ -125,10 +128,11 @@ export function makeHandlers(ctx: () => Ctx): Handlers {
           };
           setTools({
             measureA: null,
+            measureIds: [...(st.measureIds ?? []).slice(0, 1), id as number],
             measureText: `Distância ≈ ${r.distanceMm} mm (${r.distance} larguras de ponto) · estimativa`,
           });
         } catch (e) {
-          setTools({ measureA: null, measureText: (e as Error).message });
+          setTools({ measureA: null, measureIds: null, measureText: (e as Error).message });
         }
         return;
       }

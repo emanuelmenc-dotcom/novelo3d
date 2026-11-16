@@ -58,7 +58,7 @@ const SEAM_TYPES: [string, string][] = [
 const AXES = ["x", "y", "z"] as const;
 
 /** Menu de contexto da árvore: os mesmos comandos do ribbon e da árvore, para a peça em que se clicou. */
-function TreeMenu(props: {
+export function TreeMenu(props: {
   menu: { id: string; x: number; y: number };
   onClose: () => void;
   run: (method: string, params?: Record<string, unknown>) => unknown;

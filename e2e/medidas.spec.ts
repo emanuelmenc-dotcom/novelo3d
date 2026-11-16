@@ -55,6 +55,9 @@ test("distância entre dois cliques, em mm estimados, e fora do modo de leitura"
   await page.mouse.click(box.x + (pts[b * 2] as number), box.y + (pts[b * 2 + 1] as number));
   const bar = page.getByTestId("options-bar");
   await expect(bar).toContainText(/Distância ≈ [\d.]+ mm .* estimativa/);
+  // os dois pontos ficam marcados com a linha entre eles, e medir não destaca a volta na receita (perguntas 22 e 23)
+  await expect.poll(async () => (await state(page))?.measure).toBe(2);
+  expect((await state(page))?.rowsHighlighted).toBe(0);
   // a tela mede os pontos que estavam sob os cliques; o valor tem de ser o do comando para esses dois pontos
   const shown = Number(/\(([\d.]+) larguras/.exec((await bar.textContent()) ?? "")?.[1]);
   const r = await page.evaluate(
@@ -271,4 +274,26 @@ test("o MCP mede e gera receita por forma: measure.bounds, measure.distance e fo
   } finally {
     await client.close();
   }
+});
+
+test("clique direito parado no 3D abre o menu da peça; arrastar com o direito não abre (pergunta 11)", async ({
+  page,
+}) => {
+  await open(page);
+  const box = await page.getByTestId("scene").locator("canvas").boundingBox();
+  const pts = await xy(page);
+  if (!box) throw new Error("sem 3D");
+  const x = box.x + (pts[200] as number);
+  const y = box.y + (pts[201] as number);
+  await page.mouse.click(x, y, { button: "right" });
+  await expect(page.getByRole("menu", { name: "Menu de Peça 1" })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Nova instância" }).click();
+  await expect.poll(() => count(page)).toBe(866);
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  // arrastar com o botão direito desloca a câmera e não abre menu
+  await page.mouse.move(x, y);
+  await page.mouse.down({ button: "right" });
+  await page.mouse.move(x + 60, y + 20, { steps: 5 });
+  await page.mouse.up({ button: "right" });
+  await expect(page.getByRole("menu")).toHaveCount(0);
 });

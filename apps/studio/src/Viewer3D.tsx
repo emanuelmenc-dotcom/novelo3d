@@ -31,6 +31,8 @@ export function Viewer3D(props: {
   tutorial?: TutorialView | null;
   /** Corte (seção) da vista, ou null. */
   section?: SectionSpec | null;
+  /** Pontos da medida de distância (índices desta vista), ou null. */
+  measure?: number[] | null;
   /** Opções de exibição do menu de vista, ao lado do cubo. */
   onWire: (v: boolean) => void;
   onGraph: (v: boolean) => void;
@@ -90,6 +92,11 @@ export function Viewer3D(props: {
   useEffect(() => {
     view.current?.setSection(props.section ?? null);
   }, [props.section]);
+  // depois de trocar os dados (os pontos mudam de lugar) a medida é redesenhada
+  // biome-ignore lint/correctness/useExhaustiveDependencies: o layout muda a posição dos pontos marcados
+  useEffect(() => {
+    view.current?.setMeasure(props.measure ?? null);
+  }, [props.measure, props.layout]);
   useEffect(() => {
     view.current?.highlightRows(props.rows, props.activePart);
   }, [props.rows, props.activePart]);

@@ -35,7 +35,7 @@ import {
 } from "@novelo/commands";
 import { StrictMode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createRoot } from "react-dom/client";
-import { AssemblyPanel } from "./AssemblyPanel.tsx";
+import { AssemblyPanel, TreeMenu } from "./AssemblyPanel.tsx";
 import { type BridgeState, startBridge } from "./bridge.ts";
 import { CommandPalette } from "./CommandPalette.tsx";
 import { lastCamera } from "./cameraStore.ts";
@@ -673,6 +673,29 @@ function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // clique direito parado no 3D: o mesmo menu da árvore, da peça sob o cursor (no vazio, o do projeto; pergunta 11)
+  const [ctxMenu, setCtxMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  // clicar fora fecha o menu
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const close = (e: PointerEvent) => {
+      if (!(e.target as HTMLElement).closest(".tree-menu")) setCtxMenu(null);
+    };
+    window.addEventListener("pointerdown", close, true);
+    return () => window.removeEventListener("pointerdown", close, true);
+  }, [ctxMenu]);
+  const handlers3d = useMemo(
+    () => ({
+      ...handlers,
+      onContext: (id: number | null, x: number, y: number) => {
+        const n = id === null ? undefined : layoutRef.current?.nodes[id];
+        const part = n ? (n.part ?? partsSnapshot().active) : "root";
+        setCtxMenu({ id: part, x, y });
+      },
+    }),
+    [handlers],
+  );
+
   const viewer3d = (
     <Viewer3D
       layout={layout}
@@ -680,12 +703,14 @@ function App() {
       wire={wire}
       tutorial={tutorialView}
       section={reading ? null : sectionSpec(sec)}
-      rows={reading ? null : highlighted}
+      measure={reading || tools.mode !== "measure" ? null : tools.measureIds}
+      // medir não destaca a volta do ponto na receita (pergunta 23)
+      rows={reading || tools.mode === "measure" ? null : highlighted}
       {...(multi ? { activePart: partsState.active } : {})}
       cube={settings.interface.viewCube}
       // no modo de leitura o botão esquerdo só gira: nada de pintar nem selecionar
       tool={reading ? "orbit" : viewerTool(tools)}
-      handlers={reading ? {} : handlers}
+      handlers={reading ? {} : handlers3d}
       selection={reading ? null : selection}
       onSelect={onSelect3D}
       onWire={setWire}
@@ -939,6 +964,9 @@ function App() {
         </FloatingWindow>
       )}
       {!reading && <ShapeWindow />}
+      {ctxMenu && !reading && (
+        <TreeMenu menu={ctxMenu} onClose={() => setCtxMenu(null)} run={(m, p) => runTool(m, p ?? {})} />
+      )}
       {showMaterials && !reading && (
         <FloatingWindow
           title="Lista de materiais"

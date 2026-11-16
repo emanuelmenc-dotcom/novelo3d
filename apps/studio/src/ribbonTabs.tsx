@@ -382,8 +382,8 @@ export function buildRibbonTabs(c: RibbonCtx): RibbonTab[] {
               () =>
                 setTools(
                   t.mode === "measure"
-                    ? { mode: "orbit", measureA: null }
-                    : { mode: "measure", measureA: null, measureText: null },
+                    ? { mode: "orbit", measureA: null, measureIds: null }
+                    : { mode: "measure", measureA: null, measureText: null, measureIds: null },
                 ),
               {
                 pressed: t.mode === "measure",

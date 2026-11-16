@@ -166,7 +166,7 @@ test("com uma instância movida, o corte em X vale no mundo, o conjunto mede mai
   await open(page);
   await page.evaluate(() => {
     window.__timeline?.run("parts.instance", { id: "p1" });
-    window.__timeline?.run("parts.set", { id: "p2", pos: [30, 0, 0] });
+    window.__timeline?.run("parts.set", { id: "p2", pos: [150, 0, 0] }); // mm: 30 larguras de ponto
   });
   await expect.poll(() => count(page)).toBe(866);
   // medir um ponto em cada bola: a peça de cada clique tem de ser a certa (as instâncias repartem os mesmos uids)

@@ -67,7 +67,8 @@ describe("measure.bounds", () => {
     dispatch("assembly.set", { id: "a1", pos: [40, 0, 0] });
     const b = bounds({ target: "assembly", id: "a1" });
     expect(b.size).toEqual(a.size);
-    expect(b.min[0]).toBeCloseTo((a.min[0] as number) + 40, 2);
+    // a posição é em mm; o tamanho medido é em larguras de ponto de 5 mm
+    expect(b.min[0]).toBeCloseTo((a.min[0] as number) + 40 / 5, 2);
   });
 
   test("peça escondida não entra na medida; sem nada à vista é erro claro", () => {

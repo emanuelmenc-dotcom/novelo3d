@@ -85,7 +85,7 @@ function Editor(props: { item: Item; onDone: () => void; run: Run }) {
       );
     return (
       <div className="tl-edit" data-testid="timeline-editor">
-        {p.pos !== undefined && vec("pos", "Posição")}
+        {p.pos !== undefined && vec("pos", "Posição (mm)")}
         {p.rot !== undefined && vec("rot", "Rotação")}
         <button
           type="button"

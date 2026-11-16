@@ -258,8 +258,11 @@ const typeOf = (v: unknown): SeamType => {
 // ------------------------------------------------------------------ transformação das peças na montagem
 
 const rad = (d: number) => (d * Math.PI) / 180;
+/** Milímetros por largura de ponto: as posições das peças e montagens são em mm (pergunta 25 em docs/12). */
+const unit = () => getSettings().yarns.stitchWidthMm;
 type Placed = { rot: [number, number, number]; pos: [number, number, number]; mirror?: string };
 export function transformFn(part: Placed): (x: number, y: number, z: number) => [number, number, number] {
+  const u = unit(); // posição em mm; o espaço do 3D é em larguras de ponto
   const [ax, ay, az] = part.rot.map(rad) as [number, number, number];
   const cx = Math.cos(ax);
   const sx = Math.sin(ax);
@@ -281,12 +284,13 @@ export function transformFn(part: Placed): (x: number, y: number, z: number) => 
     const z2 = -x * sy + z1 * cy;
     const x3 = x2 * cz - y1 * sz;
     const y3 = x2 * sz + y1 * cz;
-    return [x3 + part.pos[0], y3 + part.pos[1], z2 + part.pos[2]];
+    return [x3 + part.pos[0] / u, y3 + part.pos[1] / u, z2 + part.pos[2] / u];
   };
 }
 
 /** O inverso de `transformFn`: do espaço de fora de volta ao espaço da peça (ou montagem). */
 export function invTransformFn(part: Placed): (x: number, y: number, z: number) => [number, number, number] {
+  const u = unit();
   const [ax, ay, az] = part.rot.map(rad) as [number, number, number];
   const cx = Math.cos(ax);
   const sx = Math.sin(ax);
@@ -298,9 +302,9 @@ export function invTransformFn(part: Placed): (x: number, y: number, z: number) 
   const my = part.mirror === "y" ? -1 : 1;
   const mz = part.mirror === "z" ? -1 : 1;
   return (x0, y0, z0) => {
-    const x3 = x0 - part.pos[0];
-    const y3 = y0 - part.pos[1];
-    const z2 = z0 - part.pos[2];
+    const x3 = x0 - part.pos[0] / u;
+    const y3 = y0 - part.pos[1] / u;
+    const z2 = z0 - part.pos[2] / u;
     // desfaz Rz, depois Ry, depois Rx (a ordem contrária de transformFn)
     const x2 = x3 * cz + y3 * sz;
     const y1 = -x3 * sz + y3 * cz;
@@ -706,7 +710,7 @@ export function partsCommands(
           // a pose da peça é dentro da montagem dela: os alvos saem do mundo para o espaço da montagem (pergunta 14)
           const fit = fitRigid(L, W.map(toAssemblySpace(next)));
           before[next.id] = { pos: [...next.pos], rot: [...next.rot] };
-          patchPart(next.id, { pos: fit.t, rot: eulerOf(fit.R) });
+          patchPart(next.id, { pos: fit.t.map((v) => v * unit()) as V3, rot: eulerOf(fit.R) });
           void targetCentroid;
           visited.add(next.id);
         }

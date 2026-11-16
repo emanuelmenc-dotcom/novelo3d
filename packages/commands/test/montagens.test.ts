@@ -80,8 +80,9 @@ describe("posição e rotação", () => {
     for (let i = 0; i < 2; i++) {
       const b = before[i] as number[];
       const f = after[i] as number[];
-      expect(f[0]).toBeCloseTo((b[0] as number) + 10, 5);
-      expect(f[2]).toBeCloseTo((b[2] as number) + 5, 5);
+      // a posição é em mm e o 3D em larguras de ponto de 5 mm
+      expect(f[0]).toBeCloseTo((b[0] as number) + 10 / 5, 5);
+      expect(f[2]).toBeCloseTo((b[2] as number) + 5 / 5, 5);
     }
     expect((dispatch("parts.get") as { parts: { pos: number[] }[] }).parts[0]?.pos).toEqual([0, 0, 0]);
   });
@@ -100,7 +101,7 @@ describe("posição e rotação", () => {
     dispatch("assembly.set", { id: "a1", parent: "a2", pos: [1, 0, 0] });
     const before = (centroid("p1") as number[])[0] as number;
     dispatch("assembly.set", { id: "a2", pos: [4, 0, 0] });
-    expect((centroid("p1") as number[])[0]).toBeCloseTo(before + 4, 5);
+    expect((centroid("p1") as number[])[0]).toBeCloseTo(before + 4 / 5, 5); // mm → larguras de ponto
   });
 
   test("não deixa uma montagem ficar dentro dela mesma", () => {
@@ -175,4 +176,17 @@ test("montagens vão e voltam no arquivo do projeto", () => {
   expect(tree()[0]).toMatchObject({ id: "a1", name: "Grupo", pos: [3, 2, 1], children: [{ id: "p2" }] });
   dispatch("assembly.add", {});
   expect(tree().some((n) => n.id === "a2")).toBe(true); // o contador continua
+});
+
+test("projeto gravado antes das posições em mm abre convertido (pergunta 25 em docs/12)", () => {
+  dispatch("parts.set", { id: "p1", pos: [3, 0, 1] });
+  const file = JSON.parse(JSON.stringify(dispatch("project.export")));
+  expect(file.parts.unit).toBe("mm");
+  file.parts.unit = undefined; // como era antes: larguras de ponto
+  file.timeline = undefined;
+  dispatch("project.import", { project: file });
+  const p1 = (dispatch("parts.get") as { parts: { id: string; pos: number[] }[] }).parts.find(
+    (q) => q.id === "p1",
+  );
+  expect(p1?.pos).toEqual([15, 0, 5]); // 3 e 1 larguras de ponto de 5 mm
 });

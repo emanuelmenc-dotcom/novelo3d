@@ -16,7 +16,7 @@ import {
 export type PartKind = "own" | "instance" | "mirror";
 export type MirrorPlane = "x" | "y" | "z";
 
-import { SEAM_TYPES, type SeamType } from "./settings.ts";
+import { getSettings, SEAM_TYPES, type SeamType } from "./settings.ts";
 
 export { SEAM_TYPES, type SeamType };
 export const SEAM_TYPE_NAMES: Record<SeamType, string> = {
@@ -191,11 +191,14 @@ export function addPart(input: { name?: string; text?: string; dialect?: Dialect
     kind: "own",
     text: input.text ?? "",
     ...(input.dialect ? { dialect: input.dialect } : {}),
-    pos: [last.pos[0] + 14, last.pos[1], last.pos[2]],
+    pos: [last.pos[0] + gap(), last.pos[1], last.pos[2]],
     rot: [0, 0, 0],
   };
   return commit({ ...state, parts: [...state.parts, part] });
 }
+
+/** Distância (mm) entre uma peça nova e a anterior: 14 larguras de ponto. */
+const gap = () => 14 * getSettings().yarns.stitchWidthMm;
 
 /** Instância (acompanha a original) ou espelhada (instância espelhada no plano `mirror`). */
 export function addInstance(
@@ -214,7 +217,7 @@ export function addInstance(
     text: "",
     source: root.id,
     ...(kind === "mirror" ? { mirror } : {}),
-    pos: [last.pos[0] + 14, last.pos[1], last.pos[2]],
+    pos: [last.pos[0] + gap(), last.pos[1], last.pos[2]],
     rot: [0, 0, 0],
   };
   return commit({ ...state, parts: [...state.parts, part] });
@@ -234,7 +237,7 @@ export function copyPart(id: string): PartsState {
     kind: "own",
     text: root.text,
     ...(root.dialect ? { dialect: root.dialect } : {}),
-    pos: [src.pos[0] + 14, src.pos[1], src.pos[2]],
+    pos: [src.pos[0] + gap(), src.pos[1], src.pos[2]],
     rot: [...src.rot],
   };
   return commit({ ...state, parts: [...state.parts, copy] });
@@ -516,9 +519,12 @@ export interface PartsJson {
   seamNo: number;
   assemblies?: Assembly[];
   asmNo?: number;
+  /** Unidade das posições: "mm" desde 2026-11-15 (antes, larguras de ponto; convertidas ao carregar). */
+  unit?: "mm";
 }
 
 export const exportParts = (): PartsJson => ({
+  unit: "mm",
   parts: state.parts,
   seams: state.seams,
   active: state.active,
@@ -591,14 +597,25 @@ export function loadParts(raw: unknown, fallback: { text: string; dialect?: Dial
   const fixedAsm = assemblies.map((a) =>
     a.parent && !asmIds.has(a.parent) ? { ...a, parent: undefined } : a,
   );
-  const fixedParts = parts.map((p) =>
-    p.assembly && !asmIds.has(p.assembly) ? { ...p, assembly: undefined } : p,
-  );
+  // gravado antes das posições em mm (pergunta 25 em docs/12): eram larguras de ponto
+  const k = o.unit === "mm" ? 1 : getSettings().yarns.stitchWidthMm;
+  const mm = <T extends { pos: [number, number, number] }>(x: T): T =>
+    k === 1 ? x : { ...x, pos: x.pos.map((v) => v * k) as [number, number, number] };
+  const fixedParts = parts
+    .map((p) => (p.assembly && !asmIds.has(p.assembly) ? { ...p, assembly: undefined } : p))
+    .map(mm);
   asmNo = Math.max(
     typeof o.asmNo === "number" ? o.asmNo : 0,
     ...fixedAsm.map((a) => Number(a.id.slice(1)) || 0),
   );
-  state = { parts: fixedParts, assemblies: fixedAsm, seams, active, draft: {}, version: state.version };
+  state = {
+    parts: fixedParts,
+    assemblies: fixedAsm.map(mm),
+    seams,
+    active,
+    draft: {},
+    version: state.version,
+  };
   return reload();
 }
 

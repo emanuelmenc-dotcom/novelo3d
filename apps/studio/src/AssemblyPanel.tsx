@@ -336,7 +336,7 @@ export function AssemblyPanel(props: { sections: AssemblySection[] }) {
           <div className="row">
             {(["pos", "rot"] as const).map((k) => (
               <span key={k} className="row">
-                {k === "pos" ? "Posição" : "Rotação°"}
+                {k === "pos" ? "Posição (mm)" : "Rotação°"}
                 {[0, 1, 2].map((i) => (
                   <input
                     key={`${k}${i}`}
@@ -425,7 +425,7 @@ export function AssemblyPanel(props: { sections: AssemblySection[] }) {
           <div className="row">
             {(["pos", "rot"] as const).map((k) => (
               <span key={k} className="row">
-                {k === "pos" ? "Posição" : "Rotação°"}
+                {k === "pos" ? "Posição (mm)" : "Rotação°"}
                 {[0, 1, 2].map((i) => (
                   <input
                     key={`${k}${i}`}

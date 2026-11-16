@@ -25,7 +25,7 @@ test("instância, montagem, pintura, desfazer, esconder, corte, medida, leitura,
     ((await run(page, "measure.bounds", { target: "all" })) as { size: number[] }).size[0] as number;
   const base = await width(); // a instância já nasce ao lado da original
   await run(page, "assembly.add", { parts: ["p2"] });
-  await run(page, "assembly.set", { id: "a1", pos: [40, 0, 0] });
+  await run(page, "assembly.set", { id: "a1", pos: [200, 0, 0] }); // mm: 40 larguras de ponto
   await run(page, "paint.rows", { yarn: "B", from: 2, to: 2 });
   await expect.poll(() => count(page)).toBe(866);
 

@@ -459,5 +459,5 @@ test("pincel 'só na seleção' grava a seleção de quando foi feito: reexecuta
   replayTimeline();
   expect(edits()).toBe(live);
   const f = timelineView().features.find((x) => x.method === "tool.brush");
-  expect((f?.params.onlySelection as { kind: string }).kind).toBe("uidRanges");
+  expect(f?.params.onlySelection).toMatchObject({ kind: "uidRanges" });
 });
